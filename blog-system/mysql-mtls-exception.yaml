@@ -1,0 +1,11 @@
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: mysql-mtls-exception
+  namespace: blog-system
+spec:
+  selector:
+    matchLabels:
+      app: mysql
+  mtls:
+    mode: PERMISSIVE  # MySQL은 mTLS 선택사항 (평문도 허용)
