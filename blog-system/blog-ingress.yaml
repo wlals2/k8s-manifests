@@ -15,9 +15,9 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: web-service
+            name: was-service
             port:
-              number: 80
+              number: 8080
       - path: /board
         pathType: Prefix
         backend:
