@@ -1,0 +1,38 @@
+# ==============================================================================
+# WEB AuthorizationPolicy
+# ==============================================================================
+# 목적: web-service 접근 제어 (Zero Trust)
+#
+# 보안 원칙:
+# - istio-system namespace (Ingress Gateway)에서만 접근 허용
+# - 포트 80 (HTTP)만 허용
+# - 기타 모든 접근 차단
+#
+# 효과:
+# - Defense in Depth (다층 방어)
+# - 공격 표면 최소화
+# - 규제 준수 (Zero Trust 아키텍처)
+# ==============================================================================
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: web-authz
+  namespace: blog-system
+  labels:
+    app: web
+    tier: frontend
+spec:
+  selector:
+    matchLabels:
+      app: web
+
+  action: ALLOW
+
+  rules:
+  # Rule 1: Ingress Gateway에서의 접근 허용
+  - from:
+    - source:
+        namespaces: ["istio-system"]  # Ingress Gateway namespace
+    to:
+    - operation:
+        ports: ["80"]  # HTTP 포트만 허용
