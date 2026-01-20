@@ -1,0 +1,21 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: web-vsvc
+  namespace: blog-system
+spec:
+  hosts:
+  - web-service  # Service 이름
+
+  http:
+  - name: primary  # Rollout이 참조할 route 이름
+    route:
+    - destination:
+        host: web-service
+        subset: stable  # 안정 버전 (기본 100%)
+      weight: 100
+
+    - destination:
+        host: web-service
+        subset: canary  # 카나리 버전 (기본 0%)
+      weight: 0

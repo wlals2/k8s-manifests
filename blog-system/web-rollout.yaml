@@ -1,5 +1,5 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
 metadata:
   name: web
   namespace: blog-system
@@ -8,14 +8,46 @@ metadata:
     tier: frontend
 spec:
   replicas: 2
+  revisionHistoryLimit: 3
   selector:
     matchLabels:
       app: web
+
+  # Canary 배포 전략
   strategy:
-    rollingUpdate:
-      maxSurge: 25%
-      maxUnavailable: 25%
-    type: RollingUpdate
+    canary:
+      # Istio 트래픽 라우팅 설정
+      trafficRouting:
+        istio:
+          virtualService:
+            name: web-vsvc        # VirtualService 이름
+            routes:
+            - primary               # VirtualService의 route 이름
+          destinationRule:
+            name: web-dest-rule   # DestinationRule 이름
+            canarySubsetName: canary  # canary subset 이름
+            stableSubsetName: stable  # stable subset 이름
+
+      # Canary 배포 단계 (트래픽 가중치)
+      steps:
+      - setWeight: 10    # 1단계: Canary 10%, Stable 90%
+      - pause:
+          duration: 30s  # 30초 대기
+
+      - setWeight: 30    # 2단계: Canary 30%, Stable 70%
+      - pause:
+          duration: 30s
+
+      - setWeight: 50    # 3단계: Canary 50%, Stable 50%
+      - pause:
+          duration: 30s
+
+      - setWeight: 70    # 4단계: Canary 70%, Stable 30%
+      - pause:
+          duration: 30s
+
+      - setWeight: 100   # 5단계: Canary 100% (완료)
+
   template:
     metadata:
       labels:
