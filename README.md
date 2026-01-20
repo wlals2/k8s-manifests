@@ -6,16 +6,90 @@
 
 ```
 blog-system/
-├── web-deployment.yaml      # Hugo 블로그 (nginx)
-├── web-service.yaml
-├── was-deployment.yaml      # Spring Boot WAS
-├── was-service.yaml
-├── was-configmap.yaml
-├── mysql-deployment.yaml    # MySQL 8.0
-├── mysql-service.yaml
-├── mysql-pvc.yaml           # PersistentVolumeClaim (Longhorn)
-└── blog-ingress.yaml        # Ingress (blog.jiminhome.shop)
+# Frontend
+├── web-rollout.yaml             # Hugo 블로그 (nginx) - Argo Rollouts Canary
+├── web-nginx-config.yaml        # Nginx ConfigMap (/api → was-service 프록시)
+├── web-service.yaml             # ClusterIP Service
+├── web-virtualservice.yaml      # Istio VirtualService (stable/canary)
+├── web-destinationrule.yaml     # Istio DestinationRule (subsets)
+
+# Backend
+├── was-deployment.yaml          # Spring Boot WAS
+├── was-service.yaml             # ClusterIP Service
+├── was-configmap.yaml           # WAS 설정
+├── was-retry-timeout.yaml       # Istio Retry & Timeout 정책
+
+# Database
+├── mysql-deployment.yaml        # MySQL 8.0 (Istio mesh 제외)
+├── mysql-service.yaml           # ClusterIP Service
+├── mysql-pvc.yaml               # PersistentVolumeClaim (Longhorn)
+├── mysql-circuit-breaker.yaml   # Istio Circuit Breaker
+├── mysql-mtls-exception.yaml    # MySQL mTLS 예외 (PERMISSIVE)
+
+# Ingress & Security
+├── blog-ingress.yaml            # Nginx Ingress (blog.jiminhome.shop)
+├── mtls-peerauthentication.yaml # Istio mTLS 정책 (PERMISSIVE)
+└── mysql-exporter.yaml          # Prometheus MySQL Exporter
 ```
+
+## Architecture
+
+### Traffic Flow (Istio Service Mesh)
+
+```
+[외부 사용자]
+      ↓
+[Nginx Ingress] (192.168.1.61)
+      ↓ (모든 경로)
+[web-service] ClusterIP
+      ↓
+[web pod - nginx + istio-proxy]
+      ├─ / → 정적 파일 (Hugo)
+      └─ /api/ → was-service:8080 (Istio mesh 통과 🔒)
+              ↓ mTLS 암호화
+        [was-service] ClusterIP
+              ↓
+        [was pod - Spring Boot + istio-proxy]
+              ↓ 평문 TCP (MySQL은 mesh 제외)
+        [mysql-service] ClusterIP
+              ↓
+        [mysql pod - MySQL 8.0]
+```
+
+### Istio Service Mesh 기능
+
+| 기능 | 적용 대상 | 설정 파일 | 효과 |
+|------|----------|----------|------|
+| **mTLS** | web ↔ was | mtls-peerauthentication.yaml | 🔒 자동 암호화 |
+| **Circuit Breaking** | was → mysql | mysql-circuit-breaker.yaml | 과부하 방지 |
+| **Retry & Timeout** | web → was | was-retry-timeout.yaml | 장애 복구 |
+| **Canary Deployment** | web | web-rollout.yaml | 점진적 배포 |
+| **Observability** | 전체 | Kiali, Jaeger, Prometheus | 시각화 |
+
+### Argo Rollouts Canary Strategy
+
+**web-rollout.yaml**:
+```
+Canary Steps:
+1. 10% 트래픽 → 30초 대기
+2. 50% 트래픽 → 30초 대기
+3. 90% 트래픽 → 30초 대기
+4. 100% 트래픽 → 배포 완료
+
+Istio Integration:
+- VirtualService: 트래픽 가중치 자동 조정
+- DestinationRule: stable/canary subset 관리
+```
+
+### MySQL Istio 제외 이유
+
+**문제**: MySQL JDBC 드라이버는 Istio mTLS와 호환되지 않음
+- JDBC는 평문 TCP/IP 연결 사용
+- Istio sidecar가 mTLS 협상 시도 → 연결 실패
+
+**해결**:
+1. **mysql-deployment.yaml**: `sidecar.istio.io/inject: "false"` (sidecar 주입 제외)
+2. **mysql-mtls-exception.yaml**: `mode: PERMISSIVE` (평문 허용)
 
 ## ArgoCD Application
 
@@ -105,13 +179,13 @@ ArgoCD가 이 저장소를 감시하고 자동으로 Kubernetes에 동기화합�
 3. ArgoCD가 자동으로 감지 (3초 이내)
 4. Kubernetes 자동 동기화
 
-**예시:**
+**예시 1: Replicas 변경**
 ```bash
 # replicas 변경
-vi blog-system/web-deployment.yaml
+vi blog-system/web-rollout.yaml
 # replicas: 2 → 3
 
-git add blog-system/web-deployment.yaml
+git add blog-system/web-rollout.yaml
 git commit -m "scale: web replicas 2 → 3"
 git push
 
@@ -120,8 +194,92 @@ kubectl get pods -n blog-system
 # web-xxx-1, web-xxx-2, web-xxx-3 (3개로 증가)
 ```
 
+**예시 2: Canary 배포 (이미지 변경)**
+```bash
+# 이미지 태그 변경
+vi blog-system/web-rollout.yaml
+# image: ghcr.io/wlals2/blog-web:v11 → v12
+
+git add blog-system/web-rollout.yaml
+git commit -m "deploy: web v11 → v12"
+git push
+
+# Argo Rollouts Canary 배포 확인
+kubectl argo rollouts get rollout web -n blog-system
+# Step 1/7: Canary 10%, Stable 90%
+# Step 3/7: Canary 50%, Stable 50%
+# Step 5/7: Canary 90%, Stable 10%
+# Step 7/7: Canary 100% (배포 완료)
+
+# 수동 승인 (필요 시)
+kubectl argo rollouts promote web -n blog-system
+```
+
+## Observability
+
+### Kiali (Service Mesh 시각화)
+```bash
+# Kiali 접속
+http://kiali.jiminhome.shop
+
+# Graph 설정
+- Graph Type: Workload graph
+- Display 옵션:
+  ✅ Security (mTLS 🔒 아이콘)
+  ✅ Traffic Distribution (트래픽 비율 %)
+  ✅ Traffic Rate (RPS)
+  ✅ Traffic Animation (흐름 애니메이션)
+```
+
+### Jaeger (분산 추적)
+```bash
+# Jaeger 접속
+http://jaeger.jiminhome.shop
+
+# 트레이스 조회
+Service: web.blog-system
+Operation: /api/boards
+```
+
+## Troubleshooting
+
+### WAS CrashLoopBackOff (MySQL 연결 실패)
+**증상**: `Communications link failure`, `SocketTimeoutException`
+
+**원인**: Istio mTLS STRICT 모드가 MySQL JDBC와 충돌
+
+**해결**:
+```bash
+# MySQL을 Istio mesh에서 제외
+kubectl get deployment mysql -n blog-system -o yaml | grep "sidecar.istio.io/inject"
+# annotations:
+#   sidecar.istio.io/inject: "false"
+
+# MySQL mTLS PERMISSIVE 모드 확인
+kubectl get peerauthentication mysql-mtls-exception -n blog-system
+# mode: PERMISSIVE (평문 TCP 허용)
+```
+
+### Kiali에서 트래픽이 안 보임
+**원인**: 트래픽이 없거나, Display 옵션이 비활성화됨
+
+**해결**:
+```bash
+# 트래픽 생성
+for i in {1..50}; do
+  curl -s http://blog.jiminhome.shop/ > /dev/null
+  curl -sL http://blog.jiminhome.shop/api/boards/ > /dev/null
+  sleep 1
+done
+
+# Kiali Display 옵션 활성화 (UI)
+# ✅ Security, Traffic Distribution, Traffic Rate, Traffic Animation
+```
+
 ## Notes
 
 - **Image Tag 업데이트**: GitHub Actions가 자동으로 업데이트
 - **SelfHeal 활성화**: kubectl로 수정해도 Git 상태로 복구됨
 - **Prune 활성화**: Git에서 삭제된 리소스는 클러스터에서도 삭제됨
+- **Canary 배포**: Argo Rollouts가 자동으로 트래픽 가중치 조정
+- **Istio mTLS**: web ↔ was 자동 암호화 (MySQL 제외)
