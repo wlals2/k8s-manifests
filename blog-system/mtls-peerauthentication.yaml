@@ -4,17 +4,17 @@
 # 목적: Istio mesh 내부 트래픽 암호화 설정
 #
 # 정책:
-# - 기본: STRICT (모든 mesh 내부 트래픽 mTLS 강제)
-# - 예외: web-service:80만 PERMISSIVE (Nginx Ingress 호환)
+# - namespace 기본: PERMISSIVE (Nginx Ingress 호환성 유지)
+# - DestinationRule에서 ISTIO_MUTUAL 명시로 mTLS 강제
 #
 # 효과:
-# - web → was: mTLS 강제 (보안 강화)
-# - Ingress → web: plain text 허용 (호환성 유지)
+# - web → was: DestinationRule의 ISTIO_MUTUAL로 mTLS 강제
+# - Ingress → web: plain text 허용 (PERMISSIVE)
 # - was → mysql: plain text (mysql은 mesh 제외)
 #
 # 참고:
 # - Commit 0b8d573: STRICT → PERMISSIVE 변경 (502 에러 해결)
-# - 현재: portLevelMtls로 세밀한 제어 (보안 + 호환성)
+# - portLevelMtls는 selector 필요 → 대신 DestinationRule로 mTLS 강제
 # ==============================================================================
 apiVersion: security.istio.io/v1beta1
 kind: PeerAuthentication
@@ -23,9 +23,4 @@ metadata:
   namespace: blog-system
 spec:
   mtls:
-    mode: STRICT  # 기본은 STRICT (모든 mesh 내부 트래픽 mTLS 강제)
-
-  # 포트별 예외 설정
-  portLevelMtls:
-    80:
-      mode: PERMISSIVE  # web-service:80만 예외 (Nginx Ingress Controller 호환)
+    mode: PERMISSIVE  # mTLS와 plain text 둘 다 허용 (Ingress 접근 위해 필요)
