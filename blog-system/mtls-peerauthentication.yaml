@@ -5,4 +5,4 @@ metadata:
   namespace: blog-system
 spec:
   mtls:
-    mode: STRICT  # 모든 통신 mTLS 강제
+    mode: PERMISSIVE  # mTLS와 plain text 둘 다 허용 (Ingress 접근 위해 필요)
