@@ -1,0 +1,24 @@
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: mysql-circuit-breaker
+  namespace: blog-system
+spec:
+  host: mysql-service
+
+  trafficPolicy:
+    # Connection Pool 설정
+    connectionPool:
+      tcp:
+        maxConnections: 20        # 최대 동시 연결 20개
+      http:
+        http1MaxPendingRequests: 10
+        maxRequestsPerConnection: 5
+
+    # Outlier Detection (Circuit Breaking)
+    outlierDetection:
+      consecutive5xxErrors: 3     # 3회 연속 5xx 에러 시
+      interval: 30s               # 30초마다 체크
+      baseEjectionTime: 30s       # 30초간 차단
+      maxEjectionPercent: 50      # 최대 50% Pod만 차단
+      minHealthPercent: 30        # 최소 30% Pod는 유지

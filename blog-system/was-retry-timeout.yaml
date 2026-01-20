@@ -1,0 +1,24 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: was-retry-timeout
+  namespace: blog-system
+spec:
+  hosts:
+  - was-service
+
+  http:
+  - route:
+    - destination:
+        host: was-service
+        port:
+          number: 8080
+
+    # Timeout 설정
+    timeout: 5s  # 전체 요청 타임아웃 5초
+
+    # Retry 설정
+    retries:
+      attempts: 3             # 최대 3회 재시도
+      perTryTimeout: 2s       # 각 시도마다 2초 타임아웃
+      retryOn: 5xx,reset,connect-failure,refused-stream  # 재시도 조건
