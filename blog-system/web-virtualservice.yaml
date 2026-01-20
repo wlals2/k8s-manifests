@@ -1,13 +1,55 @@
+# ==============================================================================
+# WEB VirtualService
+# ==============================================================================
+# 목적: 고급 트래픽 라우팅 및 Resilience 정책
+#
+# 주요 기능:
+# - 헤더 기반 카나리 라우팅: 관리자만 canary 테스트 가능
+# - Retry 정책: 일시적 네트워크 오류 자동 복구
+# - Timeout: 무한 대기 방지
+# - Traffic Mirroring: 무위험 canary 테스트 (주석 처리)
+#
+# 사용법:
+# - 일반 사용자: stable 버전 자동 접근
+# - 관리자: curl -H "x-canary-test: true" https://blog.jiminhome.shop/
+# - Argo Rollouts가 primary route의 weight 자동 조정
+# ==============================================================================
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
   name: web-vsvc
   namespace: blog-system
+  labels:
+    app: web
+    tier: frontend
 spec:
   hosts:
   - web-service  # Service 이름
 
   http:
+  # Route 1: 관리자 트래픽 (헤더 기반 카나리 라우팅)
+  # 우선순위 높음 (먼저 매칭)
+  - name: canary-testing
+    match:
+    - headers:
+        x-canary-test:
+          exact: "true"  # curl -H "x-canary-test: true"
+    route:
+    - destination:
+        host: web-service
+        subset: canary  # 항상 canary 버전으로 라우팅
+      weight: 100
+
+    # Retry 정책 (canary 테스트용)
+    retries:
+      attempts: 2  # canary는 2회만 재시도 (빠른 실패)
+      perTryTimeout: 3s
+      retryOn: 5xx,reset,connect-failure
+
+    # Timeout
+    timeout: 15s  # canary 테스트는 여유있게
+
+  # Route 2: 일반 트래픽 (Argo Rollouts가 weight 조정)
   - name: primary  # Rollout이 참조할 route 이름
     route:
     - destination:
@@ -19,3 +61,28 @@ spec:
         host: web-service
         subset: canary  # 카나리 버전 (기본 0%)
       weight: 0
+
+    # Retry 정책 (프로덕션용)
+    retries:
+      attempts: 3  # 3회 재시도
+      perTryTimeout: 2s  # 재시도당 2초 timeout
+      retryOn: 5xx,reset,connect-failure,refused-stream  # 재시도 조건
+
+    # Timeout (nginx의 5s보다 여유있게)
+    timeout: 10s
+
+    # Traffic Mirroring (무위험 canary 테스트)
+    # 주석 해제 시: stable 트래픽의 100%를 canary에 복사 (응답 버림)
+    # mirror:
+    #   host: web-service
+    #   subset: canary
+    # mirrorPercentage:
+    #   value: 100.0  # stable 트래픽의 100%를 canary에 shadow
+
+    # Fault Injection (테스트용 - 주석 처리)
+    # 주석 해제 시: 10% 요청에 2초 지연 주입 (Resilience 테스트)
+    # fault:
+    #   delay:
+    #     percentage:
+    #       value: 10.0  # 10% 요청
+    #     fixedDelay: 2s  # 2초 지연
