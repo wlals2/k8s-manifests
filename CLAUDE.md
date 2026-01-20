@@ -158,7 +158,64 @@ kubectl argo rollouts abort web -n blog-system
 
 ---
 
-## 7. 파일 위치
+## 7. WAS 애플리케이션 (중요!)
+
+### ✅ WAS 소스 코드 위치 (확인 완료 - 2026-01-20)
+
+**실제 WAS 저장소**:
+```
+/home/jimin/blogsite/blog-k8s-project/was/
+```
+
+**프로젝트 정보**:
+- 배포된 이미지: `ghcr.io/wlals2/board-was:v1`
+- 프로젝트 타입: Maven + Spring Boot
+- 메인 패키지: `com.jimin.board`
+- Controller: `PostController.java`
+- 빌드: `mvn clean package` → `target/board-*.jar`
+
+### ❌ 사용하지 않는 디렉터리
+
+**`/home/jimin/CICD/` 디렉터리는 현재 사용하지 않음**
+
+이 디렉터리에 있는 내용들:
+- `/home/jimin/CICD/sourece-repo/was/` - PetClinic 소스 (현재 미사용)
+- `/home/jimin/CICD/docker/was/` - Tomcat + PetClinic Dockerfile (현재 미사용)
+- `/home/jimin/CICD/manifestrepo/` - 구 manifest (현재 미사용)
+
+**주의**:
+- ❌ CICD 디렉터리의 소스 코드를 참고하지 말 것
+- ❌ PetClinic이 아님 (board-was는 별도 애플리케이션)
+- ✅ 현재 프로젝트: `/home/jimin/k8s-manifests` (manifest), `/home/jimin/blogsite/blog-k8s-project/was` (WAS 소스)
+
+### WAS API 엔드포인트 (확인 완료)
+
+**실제 API 경로**: `/api/posts`
+
+**작동하는 엔드포인트**:
+- `GET /api/posts` - 모든 게시글 조회 ✅
+- `GET /api/posts/{id}` - 특정 게시글 조회 ✅
+- `POST /api/posts` - 게시글 작성 ✅
+- `PUT /api/posts/{id}` - 게시글 수정 ✅
+- `DELETE /api/posts/{id}` - 게시글 삭제 ✅
+- `GET /api/posts/search?keyword=XXX` - 게시글 검색 ✅
+- `GET /actuator/health` - Health check ✅
+- `GET /actuator/info` - 애플리케이션 정보 ✅
+
+**테스트 결과** (2026-01-20):
+```bash
+# 내부 테스트
+kubectl exec was-pod -- wget -O- http://localhost:8080/api/posts
+# [{"id":1,"title":"First Post",...}]
+
+# 외부 테스트
+curl https://blog.jiminhome.shop/api/posts
+# [{"id":1,"title":"First Post",...}]
+```
+
+---
+
+## 8. 파일 위치
 
 | 파일 | 경로 |
 |------|------|
@@ -172,7 +229,7 @@ kubectl argo rollouts abort web -n blog-system
 
 ---
 
-## 8. 다음 작업 시 확인 사항
+## 9. 다음 작업 시 확인 사항
 
 1. ✅ 변경 사항을 Git에 커밋했는가?
 2. ✅ ArgoCD Sync 상태를 확인했는가?

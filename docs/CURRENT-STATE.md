@@ -48,18 +48,43 @@
 ghcr.io/wlals2/board-was:v1
 ```
 
-### 소스 코드 위치
+### ⚠️ 소스 코드 위치 불명
+
+**`/home/jimin/CICD/` 디렉터리는 현재 사용하지 않음**
+
+- `/home/jimin/CICD/sourece-repo/was/` - PetClinic 소스 (실제 이미지와 무관)
+- `/home/jimin/CICD/docker/was/` - Tomcat Dockerfile (실제 이미지와 무관)
+- 실제 board-was 소스 코드: **위치 불명**
+
+### 실제 WAS 내부 상태 (조사 완료)
+
+**프로세스**:
 ```
-/home/jimin/CICD/sourece-repo/was/
+java -jar app.jar  # Spring Boot JAR
 ```
 
-**주의**: 소스 코드는 PetClinic 기반이지만, 실제 배포된 이미지는 `board-was`
+**파일 구조**:
+```
+/app/
+└── app.jar  # Spring Boot JAR (내용 불명)
+```
 
-### 알려진 엔드포인트
-- ❌ `/api/actuator/health` → 404
-- ❌ `/api/boards` → 404
-- ❓ `/actuator/health` → 미확인
-- ❓ `/boards` → 미확인
+### 테스트 완료한 엔드포인트 (2026-01-20)
+
+| 경로 | 내부 테스트 | 외부 테스트 | 상태 |
+|------|------------|------------|------|
+| `/actuator/health` | ✅ 200 OK | ✅ 200 OK | 작동 |
+| `/actuator/info` | ✅ 200 OK | - | 작동 |
+| `/actuator/mappings` | ❌ 404 | - | 비활성화 |
+| `/boards` | ❌ 404 | ❌ 404 | 없음 |
+| `/api/boards` | ❌ 404 | ❌ 404 | 없음 |
+| `/owners` | ❌ 404 | - | 없음 (PetClinic 아님) |
+| `/vets` | ❌ 404 | - | 없음 (PetClinic 아님) |
+| `/pets` | ❌ 404 | - | 없음 (PetClinic 아님) |
+| `/petclinic/` | ❌ 404 | - | 없음 (Tomcat 아님) |
+| `/` | ❌ 404 | - | 없음 |
+
+**결론**: WAS는 **Actuator만 활성화된 빈 Spring Boot 애플리케이션**일 가능성 높음
 
 ---
 
