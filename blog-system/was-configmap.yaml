@@ -1,0 +1,27 @@
+# ==============================================================================
+# WAS ConfigMap
+# ==============================================================================
+# 목적: WAS Pod에 주입할 환경변수 (민감하지 않은 정보)
+#
+# 포함 정보:
+# - SPRING_DATASOURCE_URL: MySQL 연결 URL
+# - SPRING_DATASOURCE_USERNAME: DB 사용자명
+#
+# 민감한 정보 (비밀번호)는 Secret으로 관리
+# ==============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: was-config
+  namespace: blog-system
+  labels:
+    app: was
+    tier: backend
+data:
+  # MySQL 연결 URL
+  # mysql-service: Kubernetes Service DNS (같은 Namespace)
+  # 전체 DNS: mysql-service.blog-system.svc.cluster.local
+  SPRING_DATASOURCE_URL: jdbc:mysql://mysql-service:3306/board?useSSL=false&allowPublicKeyRetrieval=true
+
+  # MySQL 사용자명 (민감하지 않음)
+  SPRING_DATASOURCE_USERNAME: root
