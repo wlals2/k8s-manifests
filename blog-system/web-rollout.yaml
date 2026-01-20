@@ -12,7 +12,6 @@ spec:
   selector:
     matchLabels:
       app: web
-
   # Canary 배포 전략
   strategy:
     canary:
@@ -20,30 +19,25 @@ spec:
       trafficRouting:
         istio:
           virtualService:
-            name: web-vsvc        # VirtualService 이름
+            name: web-vsvc # VirtualService 이름
             routes:
-            - primary               # VirtualService의 route 이름
+              - primary # VirtualService의 route 이름
           destinationRule:
-            name: web-dest-rule   # DestinationRule 이름
-            canarySubsetName: canary  # canary subset 이름
-            stableSubsetName: stable  # stable subset 이름
-
+            name: web-dest-rule # DestinationRule 이름
+            canarySubsetName: canary # canary subset 이름
+            stableSubsetName: stable # stable subset 이름
       # Canary 배포 단계 (트래픽 가중치)
       steps:
-      - setWeight: 10    # 1단계: Canary 10%, Stable 90%
-      - pause:
-          duration: 30s  # 30초 대기
-
-      - setWeight: 50    # 2단계: Canary 50%, Stable 50%
-      - pause:
-          duration: 30s
-
-      - setWeight: 90    # 3단계: Canary 90%, Stable 10%
-      - pause:
-          duration: 30s
-
-      - setWeight: 100   # 4단계: Canary 100% (완료)
-
+        - setWeight: 10 # 1단계: Canary 10%, Stable 90%
+        - pause:
+            duration: 30s # 30초 대기
+        - setWeight: 50 # 2단계: Canary 50%, Stable 50%
+        - pause:
+            duration: 30s
+        - setWeight: 90 # 3단계: Canary 90%, Stable 10%
+        - pause:
+            duration: 30s
+        - setWeight: 100 # 4단계: Canary 100% (완료)
   template:
     metadata:
       labels:
@@ -51,47 +45,47 @@ spec:
         tier: frontend
     spec:
       containers:
-      - name: nginx
-        image: ghcr.io/wlals2/blog-web:v11
-        imagePullPolicy: Always
-        ports:
-        - containerPort: 80
-          name: http
-        volumeMounts:
-        - name: nginx-config
-          mountPath: /etc/nginx/conf.d/default.conf
-          subPath: default.conf
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 200m
-            memory: 256Mi
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 80
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 80
-          initialDelaySeconds: 5
-          periodSeconds: 5
-          timeoutSeconds: 3
-          failureThreshold: 2
+        - name: nginx
+          image: ghcr.io/wlals2/blog-web:v14
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+              name: http
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
       volumes:
-      - name: nginx-config
-        configMap:
-          name: web-nginx-config
+        - name: nginx-config
+          configMap:
+            name: web-nginx-config
       topologySpreadConstraints:
-      - maxSkew: 1
-        topologyKey: kubernetes.io/hostname
-        whenUnsatisfiable: ScheduleAnyway
-        labelSelector:
-          matchLabels:
-            app: web
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: web
