@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: blog-system
+  namespace: argocd
+spec:
+  project: default
+
+  # Git 저장소 설정
+  source:
+    repoURL: https://github.com/wlals2/k8s-manifests.git
+    targetRevision: main
+    path: blog-system
+
+  # 배포 대상 Kubernetes 클러스터
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: blog-system
+
+  # 동기화 정책
+  syncPolicy:
+    automated:
+      # Git에서 삭제된 리소스를 클러스터에서도 삭제
+      prune: true
+      # kubectl로 수정된 리소스를 Git 상태로 되돌림
+      selfHeal: true
+
+    syncOptions:
+      # namespace가 없으면 자동 생성
+      - CreateNamespace=true

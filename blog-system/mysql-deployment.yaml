@@ -22,14 +22,21 @@ spec:
         - containerPort: 3306
           name: mysql
         env:
+        # Secret에서 비밀번호 가져오기
         - name: MYSQL_ROOT_PASSWORD
-          value: "rootpassword"
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secret
+              key: mysql-root-password
         - name: MYSQL_DATABASE
           value: "boarddb"
         - name: MYSQL_USER
           value: "board"
         - name: MYSQL_PASSWORD
-          value: "boardpassword"
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secret
+              key: mysql-password
         volumeMounts:
         - name: mysql-storage
           mountPath: /var/lib/mysql
