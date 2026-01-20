@@ -34,19 +34,15 @@ spec:
       - pause:
           duration: 30s  # 30초 대기
 
-      - setWeight: 30    # 2단계: Canary 30%, Stable 70%
+      - setWeight: 50    # 2단계: Canary 50%, Stable 50%
       - pause:
           duration: 30s
 
-      - setWeight: 50    # 3단계: Canary 50%, Stable 50%
+      - setWeight: 90    # 3단계: Canary 90%, Stable 10%
       - pause:
           duration: 30s
 
-      - setWeight: 70    # 4단계: Canary 70%, Stable 30%
-      - pause:
-          duration: 30s
-
-      - setWeight: 100   # 5단계: Canary 100% (완료)
+      - setWeight: 100   # 4단계: Canary 100% (완료)
 
   template:
     metadata:
