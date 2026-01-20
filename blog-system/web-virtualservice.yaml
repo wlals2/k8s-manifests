@@ -72,15 +72,16 @@ spec:
     timeout: 10s
 
     # Traffic Mirroring (무위험 canary 테스트)
-    # 주석 해제 시: stable 트래픽의 100%를 canary에 복사 (응답 버림)
-    # mirror:
-    #   host: web-service
-    #   subset: canary
-    # mirrorPercentage:
-    #   value: 100.0  # stable 트래픽의 100%를 canary에 shadow
+    # stable 트래픽의 100%를 canary에 복사 (응답 버림)
+    mirror:
+      host: web-service
+      subset: canary
+    mirrorPercentage:
+      value: 100.0  # stable 트래픽의 100%를 canary에 shadow
 
     # Fault Injection (테스트용 - 주석 처리)
     # 주석 해제 시: 10% 요청에 2초 지연 주입 (Resilience 테스트)
+    # 참고: web nginx가 was로 프록시하므로 클라이언트에게는 지연 전달 안 됨
     # fault:
     #   delay:
     #     percentage:
