@@ -114,3 +114,4 @@ spec:
       storage: 20Gi         # PVC 최대 20Gi
     min:
       storage: 1Gi          # PVC 최소 1Gi
+# Test MCP Auto-Context: Wed Jan 21 12:12:25 PM KST 2026
