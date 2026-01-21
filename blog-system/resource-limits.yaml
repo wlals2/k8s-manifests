@@ -71,7 +71,7 @@ spec:
   # ==============================================================================
   - type: Pod
     max:
-      cpu: "2"              # Pod 전체 CPU 최대 2 cores
+      cpu: "3"              # Pod 전체 CPU 최대 3 cores (Istio sidecar 포함: nginx 200m + istio-proxy 2000m)
       memory: 4Gi           # Pod 전체 메모리 최대 4Gi
     min:
       cpu: 10m              # Pod 전체 CPU 최소 10m
@@ -103,8 +103,8 @@ spec:
 
     # Limit/Request 비율 제한 (리소스 오버커밋 방지)
     maxLimitRequestRatio:
-      cpu: 10               # limit ≤ request * 10
-      memory: 8             # limit ≤ request * 8
+      cpu: 200              # limit ≤ request * 200 (Istio sidecar 기본 설정: 10m/2000m)
+      memory: 30            # limit ≤ request * 30 (Istio sidecar 기본 설정: 40Mi/1Gi)
 
   # ==============================================================================
   # PVC 단위 제한
