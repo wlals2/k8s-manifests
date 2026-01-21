@@ -34,7 +34,7 @@ spec:
   hard:
     # CPU 제한
     requests.cpu: "2"           # 전체 요청 CPU 2 cores까지
-    limits.cpu: "15"            # 전체 제한 CPU 15 cores까지 (istio-proxy sidecar 포함)
+    limits.cpu: "20"            # 전체 제한 CPU 20 cores까지 (istio-proxy sidecar 포함, 여유 확보)
 
     # Memory 제한
     requests.memory: 4Gi        # 전체 요청 메모리 4Gi까지
