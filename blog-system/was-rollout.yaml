@@ -34,7 +34,7 @@ spec:
     spec:
       containers:
         - name: spring-boot
-          image: ghcr.io/wlals2/board-was:v9
+          image: ghcr.io/wlals2/board-was:v10
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
