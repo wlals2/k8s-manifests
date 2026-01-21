@@ -43,6 +43,12 @@ spec:
       labels:
         app: web
         tier: frontend
+      annotations:
+        # Istio sidecar 리소스 최적화
+        sidecar.istio.io/proxyCPU: "10m"
+        sidecar.istio.io/proxyCPULimit: "200m"
+        sidecar.istio.io/proxyMemory: "40Mi"
+        sidecar.istio.io/proxyMemoryLimit: "128Mi"
     spec:
       containers:
         - name: nginx
