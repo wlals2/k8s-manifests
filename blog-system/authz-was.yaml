@@ -1,18 +1,21 @@
 # ==============================================================================
 # WAS AuthorizationPolicy
 # ==============================================================================
-# 목적: was-service 접근 제어 (Zero Trust)
+# 목적: was-service 접근 제어
 #
 # 보안 원칙:
-# - blog-system namespace의 web pod에서만 접근 허용
+# - blog-system namespace의 pod에서만 접근 허용
 # - 포트 8080만 허용
 # - /api/*, /actuator/* 경로만 허용
 # - 기타 모든 접근 차단 (외부 직접 접근 불가)
 #
+# 주의:
+# - mTLS DISABLE 모드이므로 principals 조건 사용 불가
+# - namespace 기반 접근 제어만 적용
+#
 # 효과:
 # - 외부 → was 직접 접근 차단
-# - web → was만 허용 (프록시 패턴 강제)
-# - 계층 간 우회 방지 (web → mysql 차단)
+# - blog-system namespace → was만 허용
 # ==============================================================================
 apiVersion: security.istio.io/v1beta1
 kind: AuthorizationPolicy
@@ -30,10 +33,9 @@ spec:
   action: ALLOW
 
   rules:
-  # Rule 1: blog-system namespace의 web pod에서만 접근 허용
+  # Rule 1: blog-system namespace에서만 접근 허용
   - from:
     - source:
-        principals: ["cluster.local/ns/blog-system/sa/default"]  # ServiceAccount
         namespaces: ["blog-system"]  # blog-system namespace만
     to:
     - operation:
