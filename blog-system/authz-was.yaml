@@ -33,11 +33,8 @@ spec:
   action: ALLOW
 
   rules:
-  # Rule 1: blog-system namespace에서만 접근 허용
-  - from:
-    - source:
-        namespaces: ["blog-system"]  # blog-system namespace만
-    to:
+  # Rule 1: 특정 port와 path로만 접근 허용 (from 조건 없음: mTLS DISABLE 모드)
+  - to:
     - operation:
         ports: ["8080"]  # WAS 포트만 허용
         paths: ["/api/*", "/actuator/*"]  # API 및 모니터링 경로만
