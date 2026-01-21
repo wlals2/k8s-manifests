@@ -40,7 +40,7 @@ spec:
     spec:
       containers:
         - name: spring-boot
-          image: ghcr.io/wlals2/board-was:v11
+          image: ghcr.io/wlals2/board-was:v13
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -78,7 +78,7 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 18  # 최대 30 + (10 * 18) = 210초 (3.5분)
+            failureThreshold: 18 # 최대 30 + (10 * 18) = 210초 (3.5분)
           # Liveness Probe (Startup 완료 후 실행)
           livenessProbe:
             httpGet:
