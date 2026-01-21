@@ -70,12 +70,20 @@ spec:
             limits:
               cpu: 500m
               memory: 1Gi
-          # Liveness Probe
+          # Startup Probe (초기 시작 시간 확보)
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 18  # 최대 30 + (10 * 18) = 210초 (3.5분)
+          # Liveness Probe (Startup 완료 후 실행)
           livenessProbe:
             httpGet:
               path: /actuator/health
               port: 8080
-            initialDelaySeconds: 60
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
@@ -84,7 +92,6 @@ spec:
             httpGet:
               path: /actuator/health
               port: 8080
-            initialDelaySeconds: 50
             periodSeconds: 5
             timeoutSeconds: 3
             failureThreshold: 2
