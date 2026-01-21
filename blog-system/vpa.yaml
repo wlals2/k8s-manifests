@@ -39,7 +39,7 @@ spec:
   # Recreate: 수동으로 재시작 필요
   # Off: 권장 값만 제공 (적용 안 함)
   updatePolicy:
-    updateMode: "Auto"
+    updateMode: "Off"
 
   # 리소스 정책
   resourcePolicy:
@@ -76,7 +76,7 @@ spec:
     name: web
 
   updatePolicy:
-    updateMode: "Auto"
+    updateMode: "Off"
 
   resourcePolicy:
     containerPolicies:
