@@ -22,12 +22,10 @@ metadata:
     app: was
     tier: backend
 spec:
-  replicas: 2  # 초기 replicas (HPA가 2-10으로 조정)
-
+  replicas: 2 # 초기 replicas (HPA가 2-10으로 조정)
   selector:
     matchLabels:
       app: was
-
   template:
     metadata:
       labels:
@@ -35,71 +33,63 @@ spec:
         tier: backend
     spec:
       containers:
-      - name: spring-boot
-        image: ghcr.io/wlals2/board-was:v1
-        imagePullPolicy: Always
-        ports:
-        - containerPort: 8080
-          name: http
-
-        # 환경변수 주입 (ConfigMap + Secret)
-        env:
-        - name: SPRING_DATASOURCE_URL
-          valueFrom:
-            configMapKeyRef:
-              name: was-config
-              key: SPRING_DATASOURCE_URL
-
-        - name: SPRING_DATASOURCE_USERNAME
-          valueFrom:
-            configMapKeyRef:
-              name: was-config
-              key: SPRING_DATASOURCE_USERNAME
-
-        - name: SPRING_DATASOURCE_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: mysql-secret
-              key: mysql-root-password
-
-        # 리소스 제한
-        resources:
-          requests:
-            cpu: 250m
-            memory: 512Mi
-          limits:
-            cpu: 500m
-            memory: 1Gi
-
-        # Liveness Probe
-        livenessProbe:
-          httpGet:
-            path: /actuator/health
-            port: 8080
-          initialDelaySeconds: 60
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
-
-        # Readiness Probe
-        readinessProbe:
-          httpGet:
-            path: /actuator/health
-            port: 8080
-          initialDelaySeconds: 50
-          periodSeconds: 5
-          timeoutSeconds: 3
-          failureThreshold: 2
-
+        - name: spring-boot
+          image: ghcr.io/wlals2/board-was:v9
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: http
+          # 환경변수 주입 (ConfigMap + Secret)
+          env:
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: was-config
+                  key: SPRING_DATASOURCE_URL
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: was-config
+                  key: SPRING_DATASOURCE_USERNAME
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: mysql-root-password
+          # 리소스 제한
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          # Liveness Probe
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # Readiness Probe
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 50
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
       # 멀티 노드 분산
       topologySpreadConstraints:
-      - maxSkew: 1
-        topologyKey: kubernetes.io/hostname
-        whenUnsatisfiable: ScheduleAnyway
-        labelSelector:
-          matchLabels:
-            app: was
-
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: was
   # ==============================================================================
   # Canary 배포 전략
   # ==============================================================================
@@ -107,31 +97,27 @@ spec:
     canary:
       # Canary 배포 단계 (API 안정성 고려)
       steps:
-      - setWeight: 20  # 1단계: 20% 트래픽 → Canary
-      - pause: {duration: 1m}  # 1분 대기 (API 응답 확인)
-
-      - setWeight: 50  # 2단계: 50% 트래픽 → Canary
-      - pause: {duration: 1m}  # 1분 대기
-
-      - setWeight: 80  # 3단계: 80% 트래픽 → Canary
-      - pause: {duration: 1m}  # 1분 대기
-
+        - setWeight: 20 # 1단계: 20% 트래픽 → Canary
+        - pause: {duration: 1m} # 1분 대기 (API 응답 확인)
+        - setWeight: 50 # 2단계: 50% 트래픽 → Canary
+        - pause: {duration: 1m} # 1분 대기
+        - setWeight: 80 # 3단계: 80% 트래픽 → Canary
+        - pause: {duration: 1m} # 1분 대기
       # 4단계: 100% → Stable 전환 (자동)
 
       # Istio Traffic Splitting
       trafficRouting:
         istio:
           virtualService:
-            name: was-retry-timeout  # WAS VirtualService
+            name: was-retry-timeout # WAS VirtualService
             routes:
-            - primary  # VirtualService의 primary route name
+              - primary # VirtualService의 primary route name
           destinationRule:
-            name: was-dest-rule  # WAS용 DestinationRule
+            name: was-dest-rule # WAS용 DestinationRule
             canarySubsetName: canary
             stableSubsetName: stable
-
-      # 자동 롤백 (추후 AnalysisTemplate 추가 시 사용)
-      # analysis:
-      #   templates:
-      #   - templateName: was-error-rate
-      #   startingStep: 2  # 2단계(50%)부터 분석 시작
+# 자동 롤백 (추후 AnalysisTemplate 추가 시 사용)
+# analysis:
+#   templates:
+#   - templateName: was-error-rate
+#   startingStep: 2  # 2단계(50%)부터 분석 시작
