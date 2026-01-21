@@ -1,0 +1,30 @@
+# ==============================================================================
+# Istio Telemetry - Metrics 활성화
+# ==============================================================================
+# 목적: istio-proxy에서 Prometheus 메트릭 생성 활성화
+#
+# 배경:
+# - Istio 1.28에서 Telemetry API 사용 시 기본 메트릭이 비활성화될 수 있음
+# - 명시적으로 metrics provider를 설정해야 메트릭 생성됨
+#
+# 생성되는 메트릭:
+# - istio_requests_total: 요청 수 (status_code, source, destination 등)
+# - istio_request_duration_milliseconds: 요청 레이턴시
+# - istio_request_bytes: 요청 크기
+# - istio_response_bytes: 응답 크기
+# ==============================================================================
+
+---
+# ==============================================================================
+# Global Metrics (모든 namespace에 적용)
+# ==============================================================================
+apiVersion: telemetry.istio.io/v1
+kind: Telemetry
+metadata:
+  name: metrics-default
+  namespace: istio-system
+spec:
+  # Prometheus 메트릭 활성화
+  metrics:
+  - providers:
+    - name: prometheus

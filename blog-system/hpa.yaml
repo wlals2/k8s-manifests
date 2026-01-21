@@ -3,14 +3,18 @@
 # ==============================================================================
 # 목적: 트래픽 증가 시 자동 Pod 증설
 #
-# 작동 원리:
-# - CPU 사용률 70% 초과 시 Pod 증설
-# - 최소 2개, 최대 10개 (WAS) / 5개 (WEB)
-# - Argo Rollout과 연동
+# 멀티 메트릭 스케일링 (OR 조건):
+# - CPU 사용률: 70% (WAS) / 60% (WEB)
+# - Network Receive Rate: 100 KB/s (WAS) / 300 KB/s (WEB)
+# → 둘 중 하나라도 임계값 초과 시 스케일 아웃
+#
+# 최소/최대 Replicas:
+# - WAS: 2-10개
+# - WEB: 2-5개
 #
 # VPA 통합:
 # - VPA updateMode: Auto → requests 자동 조정
-# - HPA는 CPU % 기반 → VPA가 requests 변경해도 영향 없음
+# - HPA는 CPU % + Pods 메트릭 → VPA와 충돌 없음
 # ==============================================================================
 
 ---
@@ -35,13 +39,22 @@ spec:
   maxReplicas: 10
 
   metrics:
-  # CPU 사용률 기준
+  # Metric 1: CPU 사용률
   - type: Resource
     resource:
       name: cpu
       target:
         type: Utilization
         averageUtilization: 70  # 70% 초과 시 스케일 아웃
+
+  # Metric 2: Network Receive Rate (Custom Metric)
+  - type: Pods
+    pods:
+      metric:
+        name: container_network_receive_bytes_per_second
+      target:
+        type: AverageValue
+        averageValue: 100k  # 100 KB/s 초과 시 스케일 아웃
 
   behavior:
     scaleDown:
@@ -79,13 +92,22 @@ spec:
   maxReplicas: 5
 
   metrics:
-  # CPU 사용률 기준
+  # Metric 1: CPU 사용률
   - type: Resource
     resource:
       name: cpu
       target:
         type: Utilization
         averageUtilization: 60  # 60% 초과 시 스케일 아웃
+
+  # Metric 2: Network Receive Rate (Custom Metric)
+  - type: Pods
+    pods:
+      metric:
+        name: container_network_receive_bytes_per_second
+      target:
+        type: AverageValue
+        averageValue: 300k  # 300 KB/s 초과 시 스케일 아웃
 
   behavior:
     scaleDown:
