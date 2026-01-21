@@ -27,7 +27,7 @@ spec:
   trafficPolicy:
     # mTLS 설정
     tls:
-      mode: ISTIO_MUTUAL  # mTLS 강제 (Istio가 인증서 자동 관리)
+      mode: DISABLE  # Plain HTTP 허용 (nginx → WAS는 같은 클러스터 내부 통신)
 
     # Connection Pool 설정
     connectionPool:
