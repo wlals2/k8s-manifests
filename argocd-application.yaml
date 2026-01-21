@@ -28,3 +28,21 @@ spec:
     syncOptions:
       # namespace가 없으면 자동 생성
       - CreateNamespace=true
+
+  # ArgoCD가 무시할 필드 (Argo Rollouts 동적 수정 허용)
+  ignoreDifferences:
+  # WEB DestinationRule - Rollouts가 subset labels 동적 수정
+  - group: networking.istio.io
+    kind: DestinationRule
+    name: web-dest-rule
+    jsonPointers:
+    - /spec/subsets/0/labels
+    - /spec/subsets/1/labels
+
+  # WAS DestinationRule - Rollouts가 subset labels 동적 수정
+  - group: networking.istio.io
+    kind: DestinationRule
+    name: was-dest-rule
+    jsonPointers:
+    - /spec/subsets/0/labels
+    - /spec/subsets/1/labels

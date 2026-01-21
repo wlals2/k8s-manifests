@@ -1,18 +1,46 @@
+# ==============================================================================
+# WAS VirtualService
+# ==============================================================================
+# 목적: WAS 트래픽 라우팅 및 Resilience 정책
+#
+# 주요 기능:
+# - Argo Rollouts Canary 배포 지원
+# - Retry 정책: 일시적 네트워크 오류 자동 복구
+# - Timeout: 무한 대기 방지
+#
+# 트래픽 흐름:
+# - web-service (nginx) → was-service (Spring Boot)
+# - Argo Rollouts가 primary route의 weight 자동 조정
+# ==============================================================================
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
   name: was-retry-timeout
   namespace: blog-system
+  labels:
+    app: was
+    tier: backend
 spec:
   hosts:
   - was-service
 
   http:
-  - route:
+  # Route: Argo Rollouts가 weight 조정
+  - name: primary  # Rollout이 참조할 route 이름
+    route:
     - destination:
         host: was-service
+        subset: stable  # 안정 버전 (기본 100%)
         port:
           number: 8080
+      weight: 100
+
+    - destination:
+        host: was-service
+        subset: canary  # 카나리 버전 (기본 0%)
+        port:
+          number: 8080
+      weight: 0
 
     # Timeout 설정
     timeout: 5s  # 전체 요청 타임아웃 5초

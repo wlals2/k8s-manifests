@@ -39,3 +39,14 @@ spec:
     # Load Balancing
     loadBalancer:
       simple: ROUND_ROBIN  # 라운드 로빈 방식
+
+  # Argo Rollouts용 subset
+  subsets:
+  - name: stable  # 안정 버전
+    labels:
+      # Argo Rollouts가 자동으로 rollouts-pod-template-hash 레이블 추가
+      # stable Pod에는 stable hash 레이블이 붙음
+
+  - name: canary  # 카나리 버전
+    labels:
+      # canary Pod에는 canary hash 레이블이 붙음
