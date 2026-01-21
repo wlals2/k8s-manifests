@@ -1,0 +1,330 @@
+# ==============================================================================
+# Cilium Network Policies for blog-system
+# ==============================================================================
+# 목적: L3/L4 네트워크 격리 (Zero Trust)
+#
+# 계층적 보안:
+# - Cilium NetworkPolicy (L3/L4): IP/포트 기반 차단 ← 이 파일
+# - Istio AuthorizationPolicy (L7): HTTP 경로/메서드 기반 차단
+#
+# 보안 효과:
+# - Lateral movement 차단 (컨테이너 탈취 시 확산 방지)
+# - 최소 권한 원칙 (필요한 트래픽만 허용)
+# - 감사 로그 (Hubble로 모든 연결 추적)
+#
+# 참고:
+# - Istio mesh 내부: Istio AuthZ + Cilium NetworkPolicy
+# - Istio mesh 외부 (mysql): Cilium NetworkPolicy만
+# ==============================================================================
+
+---
+# ==============================================================================
+# MySQL 보호
+# ==============================================================================
+# 허용: was → mysql:3306
+# 차단: 기타 모든 접근 (monitoring, 외부 pod 등)
+# ==============================================================================
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: mysql-isolation
+  namespace: blog-system
+  labels:
+    app: mysql
+    tier: database
+spec:
+  description: "MySQL access restricted to WAS pods only"
+
+  endpointSelector:
+    matchLabels:
+      app: mysql  # mysql Pod에만 적용
+
+  # Ingress (들어오는 트래픽)
+  ingress:
+  # Rule 1: was → mysql:3306 허용
+  - fromEndpoints:
+    - matchLabels:
+        app: was  # was Pod에서만
+        io.kubernetes.pod.namespace: blog-system
+    toPorts:
+    - ports:
+      - port: "3306"
+        protocol: TCP
+
+  # Rule 2: 같은 Pod 내부 통신 허용 (헬스체크 등)
+  - fromEndpoints:
+    - matchLabels:
+        app: mysql
+    toPorts:
+    - ports:
+      - port: "3306"
+        protocol: TCP
+
+  # Egress (나가는 트래픽) - DNS만 허용
+  egress:
+  # Rule 1: DNS 쿼리 허용
+  - toEndpoints:
+    - matchLabels:
+        io.kubernetes.pod.namespace: kube-system
+        k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: UDP
+      rules:
+        dns:
+        - matchPattern: "*"
+
+---
+# ==============================================================================
+# WAS 보호
+# ==============================================================================
+# 허용: web → was:8080
+# 차단: 기타 모든 접근 (monitoring, 외부 pod 등)
+#
+# 참고: Istio AuthZ에서도 같은 정책 적용 (심층 방어)
+# ==============================================================================
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: was-isolation
+  namespace: blog-system
+  labels:
+    app: was
+    tier: backend
+spec:
+  description: "WAS access restricted to WEB pods only"
+
+  endpointSelector:
+    matchLabels:
+      app: was  # was Pod에만 적용
+
+  # Ingress
+  ingress:
+  # Rule 1: web → was:8080 허용
+  - fromEndpoints:
+    - matchLabels:
+        app: web  # web Pod에서만
+        io.kubernetes.pod.namespace: blog-system
+    toPorts:
+    - ports:
+      - port: "8080"
+        protocol: TCP
+      rules:
+        http:
+        - method: "GET"
+          path: "/api/.*"
+        - method: "POST"
+          path: "/api/.*"
+        - method: "PUT"
+          path: "/api/.*"
+        - method: "DELETE"
+          path: "/api/.*"
+        - method: "GET"
+          path: "/actuator/.*"
+
+  # Rule 2: 같은 Pod 내부 통신 허용
+  - fromEndpoints:
+    - matchLabels:
+        app: was
+    toPorts:
+    - ports:
+      - port: "8080"
+        protocol: TCP
+
+  # Rule 3: Istio sidecar 통신 허용
+  - fromEndpoints:
+    - {}  # 모든 endpoint (istio-proxy sidecar)
+    toPorts:
+    - ports:
+      - port: "15090"  # Istio Envoy admin
+        protocol: TCP
+      - port: "15021"  # Istio health check
+        protocol: TCP
+
+  # Egress
+  egress:
+  # Rule 1: was → mysql:3306 허용
+  - toEndpoints:
+    - matchLabels:
+        app: mysql
+        io.kubernetes.pod.namespace: blog-system
+    toPorts:
+    - ports:
+      - port: "3306"
+        protocol: TCP
+
+  # Rule 2: DNS 허용
+  - toEndpoints:
+    - matchLabels:
+        io.kubernetes.pod.namespace: kube-system
+        k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: UDP
+      rules:
+        dns:
+        - matchPattern: "*"
+
+  # Rule 3: Istio control plane 통신 허용
+  - toEndpoints:
+    - matchLabels:
+        io.kubernetes.pod.namespace: istio-system
+    toPorts:
+    - ports:
+      - port: "15012"  # Istio xDS
+        protocol: TCP
+
+---
+# ==============================================================================
+# WEB 보호
+# ==============================================================================
+# 허용: 외부(Ingress) + 내부 모두 → web:80
+# 차단: 없음 (WEB은 외부 접근 허용하는 계층)
+#
+# 참고: WEB은 Ingress 역할이므로 제한 완화
+# ==============================================================================
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: web-isolation
+  namespace: blog-system
+  labels:
+    app: web
+    tier: frontend
+spec:
+  description: "WEB accepts all traffic on port 80 (acts as Ingress)"
+
+  endpointSelector:
+    matchLabels:
+      app: web  # web Pod에만 적용
+
+  # Ingress - 포트 80은 모두 허용
+  ingress:
+  # Rule 1: 모든 소스 → web:80 허용
+  - fromEntities:
+    - all  # 모든 소스 (외부 Ingress 포함)
+    toPorts:
+    - ports:
+      - port: "80"
+        protocol: TCP
+      rules:
+        http:
+        - {}  # 모든 HTTP 요청 허용
+
+  # Rule 2: Istio sidecar 통신 허용
+  - fromEndpoints:
+    - {}
+    toPorts:
+    - ports:
+      - port: "15090"  # Istio Envoy admin
+        protocol: TCP
+      - port: "15021"  # Istio health check
+        protocol: TCP
+
+  # Egress
+  egress:
+  # Rule 1: web → was:8080 허용
+  - toEndpoints:
+    - matchLabels:
+        app: was
+        io.kubernetes.pod.namespace: blog-system
+    toPorts:
+    - ports:
+      - port: "8080"
+        protocol: TCP
+
+  # Rule 2: DNS 허용
+  - toEndpoints:
+    - matchLabels:
+        io.kubernetes.pod.namespace: kube-system
+        k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: UDP
+      rules:
+        dns:
+        - matchPattern: "*"
+
+  # Rule 3: Istio control plane 통신 허용
+  - toEndpoints:
+    - matchLabels:
+        io.kubernetes.pod.namespace: istio-system
+    toPorts:
+    - ports:
+      - port: "15012"  # Istio xDS
+        protocol: TCP
+
+---
+# ==============================================================================
+# MySQL Exporter 보호
+# ==============================================================================
+# 허용: monitoring/prometheus → mysql-exporter:9104
+# 차단: 기타 모든 접근
+# ==============================================================================
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: mysql-exporter-isolation
+  namespace: blog-system
+  labels:
+    app: mysql-exporter
+    tier: monitoring
+spec:
+  description: "MySQL Exporter restricted to Prometheus scraping"
+
+  endpointSelector:
+    matchLabels:
+      app: mysql-exporter  # mysql-exporter Pod에만 적용
+
+  # Ingress
+  ingress:
+  # Rule 1: monitoring/prometheus → mysql-exporter:9104 허용
+  - fromEndpoints:
+    - matchLabels:
+        app: prometheus
+        io.kubernetes.pod.namespace: monitoring
+    toPorts:
+    - ports:
+      - port: "9104"
+        protocol: TCP
+      rules:
+        http:
+        - method: "GET"
+          path: "/metrics"
+
+  # Rule 2: 같은 Pod 내부 통신 허용 (헬스체크)
+  - fromEndpoints:
+    - matchLabels:
+        app: mysql-exporter
+    toPorts:
+    - ports:
+      - port: "9104"
+        protocol: TCP
+
+  # Egress
+  egress:
+  # Rule 1: mysql-exporter → mysql:3306 허용
+  - toEndpoints:
+    - matchLabels:
+        app: mysql
+        io.kubernetes.pod.namespace: blog-system
+    toPorts:
+    - ports:
+      - port: "3306"
+        protocol: TCP
+
+  # Rule 2: DNS 허용
+  - toEndpoints:
+    - matchLabels:
+        io.kubernetes.pod.namespace: kube-system
+        k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: UDP
+      rules:
+        dns:
+        - matchPattern: "*"

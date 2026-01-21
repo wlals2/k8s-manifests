@@ -1,0 +1,116 @@
+# ==============================================================================
+# ResourceQuota & LimitRange for blog-system
+# ==============================================================================
+# 목적: 리소스 사용량 제한 및 기본값 설정
+#
+# 보안 효과:
+# - Noisy Neighbor 방지 (한 Pod이 전체 리소스 독점 방지)
+# - Cryptocurrency Mining 공격 차단 (CPU 무제한 사용 방지)
+# - OOM Killer 방지 (메모리 제한으로 노드 안정성 보장)
+#
+# 현재 사용량 (blog-system):
+# - Requests: CPU 1000m, Memory 1856Mi
+# - Limits: CPU 2600m, Memory 4Gi
+#
+# Quota 설정 (여유 100-150%):
+# - Requests: CPU 2cores, Memory 4Gi
+# - Limits: CPU 6cores, Memory 10Gi
+# ==============================================================================
+
+---
+# ==============================================================================
+# ResourceQuota
+# ==============================================================================
+# namespace 전체 리소스 상한선
+# ==============================================================================
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: blog-system-quota
+  namespace: blog-system
+  labels:
+    tier: infrastructure
+spec:
+  hard:
+    # CPU 제한
+    requests.cpu: "2"           # 전체 요청 CPU 2 cores까지
+    limits.cpu: "15"            # 전체 제한 CPU 15 cores까지 (istio-proxy sidecar 포함)
+
+    # Memory 제한
+    requests.memory: 4Gi        # 전체 요청 메모리 4Gi까지
+    limits.memory: 15Gi         # 전체 제한 메모리 15Gi까지 (istio-proxy sidecar 포함)
+
+    # Pod 수 제한
+    pods: "30"                  # 최대 Pod 30개 (현재 6개)
+
+    # Storage 제한
+    persistentvolumeclaims: "10"  # PVC 10개까지 (현재 1개)
+    requests.storage: 50Gi        # 전체 스토리지 50Gi까지
+
+    # Service 제한
+    services: "10"                # Service 10개까지 (현재 4개)
+    services.loadbalancers: "0"   # LoadBalancer 금지 (Ingress 사용)
+
+---
+# ==============================================================================
+# LimitRange
+# ==============================================================================
+# Pod/Container 기본값 및 최소/최대값 설정
+# ==============================================================================
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: blog-system-limits
+  namespace: blog-system
+  labels:
+    tier: infrastructure
+spec:
+  limits:
+  # ==============================================================================
+  # Pod 단위 제한
+  # ==============================================================================
+  - type: Pod
+    max:
+      cpu: "2"              # Pod 전체 CPU 최대 2 cores
+      memory: 4Gi           # Pod 전체 메모리 최대 4Gi
+    min:
+      cpu: 10m              # Pod 전체 CPU 최소 10m
+      memory: 16Mi          # Pod 전체 메모리 최소 16Mi
+
+  # ==============================================================================
+  # Container 단위 제한 (requests/limits 없는 Container에 자동 적용)
+  # ==============================================================================
+  - type: Container
+    # 기본 limits (Container에 limits가 없으면 자동 적용)
+    default:
+      cpu: 500m             # CPU limit 기본값 500m
+      memory: 512Mi         # Memory limit 기본값 512Mi
+
+    # 기본 requests (Container에 requests가 없으면 자동 적용)
+    defaultRequest:
+      cpu: 100m             # CPU request 기본값 100m
+      memory: 128Mi         # Memory request 기본값 128Mi
+
+    # 최대값 (이 값을 초과하는 Container 생성 불가)
+    max:
+      cpu: "2"              # Container CPU 최대 2 cores
+      memory: 4Gi           # Container Memory 최대 4Gi
+
+    # 최소값 (이 값 미만의 Container 생성 불가)
+    min:
+      cpu: 10m              # Container CPU 최소 10m
+      memory: 16Mi          # Container Memory 최소 16Mi
+
+    # Limit/Request 비율 제한 (리소스 오버커밋 방지)
+    maxLimitRequestRatio:
+      cpu: 10               # limit ≤ request * 10
+      memory: 8             # limit ≤ request * 8
+
+  # ==============================================================================
+  # PVC 단위 제한
+  # ==============================================================================
+  - type: PersistentVolumeClaim
+    max:
+      storage: 20Gi         # PVC 최대 20Gi
+    min:
+      storage: 1Gi          # PVC 최소 1Gi
