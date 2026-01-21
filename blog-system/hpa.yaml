@@ -1,0 +1,102 @@
+# ==============================================================================
+# HorizontalPodAutoscaler for blog-system
+# ==============================================================================
+# 목적: 트래픽 증가 시 자동 Pod 증설
+#
+# 작동 원리:
+# - CPU 사용률 70% 초과 시 Pod 증설
+# - 최소 2개, 최대 10개 (WAS) / 5개 (WEB)
+# - Argo Rollout과 연동
+#
+# VPA 통합:
+# - VPA updateMode: Auto → requests 자동 조정
+# - HPA는 CPU % 기반 → VPA가 requests 변경해도 영향 없음
+# ==============================================================================
+
+---
+# ==============================================================================
+# WAS HPA
+# ==============================================================================
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: was-hpa
+  namespace: blog-system
+  labels:
+    app: was
+    tier: backend
+spec:
+  scaleTargetRef:
+    apiVersion: argoproj.io/v1alpha1  # Argo Rollout
+    kind: Rollout
+    name: was
+
+  minReplicas: 2
+  maxReplicas: 10
+
+  metrics:
+  # CPU 사용률 기준
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70  # 70% 초과 시 스케일 아웃
+
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300  # 5분 대기 후 스케일 인
+      policies:
+      - type: Percent
+        value: 50  # 한 번에 최대 50%까지 줄임
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60  # 1분 대기 후 스케일 아웃
+      policies:
+      - type: Percent
+        value: 100  # 한 번에 최대 100%까지 늘림 (2배)
+        periodSeconds: 60
+
+---
+# ==============================================================================
+# WEB HPA
+# ==============================================================================
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: web-hpa
+  namespace: blog-system
+  labels:
+    app: web
+    tier: frontend
+spec:
+  scaleTargetRef:
+    apiVersion: argoproj.io/v1alpha1  # Argo Rollout
+    kind: Rollout
+    name: web
+
+  minReplicas: 2
+  maxReplicas: 5
+
+  metrics:
+  # CPU 사용률 기준
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 60  # 60% 초과 시 스케일 아웃
+
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300  # 5분 대기 후 스케일 인
+      policies:
+      - type: Percent
+        value: 50  # 한 번에 최대 50%까지 줄임
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60  # 1분 대기 후 스케일 아웃
+      policies:
+      - type: Percent
+        value: 100  # 한 번에 최대 100%까지 늘림 (2배)
+        periodSeconds: 60

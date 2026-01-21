@@ -1,0 +1,92 @@
+# ==============================================================================
+# VerticalPodAutoscaler for blog-system
+# ==============================================================================
+# 목적: Pod 리소스 자동 최적화 (CPU/Memory requests 자동 조정)
+#
+# 작동 원리:
+# - updateMode: Auto → Pod 재시작하면서 requests 자동 조정
+# - recommender가 과거 사용량 분석 → 적정 requests 계산
+# - updater가 Pod evict → 새 requests로 재시작
+#
+# HPA 통합:
+# - HPA는 CPU % 기반 스케일링
+# - VPA는 requests만 조정 → 충돌 없음
+#
+# 주의:
+# - Auto mode는 Pod을 재시작함 (downtime 발생 가능)
+# - 최소 2개 replica 필요 (1개는 항상 Running 유지)
+# ==============================================================================
+
+---
+# ==============================================================================
+# WAS VPA
+# ==============================================================================
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: was-vpa
+  namespace: blog-system
+  labels:
+    app: was
+    tier: backend
+spec:
+  targetRef:
+    apiVersion: argoproj.io/v1alpha1  # Argo Rollout
+    kind: Rollout
+    name: was
+
+  # Auto: 자동으로 requests 조정 + Pod 재시작
+  # Recreate: 수동으로 재시작 필요
+  # Off: 권장 값만 제공 (적용 안 함)
+  updatePolicy:
+    updateMode: "Auto"
+
+  # 리소스 정책
+  resourcePolicy:
+    containerPolicies:
+    - containerName: spring-boot
+      # 최소/최대 제한
+      minAllowed:
+        cpu: 100m
+        memory: 256Mi
+      maxAllowed:
+        cpu: 1000m
+        memory: 2Gi
+      # 조정할 리소스
+      controlledResources:
+      - cpu
+      - memory
+
+---
+# ==============================================================================
+# WEB VPA
+# ==============================================================================
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: web-vpa
+  namespace: blog-system
+  labels:
+    app: web
+    tier: frontend
+spec:
+  targetRef:
+    apiVersion: argoproj.io/v1alpha1  # Argo Rollout
+    kind: Rollout
+    name: web
+
+  updatePolicy:
+    updateMode: "Auto"
+
+  resourcePolicy:
+    containerPolicies:
+    - containerName: nginx
+      minAllowed:
+        cpu: 50m
+        memory: 64Mi
+      maxAllowed:
+        cpu: 500m
+        memory: 512Mi
+      controlledResources:
+      - cpu
+      - memory

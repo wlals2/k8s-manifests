@@ -1,0 +1,77 @@
+# ==============================================================================
+# PodDisruptionBudget for blog-system
+# ==============================================================================
+# 목적: 배포/유지보수 중 최소 가용성 보장
+#
+# 보안 효과:
+# - Node drain 중에도 서비스 지속 (무중단 배포)
+# - Cluster autoscaling 안전성 향상
+# - Rolling update 중 최소 Pod 수 보장
+#
+# 작동 방식:
+# - minAvailable: 최소 N개는 항상 Running 유지
+# - Eviction API가 PDB를 확인하여 안전하게 Pod 종료
+#
+# HPA 통합:
+# - HPA min replicas: 2
+# - PDB minAvailable: 1
+# - 항상 1개 이상 Running 보장 (HPA가 2개로 복구)
+# ==============================================================================
+
+---
+# ==============================================================================
+# WAS PodDisruptionBudget
+# ==============================================================================
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: was-pdb
+  namespace: blog-system
+  labels:
+    app: was
+    tier: backend
+spec:
+  minAvailable: 1  # 최소 1개 Pod는 항상 Running
+  selector:
+    matchLabels:
+      app: was  # Rollout의 Pod selector와 일치
+
+---
+# ==============================================================================
+# WEB PodDisruptionBudget
+# ==============================================================================
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: web-pdb
+  namespace: blog-system
+  labels:
+    app: web
+    tier: frontend
+spec:
+  minAvailable: 1  # 최소 1개 Pod는 항상 Running
+  selector:
+    matchLabels:
+      app: web  # Rollout의 Pod selector와 일치
+
+---
+# ==============================================================================
+# MySQL PodDisruptionBudget
+# ==============================================================================
+# MySQL은 StatefulSet이 아닌 단일 Deployment이므로 주의
+# minAvailable: 1로 설정하면 재시작 불가 (항상 1개만 있음)
+# maxUnavailable: 1로 설정 (필요 시 재시작 가능)
+# ==============================================================================
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mysql-pdb
+  namespace: blog-system
+  labels:
+    app: mysql
+    tier: database
+spec:
+  maxUnavailable: 1  # 최대 1개까지 Unavailable 허용 (단일 Pod이므로)
+  selector:
+    matchLabels:
+      app: mysql
