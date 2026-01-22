@@ -1,0 +1,20 @@
+# ==============================================================================
+# MySQL Backup PVC
+# ==============================================================================
+# 용도: MySQL 백업 파일 저장 (NFS 스토리지)
+# 정책: 7일 보관 (CronJob에서 관리)
+# ==============================================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-backup-pvc
+  namespace: blog-system
+  labels:
+    app: mysql-backup
+spec:
+  accessModes:
+    - ReadWriteMany  # NFS이므로 RWX 가능
+  storageClassName: nfs-client
+  resources:
+    requests:
+      storage: 10Gi

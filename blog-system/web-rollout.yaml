@@ -54,10 +54,27 @@ spec:
         sidecar.istio.io/proxyMemory: "40Mi"
         sidecar.istio.io/proxyMemoryLimit: "128Mi"
     spec:
+      # ==============================================================================
+      # SecurityContext (보안 강화)
+      # ==============================================================================
+      # 주의: nginx는 80 포트 바인딩을 위해 root가 필요하므로
+      # runAsNonRoot는 적용하지 않음 (nginx unprivileged 이미지 필요)
+      # 대신 allowPrivilegeEscalation과 capabilities drop만 적용
+      # ==============================================================================
+      securityContext:
+        fsGroup: 101  # nginx 그룹
       containers:
         - name: nginx
           image: ghcr.io/wlals2/blog-web:v45
           imagePullPolicy: Always
+          # Container 레벨 보안 설정
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - NET_BIND_SERVICE  # 80 포트 바인딩 허용
           ports:
             - containerPort: 80
               name: http

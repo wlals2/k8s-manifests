@@ -38,10 +38,28 @@ spec:
         sidecar.istio.io/proxyMemory: "40Mi"
         sidecar.istio.io/proxyMemoryLimit: "128Mi"
     spec:
+      # ==============================================================================
+      # SecurityContext (보안 강화)
+      # ==============================================================================
+      # - runAsNonRoot: Root 사용자 실행 금지
+      # - runAsUser: 65534 (nobody) 또는 Dockerfile에서 정의한 사용자
+      # - fsGroup: 볼륨 마운트 시 그룹 권한
+      # ==============================================================================
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        fsGroup: 65534
       containers:
         - name: spring-boot
           image: ghcr.io/wlals2/board-was:v16
           imagePullPolicy: Always
+          # Container 레벨 보안 설정
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
           ports:
             - containerPort: 8080
               name: http

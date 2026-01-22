@@ -1,0 +1,90 @@
+# ==============================================================================
+# MySQL Backup CronJob
+# ==============================================================================
+# 스케줄: 매일 오전 3시 (KST 기준)
+# 백업 방식: mysqldump → NFS 저장
+# 보관 정책: 7일 (오래된 백업 자동 삭제)
+# ==============================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mysql-backup
+  namespace: blog-system
+  labels:
+    app: mysql-backup
+spec:
+  # 매일 오전 3시 (UTC 18:00 = KST 03:00)
+  schedule: "0 18 * * *"
+  # 동시 실행 방지
+  concurrencyPolicy: Forbid
+  # 실패한 Job 히스토리 보관
+  failedJobsHistoryLimit: 3
+  successfulJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      # Job 타임아웃: 30분
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+            app: mysql-backup
+        spec:
+          # Istio sidecar 제외 (백업 Job에 불필요)
+          annotations:
+            sidecar.istio.io/inject: "false"
+          containers:
+          - name: backup
+            image: mysql:8.0
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "=== MySQL Backup Started: $(date) ==="
+
+              # 백업 파일명 (날짜 포함)
+              BACKUP_FILE="/backup/mysql-backup-$(date +%Y%m%d-%H%M%S).sql"
+
+              # mysqldump 실행
+              echo "Creating backup: $BACKUP_FILE"
+              mysqldump -h mysql-service -u root -p"$MYSQL_ROOT_PASSWORD" \
+                --all-databases \
+                --single-transaction \
+                --quick \
+                --lock-tables=false \
+                > "$BACKUP_FILE"
+
+              # 백업 파일 압축
+              gzip "$BACKUP_FILE"
+              echo "Compressed: ${BACKUP_FILE}.gz"
+
+              # 7일 이상 오래된 백업 삭제
+              echo "Cleaning old backups (older than 7 days)..."
+              find /backup -name "mysql-backup-*.sql.gz" -mtime +7 -delete
+
+              # 현재 백업 목록 출력
+              echo "=== Current Backups ==="
+              ls -lh /backup/
+
+              echo "=== MySQL Backup Completed: $(date) ==="
+            env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: mysql-root-password
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: mysql-backup-pvc
+          restartPolicy: OnFailure
