@@ -56,7 +56,7 @@ spec:
     spec:
       containers:
         - name: nginx
-          image: ghcr.io/wlals2/blog-web:v42
+          image: ghcr.io/wlals2/blog-web:v43
           imagePullPolicy: Always
           ports:
             - containerPort: 80
@@ -97,7 +97,7 @@ spec:
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
-          whenUnsatisfiable: DoNotSchedule  # hard constraint (HA 보장)
+          whenUnsatisfiable: DoNotSchedule # hard constraint (HA 보장)
           labelSelector:
             matchLabels:
               app: web
