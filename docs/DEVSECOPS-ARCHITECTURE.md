@@ -438,8 +438,13 @@ loki:
 
 ### ⏳ 선택 항목 (P1)
 
-- [ ] Trivy 이미지 스캔 (GitHub Actions)
+- [x] Trivy 이미지 스캔 (GitHub Actions) ✅ 완료 (exit-code: 0, 경고만)
 - [ ] WAS 테스트 활성화 (-DskipTests 제거)
+  - **현재**: Docker 빌드 환경에 MySQL 없음 → `-DskipTests` 필수
+  - **해결 방법**:
+    - Testcontainers (Docker-in-Docker)
+    - H2 In-Memory DB (`application-test.properties`)
+  - **참고**: [03-TROUBLESHOOTING.md 9.6절](/home/jimin/blogsite/docs/03-TROUBLESHOOTING.md)
 - [ ] Flyway 마이그레이션 (WAS 소스 변경 필요)
 
 ### 🔜 향후 개선
