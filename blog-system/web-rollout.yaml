@@ -52,7 +52,7 @@ spec:
     spec:
       containers:
         - name: nginx
-          image: ghcr.io/wlals2/blog-web:v38
+          image: ghcr.io/wlals2/blog-web:v39
           imagePullPolicy: Always
           ports:
             - containerPort: 80
