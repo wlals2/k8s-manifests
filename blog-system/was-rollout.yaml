@@ -95,11 +95,11 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 3
             failureThreshold: 2
-      # 멀티 노드 분산
+      # HA: Pod를 여러 노드에 강제 분산 (노드 장애 시 무중단)
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
-          whenUnsatisfiable: ScheduleAnyway
+          whenUnsatisfiable: DoNotSchedule  # 강제 분산 (soft → hard)
           labelSelector:
             matchLabels:
               app: was
