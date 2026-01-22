@@ -2,10 +2,10 @@
 # MySQL Backup CronJob
 # ==============================================================================
 # 스케줄: 매일 오전 3시 (KST 기준)
-# 백업 방식: mysqldump → 로컬 PVC + AWS S3 업로드
-# 보관 정책:
-#   - 로컬: 7일 (디스크 절약)
-#   - S3: 30일 (장기 보관, S3 Lifecycle으로 관리)
+# 백업 방식: mysqldump → AWS S3 업로드
+# 보관 정책: S3 Lifecycle (7일 후 자동 삭제)
+#
+# 참고: emptyDir 사용 (Job 종료 시 자동 정리, Longhorn 문제 우회)
 # ==============================================================================
 apiVersion: batch/v1
 kind: CronJob
@@ -108,14 +108,6 @@ spec:
 
               echo "✅ Uploaded to S3: s3://${S3_BUCKET}/$(basename $LATEST_BACKUP)"
 
-              # 로컬 백업 정리 (7일 이상 삭제)
-              echo "Cleaning old local backups (older than 7 days)..."
-              find /backup -name "mysql-backup-*.sql.gz" -mtime +7 -delete
-
-              # 현재 로컬 백업 목록
-              echo "=== Local Backups ==="
-              ls -lh /backup/
-
               # S3 백업 목록 (최근 5개만)
               echo "=== S3 Backups (recent 5) ==="
               aws s3 ls "s3://${S3_BUCKET}/" | tail -5
@@ -151,6 +143,5 @@ spec:
                 memory: 256Mi
           volumes:
           - name: backup-storage
-            persistentVolumeClaim:
-              claimName: mysql-backup-pvc
+            emptyDir: {}  # Job 종료 시 자동 정리 (S3에 영구 저장)
           restartPolicy: OnFailure
