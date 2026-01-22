@@ -60,6 +60,16 @@ spec:
       - port: "3306"
         protocol: TCP
 
+  # Rule 3: mysql-backup → mysql:3306 허용 (CronJob 백업)
+  - fromEndpoints:
+    - matchLabels:
+        app: mysql-backup
+        io.kubernetes.pod.namespace: blog-system
+    toPorts:
+    - ports:
+      - port: "3306"
+        protocol: TCP
+
   # Egress (나가는 트래픽) - DNS만 허용
   egress:
   # Rule 1: DNS 쿼리 허용
@@ -328,3 +338,59 @@ spec:
       rules:
         dns:
         - matchPattern: "*"
+
+---
+# ==============================================================================
+# MySQL Backup 보호
+# ==============================================================================
+# 허용: mysql-backup → mysql:3306 (백업)
+# 허용: mysql-backup → S3 (업로드)
+# 차단: 기타 모든 접근
+# ==============================================================================
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: mysql-backup-isolation
+  namespace: blog-system
+  labels:
+    app: mysql-backup
+    tier: backup
+spec:
+  description: "MySQL Backup Job - access to MySQL and S3"
+
+  endpointSelector:
+    matchLabels:
+      app: mysql-backup  # mysql-backup Pod에만 적용
+
+  # Egress
+  egress:
+  # Rule 1: mysql-backup → mysql:3306 허용
+  - toEndpoints:
+    - matchLabels:
+        app: mysql
+        io.kubernetes.pod.namespace: blog-system
+    toPorts:
+    - ports:
+      - port: "3306"
+        protocol: TCP
+
+  # Rule 2: DNS 허용
+  - toEndpoints:
+    - matchLabels:
+        io.kubernetes.pod.namespace: kube-system
+        k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: UDP
+      rules:
+        dns:
+        - matchPattern: "*"
+
+  # Rule 3: S3 접근 허용 (AWS S3 endpoint)
+  - toEntities:
+    - world  # 외부 인터넷 (S3)
+    toPorts:
+    - ports:
+      - port: "443"
+        protocol: TCP
