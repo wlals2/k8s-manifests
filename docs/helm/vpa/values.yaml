@@ -1,0 +1,12 @@
+# VPA Custom Values
+# 기본값 외 변경사항만 기록
+
+# 모든 컴포넌트 활성화
+recommender:
+  enabled: true
+
+updater:
+  enabled: true
+
+admissionController:
+  enabled: true
