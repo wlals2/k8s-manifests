@@ -30,10 +30,10 @@ spec:
         metadata:
           labels:
             app: mysql-backup
-        spec:
           # Istio sidecar 제외 (백업 Job에 불필요)
           annotations:
             sidecar.istio.io/inject: "false"
+        spec:
           # ==============================================================
           # Init Container: MySQL Backup (mysqldump)
           # ==============================================================
