@@ -100,7 +100,7 @@ spec:
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
-          whenUnsatisfiable: DoNotSchedule  # hard constraint (HA 보장)
+          whenUnsatisfiable: DoNotSchedule # hard constraint (HA 보장)
           labelSelector:
             matchLabels:
               app: was
