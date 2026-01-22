@@ -2,8 +2,10 @@
 # MySQL Backup CronJob
 # ==============================================================================
 # 스케줄: 매일 오전 3시 (KST 기준)
-# 백업 방식: mysqldump → NFS 저장
-# 보관 정책: 7일 (오래된 백업 자동 삭제)
+# 백업 방식: mysqldump → 로컬 PVC + AWS S3 업로드
+# 보관 정책:
+#   - 로컬: 7일 (디스크 절약)
+#   - S3: 30일 (장기 보관, S3 Lifecycle으로 관리)
 # ==============================================================================
 apiVersion: batch/v1
 kind: CronJob
@@ -32,8 +34,11 @@ spec:
           # Istio sidecar 제외 (백업 Job에 불필요)
           annotations:
             sidecar.istio.io/inject: "false"
-          containers:
-          - name: backup
+          # ==============================================================
+          # Init Container: MySQL Backup (mysqldump)
+          # ==============================================================
+          initContainers:
+          - name: mysqldump
             image: mysql:8.0
             command:
             - /bin/sh
@@ -58,15 +63,7 @@ spec:
               gzip "$BACKUP_FILE"
               echo "Compressed: ${BACKUP_FILE}.gz"
 
-              # 7일 이상 오래된 백업 삭제
-              echo "Cleaning old backups (older than 7 days)..."
-              find /backup -name "mysql-backup-*.sql.gz" -mtime +7 -delete
-
-              # 현재 백업 목록 출력
-              echo "=== Current Backups ==="
-              ls -lh /backup/
-
-              echo "=== MySQL Backup Completed: $(date) ==="
+              echo "=== MySQL Dump Completed: $(date) ==="
             env:
             - name: MYSQL_ROOT_PASSWORD
               valueFrom:
@@ -83,6 +80,75 @@ spec:
               limits:
                 cpu: 500m
                 memory: 512Mi
+          # ==============================================================
+          # Main Container: S3 Upload + Cleanup
+          # ==============================================================
+          containers:
+          - name: s3-upload
+            image: amazon/aws-cli:2.15.0
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "=== S3 Upload Started: $(date) ==="
+
+              # 최신 백업 파일 찾기
+              LATEST_BACKUP=$(ls -t /backup/mysql-backup-*.sql.gz | head -1)
+
+              if [ -z "$LATEST_BACKUP" ]; then
+                echo "ERROR: No backup file found!"
+                exit 1
+              fi
+
+              echo "Uploading: $LATEST_BACKUP"
+
+              # S3에 업로드
+              aws s3 cp "$LATEST_BACKUP" "s3://${S3_BUCKET}/$(basename $LATEST_BACKUP)"
+
+              echo "✅ Uploaded to S3: s3://${S3_BUCKET}/$(basename $LATEST_BACKUP)"
+
+              # 로컬 백업 정리 (7일 이상 삭제)
+              echo "Cleaning old local backups (older than 7 days)..."
+              find /backup -name "mysql-backup-*.sql.gz" -mtime +7 -delete
+
+              # 현재 로컬 백업 목록
+              echo "=== Local Backups ==="
+              ls -lh /backup/
+
+              # S3 백업 목록 (최근 5개만)
+              echo "=== S3 Backups (recent 5) ==="
+              aws s3 ls "s3://${S3_BUCKET}/" | tail -5
+
+              echo "=== Backup Job Completed: $(date) ==="
+            env:
+            - name: S3_BUCKET
+              value: "jimin-mysql-backup"
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: aws-s3-credentials
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-s3-credentials
+                  key: AWS_SECRET_ACCESS_KEY
+            - name: AWS_DEFAULT_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: aws-s3-credentials
+                  key: AWS_DEFAULT_REGION
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+            resources:
+              requests:
+                cpu: 50m
+                memory: 128Mi
+              limits:
+                cpu: 200m
+                memory: 256Mi
           volumes:
           - name: backup-storage
             persistentVolumeClaim:
