@@ -15,6 +15,10 @@ spec:
   # Canary 배포 전략
   strategy:
     canary:
+      # Istio 트래픽 라우팅 사용 시 stable replica를 동적으로 조절
+      # → Canary 배포 중에도 총 Pod 수 유지 (stable 1 + canary 1 = 2개)
+      # → DoNotSchedule과 함께 사용 가능
+      dynamicStableScale: true
       # Istio 트래픽 라우팅 설정
       trafficRouting:
         istio:
@@ -88,12 +92,12 @@ spec:
         - name: nginx-config
           configMap:
             name: web-nginx-config
-      # Pod 분산: Canary 배포 호환을 위해 soft constraint 사용
-      # (DoNotSchedule은 Canary 롤아웃과 충돌)
+      # HA: Pod를 여러 노드에 강제 분산 (노드 장애 시 무중단)
+      # dynamicStableScale: true 덕분에 DoNotSchedule 사용 가능
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
-          whenUnsatisfiable: ScheduleAnyway  # soft constraint (Canary 호환)
+          whenUnsatisfiable: DoNotSchedule  # hard constraint (HA 보장)
           labelSelector:
             matchLabels:
               app: web
