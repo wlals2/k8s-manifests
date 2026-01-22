@@ -95,11 +95,12 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 3
             failureThreshold: 2
-      # HA: Pod를 여러 노드에 강제 분산 (노드 장애 시 무중단)
+      # Pod 분산: Canary 배포 호환을 위해 soft constraint 사용
+      # (DoNotSchedule은 Canary 롤아웃과 충돌)
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
-          whenUnsatisfiable: DoNotSchedule  # 강제 분산 (soft → hard)
+          whenUnsatisfiable: ScheduleAnyway  # soft constraint (Canary 호환)
           labelSelector:
             matchLabels:
               app: was
