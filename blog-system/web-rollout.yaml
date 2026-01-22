@@ -114,7 +114,7 @@ spec:
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
-          whenUnsatisfiable: DoNotSchedule # hard constraint (HA 보장)
+          whenUnsatisfiable: ScheduleAnyway # soft constraint (canary 배포 시 유연성)
           labelSelector:
             matchLabels:
               app: web
