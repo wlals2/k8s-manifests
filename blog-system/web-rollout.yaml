@@ -75,6 +75,9 @@ spec:
                 - ALL
               add:
                 - NET_BIND_SERVICE # 80 포트 바인딩 허용
+                - CHOWN            # nginx cache 디렉토리 소유권 변경
+                - SETUID           # worker process 권한 전환
+                - SETGID           # worker process 그룹 전환
           ports:
             - containerPort: 80
               name: http
