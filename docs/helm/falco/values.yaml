@@ -1,170 +1,26 @@
 # ==============================================================================
-# Falco Helm Values
+# Falco Values (IDS Mode with IPS Integration)
 # ==============================================================================
-# 역할: 런타임 보안 모니터링 (IDS - Intrusion Detection System)
-# 드라이버: modern-ebpf (kernel module 대신 사용, Cilium 충돌 방지)
+# 목적: eBPF 기반 런타임 보안 모니터링 + IPS 연동
 #
-# 설치 명령:
-#   helm install falco falcosecurity/falco \
-#     -n falco --create-namespace \
-#     -f /home/jimin/k8s-manifests/docs/helm/falco/values.yaml
-#
-# 업그레이드 명령:
-#   helm upgrade falco falcosecurity/falco \
-#     -n falco \
-#     -f /home/jimin/k8s-manifests/docs/helm/falco/values.yaml
-#
-# 참고: IPS 기능은 비활성화 (운영 경험 후 추가 예정)
-# ==============================================================================
+# 구성:
+# - Falco: eBPF 기반 syscall 모니터링
+# - Falcosidekick: Alert 라우팅 (Loki + Talon)
+# - Falcosidekick UI: 웹 대시보드
+# - Talon 연동: IPS 자동 대응 (별도 설치)
 
 # ==============================================================================
-# Driver 설정
+# Collector 설정
 # ==============================================================================
-# modern-ebpf: 최신 eBPF 드라이버 (권장)
-# - kernel module 불필요 (호스트 커널 수정 없음)
-# - Cilium eBPF와 충돌 없음
-# - 성능 우수, 보안성 높음
-driver:
-  kind: modern_ebpf
-  # loader:
-  #   initContainer:
-  #     enabled: false  # modern-ebpf는 loader 불필요
+collectors:
+  containerEngine:
+    kind: auto
 
 # ==============================================================================
-# Falco 설정
+# Custom Rules (blog-system 특화)
 # ==============================================================================
-falco:
-  # JSON 출력 (Falcosidekick, Loki 연동용)
-  json_output: true
-  json_include_output_property: true
-
-  # 로그 레벨
-  log_level: info
-
-  # 우선순위 필터 (INFO 이상만)
-  priority: info
-
-  # gRPC 서버 (Falcosidekick 연동)
-  grpc:
-    enabled: true
-    bind_address: "unix:///run/falco/falco.sock"
-    threadiness: 0
-
-  grpc_output:
-    enabled: true
-
-  # HTTP 출력 (Falcosidekick으로 전송)
-  http_output:
-    enabled: true
-    url: "http://falco-falcosidekick:2801/"
-    # IPS 미사용 시 insecure 허용
-    insecure: true
-
-# ==============================================================================
-# 리소스 제한
-# ==============================================================================
-resources:
-  requests:
-    cpu: 100m
-    memory: 256Mi
-  limits:
-    cpu: 500m
-    memory: 512Mi
-
-# ==============================================================================
-# Tolerations (모든 노드에서 실행)
-# ==============================================================================
-tolerations:
-  - key: node-role.kubernetes.io/control-plane
-    operator: Exists
-    effect: NoSchedule
-  - key: node-role.kubernetes.io/master
-    operator: Exists
-    effect: NoSchedule
-
-# ==============================================================================
-# Falcosidekick 설정 (Alert 전송)
-# ==============================================================================
-# 역할: Falco Alert를 다양한 목적지로 전송
-# - Slack, Discord, Webhook, Loki 등
-# - IPS 기능 비활성화 (Response Engine 미사용)
-falcosidekick:
-  enabled: true
-
-  # 리소스 제한
-  resources:
-    requests:
-      cpu: 20m
-      memory: 64Mi
-    limits:
-      cpu: 100m
-      memory: 128Mi
-
-  # 웹 UI (선택적)
-  webui:
-    enabled: true
-    replicaCount: 1
-    resources:
-      requests:
-        cpu: 20m
-        memory: 64Mi
-      limits:
-        cpu: 100m
-        memory: 128Mi
-
-  config:
-    # ==================================================================
-    # 출력 목적지 설정
-    # ==================================================================
-    # 필요한 목적지만 활성화 (나머지는 주석 처리)
-
-    # Slack 알림 (선택)
-    # slack:
-    #   webhookurl: "https://hooks.slack.com/services/XXX/YYY/ZZZ"
-    #   minimumpriority: "warning"
-    #   outputformat: "all"
-
-    # Discord 알림 (선택)
-    # discord:
-    #   webhookurl: "https://discord.com/api/webhooks/XXX/YYY"
-    #   minimumpriority: "warning"
-
-    # Loki 연동 (Grafana 대시보드 연동)
-    loki:
-      hostport: "http://loki-stack.monitoring.svc.cluster.local:3100"
-      minimumpriority: "warning"
-      # tenant: ""  # 멀티테넌시 미사용
-
-    # Webhook (커스텀 알림)
-    # webhook:
-    #   address: "http://your-webhook-endpoint"
-    #   minimumpriority: "critical"
-
-    # ==================================================================
-    # IPS 설정 (현재 비활성화)
-    # ==================================================================
-    # 운영 경험 후 활성화 예정
-    #
-    # kubernetes:
-    #   kubeconfig: ""  # In-cluster 사용
-    #
-    #   # Pod 종료 (IPS)
-    #   # deletepod:
-    #   #   enabled: true
-    #   #   minimumpriority: "critical"
-    #
-    #   # NetworkPolicy 생성 (IPS)
-    #   # networkpolicy:
-    #   #   enabled: true
-    #   #   minimumpriority: "critical"
-
-# ==============================================================================
-# 커스텀 룰 (선택)
-# ==============================================================================
-# 기본 룰 외에 추가 룰 정의
 customRules:
-  # blog-system namespace 특화 룰
-  blog-rules.yaml: |-
+  blog-rules.yaml: |
     # ==================================================================
     # Rule 1: Java Process Spawning Shell (RCE 방어) - CRITICAL
     # ==================================================================
@@ -181,8 +37,8 @@ customRules:
         container
       output: >
         🚨 CRITICAL: Java 프로세스가 Shell을 실행했습니다 (RCE 공격 의심!)
-        (user=%user.name pod=%k8s.pod.name namespace=%k8s.ns.name
-         parent=%proc.pname cmd=%proc.cmdline container=%container.name)
+          (user=%user.name pod=%k8s.pod.name namespace=%k8s.ns.name
+           parent=%proc.pname cmd=%proc.cmdline container=%container.name)
       priority: CRITICAL
       tags: [maturity_stable, host, container, process, mitre_execution, T1059, rce, java]
 
@@ -201,8 +57,8 @@ customRules:
         not proc.pname in (package_mgmt_binaries)
       output: >
         ⚠️ WARNING: 컨테이너 내부에서 패키지 관리자가 실행되었습니다!
-        (user=%user.name pod=%k8s.pod.name namespace=%k8s.ns.name
-         cmd=%proc.cmdline container=%container.name)
+          (user=%user.name pod=%k8s.pod.name namespace=%k8s.ns.name
+           cmd=%proc.cmdline container=%container.name)
       priority: WARNING
       tags: [maturity_stable, container, process, mitre_execution, T1059]
 
@@ -253,15 +109,81 @@ customRules:
       tags: [maturity_incubating, container, network, mitre_exfiltration, T1041]
 
 # ==============================================================================
-# 수집기 설정 (Falco 0.42+)
+# Driver 설정
 # ==============================================================================
-# 참고: collectors.containerd/docker/crio는 deprecated
-# 새로운 설정: collectors.containerEngine (자동 감지)
-collectors:
-  # 컨테이너 엔진 자동 감지 (권장)
-  # Falco가 자동으로 containerd/docker/cri-o 소켓 탐지
-  containerEngine:
-    kind: auto
+driver:
+  kind: modern_ebpf
+
+# ==============================================================================
+# Falco 설정
+# ==============================================================================
+falco:
+  grpc:
+    bind_address: unix:///run/falco/falco.sock
+    enabled: true
+    threadiness: 0
+  grpc_output:
+    enabled: true
+  http_output:
+    enabled: true
+    insecure: true
+    url: http://falco-falcosidekick:2801/
+  json_include_output_property: true
+  json_output: true
+  log_level: info
+  priority: info
+
+# ==============================================================================
+# Falcosidekick 설정 (Alert 라우팅)
+# ==============================================================================
+falcosidekick:
+  enabled: true
+  config:
+    # Loki (로그 저장)
+    loki:
+      hostport: http://loki-stack.monitoring.svc.cluster.local:3100
+      minimumpriority: warning
+
+    # Talon (IPS 자동 대응) - ⭐ 추가됨
+    talon:
+      address: http://falco-talon.falco.svc.cluster.local:2803
+      minimumpriority: warning
+
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 20m
+      memory: 64Mi
+
+  # Falcosidekick UI
+  webui:
+    enabled: true
+    replicaCount: 1
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 20m
+        memory: 64Mi
+
+# ==============================================================================
+# Security Context
+# ==============================================================================
+podSecurityContext: {}
+
+# ==============================================================================
+# Resources
+# ==============================================================================
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
 
 # ==============================================================================
 # ServiceAccount
@@ -271,27 +193,12 @@ serviceAccount:
   name: falco
 
 # ==============================================================================
-# Pod Security
+# Tolerations (Control Plane 노드에도 배포)
 # ==============================================================================
-podSecurityContext:
-  # Falco는 syscall 모니터링을 위해 높은 권한 필요
-  # modern-ebpf 사용 시에도 일부 권한 필요
-  {}
-
-# ==============================================================================
-# 추후 IPS 활성화 시 추가할 설정
-# ==============================================================================
-# 1. Falcosidekick Response Engine:
-#    config:
-#      kubernetes:
-#        deletepod:
-#          enabled: true
-#          minimumpriority: "critical"
-#
-# 2. 또는 Falco Talon (별도 컴포넌트):
-#    - Response Engine 전용 도구
-#    - 더 세밀한 대응 정책 가능
-#
-# 3. 또는 Kubernetes Admission Controller:
-#    - falco-admission-webhook
-#    - 배포 시점 차단 (Prevention)
+tolerations:
+- effect: NoSchedule
+  key: node-role.kubernetes.io/control-plane
+  operator: Exists
+- effect: NoSchedule
+  key: node-role.kubernetes.io/master
+  operator: Exists
