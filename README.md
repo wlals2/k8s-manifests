@@ -39,7 +39,7 @@ blog-system/
 ```
 [외부 사용자]
       ↓
-[Nginx Ingress] (192.168.1.61)
+[Nginx Ingress] (192.168.X.200)
       ↓ (모든 경로)
 [web-service] ClusterIP
       ↓
