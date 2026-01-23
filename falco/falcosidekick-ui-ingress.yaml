@@ -11,7 +11,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-  - host: falcosidekick.jiminhome.shop
+  - host: falco.jiminhome.shop
     http:
       paths:
       - path: /
