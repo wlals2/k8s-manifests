@@ -65,7 +65,7 @@ spec:
         fsGroup: 101 # nginx 그룹
       containers:
         - name: nginx
-          image: ghcr.io/wlals2/blog-web:v54
+          image: ghcr.io/wlals2/blog-web:v55
           imagePullPolicy: Always
           # Container 레벨 보안 설정
           securityContext:
