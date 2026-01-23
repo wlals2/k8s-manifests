@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: falcosidekick-ui-ingress
+  namespace: falco
+  labels:
+    app: falcosidekick-ui
+  annotations:
+    # Nginx Ingress 설정
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: falcosidekick.jiminhome.shop
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: falco-falcosidekick-ui
+            port:
+              number: 2802
