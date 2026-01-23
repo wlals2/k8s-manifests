@@ -8,6 +8,11 @@ metadata:
   annotations:
     # Nginx Ingress 설정
     nginx.ingress.kubernetes.io/rewrite-target: /
+    # IP 화이트리스트 (내부 네트워크만 접근 가능)
+    nginx.ingress.kubernetes.io/whitelist-source-range: "192.168.1.0/24"
+    # 프록시 헤더 설정 (실제 클라이언트 IP 확인)
+    nginx.ingress.kubernetes.io/enable-real-ip: "true"
+    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
 spec:
   ingressClassName: nginx
   rules:
