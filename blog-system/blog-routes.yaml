@@ -1,0 +1,60 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: blog-routes
+  namespace: blog-system
+  labels:
+    app: blog
+spec:
+  hosts:
+  - "blog.jiminhome.shop"  # 외부 도메인
+  - "*"  # 모든 호스트 (테스트용)
+
+  gateways:
+  - blog-gateway  # 위에서 만든 Gateway 참조
+
+  http:
+  # Route 1: API 요청 → WEB Service (WEB nginx가 WAS로 프록시)
+  - match:
+    - uri:
+        prefix: "/api/"
+    route:
+    - destination:
+        host: web-service  # WEB nginx가 /api를 WAS로 프록시
+        port:
+          number: 80
+    retries:
+      attempts: 3
+      perTryTimeout: 3s
+      retryOn: 5xx,reset,connect-failure
+    timeout: 15s
+
+  # Route 2: Board 요청 → WEB Service
+  - match:
+    - uri:
+        prefix: "/board"
+    route:
+    - destination:
+        host: web-service
+        port:
+          number: 80
+    retries:
+      attempts: 3
+      perTryTimeout: 3s
+      retryOn: 5xx,reset,connect-failure
+    timeout: 15s
+
+  # Route 3: 기타 모든 요청 → WEB Service (정적 파일)
+  - match:
+    - uri:
+        prefix: "/"
+    route:
+    - destination:
+        host: web-service
+        port:
+          number: 80
+    retries:
+      attempts: 3
+      perTryTimeout: 3s
+      retryOn: 5xx,reset,connect-failure
+    timeout: 10s

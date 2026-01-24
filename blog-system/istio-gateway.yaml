@@ -1,0 +1,28 @@
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: blog-gateway
+  namespace: blog-system
+spec:
+  selector:
+    istio: ingressgateway  # istio-system의 istio-ingressgateway 사용
+  servers:
+  # HTTP 포트 (80)
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "blog.jiminhome.shop"
+    - "*"  # 모든 호스트 허용 (테스트용)
+
+  # HTTPS 포트 (443) - 향후 SSL 인증서 설정 후 활성화
+  # - port:
+  #     number: 443
+  #     name: https
+  #     protocol: HTTPS
+  #   tls:
+  #     mode: SIMPLE  # SSL Termination
+  #     credentialName: blog-tls-secret  # TLS 인증서 Secret
+  #   hosts:
+  #   - "blog.jiminhome.shop"
