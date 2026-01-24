@@ -62,6 +62,14 @@ spec:
         - name: dashboard-overview
           mountPath: /etc/grafana/dashboards/blog-system-overview.json
           subPath: blog-system-overview.json
+        # Dashboard JSON files - MySQL Detail
+        - name: dashboard-mysql-detail
+          mountPath: /etc/grafana/dashboards/mysql-detail.json
+          subPath: mysql-detail.json
+        # Dashboard JSON files - Logs (Loki)
+        - name: dashboard-logs
+          mountPath: /etc/grafana/dashboards/logs-dashboard.json
+          subPath: logs-dashboard.json
       volumes:
       - name: grafana-data
         persistentVolumeClaim:
@@ -78,3 +86,9 @@ spec:
       - name: dashboard-overview
         configMap:
           name: grafana-dashboard-overview
+      - name: dashboard-mysql-detail
+        configMap:
+          name: grafana-dashboard-mysql-detail
+      - name: dashboard-logs
+        configMap:
+          name: grafana-dashboard-logs
