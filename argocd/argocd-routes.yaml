@@ -1,0 +1,24 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: argocd-routes
+  namespace: argocd
+  labels:
+    app: argocd
+spec:
+  hosts:
+  - "argocd.jiminhome.shop"
+
+  gateways:
+  - blog-system/blog-gateway  # blog-system namespace의 Gateway 참조
+
+  http:
+  - match:
+    - uri:
+        prefix: "/"
+    route:
+    - destination:
+        host: argocd-server  # 같은 namespace 내 서비스
+        port:
+          number: 80
+    timeout: 30s
