@@ -14,7 +14,6 @@ spec:
       protocol: HTTP
     hosts:
     - "blog.jiminhome.shop"
-    - "*"  # 모든 호스트 허용 (테스트용)
 
   # HTTPS 포트 (443) - 향후 SSL 인증서 설정 후 활성화
   # - port:

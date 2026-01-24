@@ -8,7 +8,6 @@ metadata:
 spec:
   hosts:
   - "blog.jiminhome.shop"  # 외부 도메인
-  - "*"  # 모든 호스트 (테스트용)
 
   gateways:
   - blog-gateway  # 위에서 만든 Gateway 참조
@@ -21,6 +20,7 @@ spec:
     route:
     - destination:
         host: web-service  # WEB nginx가 /api를 WAS로 프록시
+        subset: stable  # DestinationRule과 매칭
         port:
           number: 80
     retries:
@@ -36,8 +36,13 @@ spec:
     route:
     - destination:
         host: web-service
+        subset: stable  # DestinationRule과 매칭
         port:
           number: 80
+      headers:
+        request:
+          set:
+            x-forwarded-proto: http  # Gateway는 평문 HTTP
     retries:
       attempts: 3
       perTryTimeout: 3s
@@ -51,8 +56,13 @@ spec:
     route:
     - destination:
         host: web-service
+        subset: stable  # DestinationRule과 매칭
         port:
           number: 80
+      headers:
+        request:
+          set:
+            x-forwarded-proto: http  # Gateway는 평문 HTTP
     retries:
       attempts: 3
       perTryTimeout: 3s

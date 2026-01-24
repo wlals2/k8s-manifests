@@ -27,9 +27,9 @@ spec:
 
   # 트래픽 정책
   trafficPolicy:
-    # mTLS 설정
+    # mTLS 설정 (Gateway → web은 평문이므로 DISABLE)
     tls:
-      mode: ISTIO_MUTUAL  # mTLS 강제 (Istio가 인증서 자동 관리)
+      mode: DISABLE  # mTLS 비활성화 (Gateway는 평문 HTTP)
 
     # Connection Pool 설정 (nginx 리소스 고려)
     connectionPool:
