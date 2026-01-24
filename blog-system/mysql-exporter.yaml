@@ -1,0 +1,91 @@
+# ==============================================================================
+# MySQL Exporter Deployment
+# ==============================================================================
+# Prometheus에 MySQL 메트릭 제공
+# Istio sidecar 제외 (MySQL은 mesh 외부)
+# ==============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-exporter
+  namespace: blog-system
+  labels:
+    app: mysql-exporter
+    tier: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql-exporter
+  template:
+    metadata:
+      labels:
+        app: mysql-exporter
+      annotations:
+        # Istio sidecar 제외 (MySQL과 직접 통신)
+        sidecar.istio.io/inject: "false"
+        # Prometheus scrape 설정
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9104"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: mysql-exporter
+        image: prom/mysqld-exporter:v0.16.0
+        args:
+        - --config.my-cnf=/etc/mysql-exporter/.my.cnf
+        - --collect.info_schema.tables
+        - --collect.info_schema.query_response_time
+        - --collect.info_schema.innodb_metrics
+        - --collect.perf_schema.tableiowaits
+        - --collect.perf_schema.indexiowaits
+        ports:
+        - name: metrics
+          containerPort: 9104
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: 9104
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: 9104
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+        volumeMounts:
+        - name: mysql-exporter-config
+          mountPath: /etc/mysql-exporter
+          readOnly: true
+      volumes:
+      - name: mysql-exporter-config
+        configMap:
+          name: mysql-exporter-config
+---
+# MySQL Exporter Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-exporter
+  namespace: blog-system
+  labels:
+    app: mysql-exporter
+spec:
+  selector:
+    app: mysql-exporter
+  ports:
+  - name: metrics
+    port: 9104
+    targetPort: 9104
+    protocol: TCP
