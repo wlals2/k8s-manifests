@@ -42,7 +42,7 @@ data:
           "type": "row"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -61,7 +61,7 @@ data:
           "type": "stat"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -77,7 +77,7 @@ data:
           "type": "stat"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -93,7 +93,7 @@ data:
           "type": "stat"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -109,7 +109,7 @@ data:
           "type": "stat"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -125,7 +125,7 @@ data:
           "type": "stat"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -149,7 +149,7 @@ data:
           "type": "row"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -169,7 +169,7 @@ data:
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -197,7 +197,7 @@ data:
           "type": "row"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -218,7 +218,7 @@ data:
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -247,7 +247,7 @@ data:
           "type": "row"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -267,7 +267,7 @@ data:
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -294,7 +294,7 @@ data:
           "type": "row"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -313,7 +313,7 @@ data:
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },

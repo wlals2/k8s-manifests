@@ -39,7 +39,7 @@ data:
           "type": "row"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -58,7 +58,7 @@ data:
           "type": "stat"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -77,7 +77,7 @@ data:
           "type": "stat"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -93,7 +93,7 @@ data:
           "type": "stat"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -117,7 +117,7 @@ data:
           "type": "row"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -140,7 +140,7 @@ data:
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -166,7 +166,7 @@ data:
           "type": "row"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -203,7 +203,7 @@ data:
           "type": "row"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -219,7 +219,7 @@ data:
           "type": "stat"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -235,7 +235,7 @@ data:
           "type": "stat"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -262,7 +262,7 @@ data:
           "type": "row"
         },
         {
-          "datasource": { "type": "loki", "uid": "loki" },
+          "datasource": "Loki",
           "gridPos": { "h": 10, "w": 24, "x": 0, "y": 29 },
           "id": 40,
           "options": {
@@ -276,7 +276,7 @@ data:
             "wrapLogMessage": true
           },
           "targets": [
-            { "datasource": { "type": "loki", "uid": "loki" }, "expr": "{namespace=\"blog-system\", pod=~\"mysql-backup.*\"}", "legendFormat": "", "refId": "A" }
+            { "datasource": "Loki", "expr": "{namespace=\"blog-system\", pod=~\"mysql-backup.*\"}", "legendFormat": "", "refId": "A" }
           ],
           "title": "MySQL Backup Job 로그",
           "type": "logs"

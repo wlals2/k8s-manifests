@@ -40,7 +40,7 @@ data:
           "type": "row"
         },
         {
-          "datasource": { "type": "loki", "uid": "loki" },
+          "datasource": "Loki",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -52,13 +52,13 @@ data:
           "id": 1,
           "options": { "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "right", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
           "targets": [
-            { "datasource": { "type": "loki", "uid": "loki" }, "expr": "sum by (namespace) (count_over_time({namespace=~\".+\"}[1m]))", "legendFormat": "{{namespace}}", "refId": "A" }
+            { "datasource": "Loki", "expr": "sum by (namespace) (count_over_time({namespace=~\".+\"}[1m]))", "legendFormat": "{{namespace}}", "refId": "A" }
           ],
           "title": "Namespace별 로그 볼륨 (/min)",
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "loki", "uid": "loki" },
+          "datasource": "Loki",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -70,13 +70,13 @@ data:
           "id": 2,
           "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [
-            { "datasource": { "type": "loki", "uid": "loki" }, "expr": "count_over_time({namespace=\"blog-system\"} |~ \"(?i)error|exception|fatal\" [1h])", "legendFormat": "Errors", "refId": "A" }
+            { "datasource": "Loki", "expr": "count_over_time({namespace=\"blog-system\"} |~ \"(?i)error|exception|fatal\" [1h])", "legendFormat": "Errors", "refId": "A" }
           ],
           "title": "blog-system 에러 (1h)",
           "type": "stat"
         },
         {
-          "datasource": { "type": "loki", "uid": "loki" },
+          "datasource": "Loki",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -88,13 +88,13 @@ data:
           "id": 3,
           "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [
-            { "datasource": { "type": "loki", "uid": "loki" }, "expr": "count_over_time({namespace=\"blog-system\"} |~ \"(?i)warn\" [1h])", "legendFormat": "Warnings", "refId": "A" }
+            { "datasource": "Loki", "expr": "count_over_time({namespace=\"blog-system\"} |~ \"(?i)warn\" [1h])", "legendFormat": "Warnings", "refId": "A" }
           ],
           "title": "blog-system 경고 (1h)",
           "type": "stat"
         },
         {
-          "datasource": { "type": "loki", "uid": "loki" },
+          "datasource": "Loki",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -106,13 +106,13 @@ data:
           "id": 4,
           "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [
-            { "datasource": { "type": "loki", "uid": "loki" }, "expr": "count_over_time({namespace=\"blog-system\", container=\"spring-boot\"} [1h])", "legendFormat": "WAS", "refId": "A" }
+            { "datasource": "Loki", "expr": "count_over_time({namespace=\"blog-system\", container=\"spring-boot\"} [1h])", "legendFormat": "WAS", "refId": "A" }
           ],
           "title": "WAS 로그 (1h)",
           "type": "stat"
         },
         {
-          "datasource": { "type": "loki", "uid": "loki" },
+          "datasource": "Loki",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -124,7 +124,7 @@ data:
           "id": 5,
           "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [
-            { "datasource": { "type": "loki", "uid": "loki" }, "expr": "count_over_time({namespace=\"blog-system\", container=\"mysql\"} [1h])", "legendFormat": "MySQL", "refId": "A" }
+            { "datasource": "Loki", "expr": "count_over_time({namespace=\"blog-system\", container=\"mysql\"} [1h])", "legendFormat": "MySQL", "refId": "A" }
           ],
           "title": "MySQL 로그 (1h)",
           "type": "stat"
@@ -138,7 +138,7 @@ data:
           "type": "row"
         },
         {
-          "datasource": { "type": "loki", "uid": "loki" },
+          "datasource": "Loki",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -150,13 +150,13 @@ data:
           "id": 10,
           "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
           "targets": [
-            { "datasource": { "type": "loki", "uid": "loki" }, "expr": "sum by (pod) (count_over_time({namespace=\"blog-system\"} |~ \"(?i)error|exception\" [1m]))", "legendFormat": "{{pod}}", "refId": "A" }
+            { "datasource": "Loki", "expr": "sum by (pod) (count_over_time({namespace=\"blog-system\"} |~ \"(?i)error|exception\" [1m]))", "legendFormat": "{{pod}}", "refId": "A" }
           ],
           "title": "Pod별 에러 로그 추이",
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "loki", "uid": "loki" },
+          "datasource": "Loki",
           "gridPos": { "h": 12, "w": 24, "x": 0, "y": 18 },
           "id": 11,
           "options": {
@@ -170,7 +170,7 @@ data:
             "wrapLogMessage": true
           },
           "targets": [
-            { "datasource": { "type": "loki", "uid": "loki" }, "expr": "{namespace=\"blog-system\"} |~ \"(?i)error|exception|fatal\"", "legendFormat": "", "refId": "A" }
+            { "datasource": "Loki", "expr": "{namespace=\"blog-system\"} |~ \"(?i)error|exception|fatal\"", "legendFormat": "", "refId": "A" }
           ],
           "title": "에러 로그 스트림 (blog-system)",
           "type": "logs"
@@ -184,7 +184,7 @@ data:
           "type": "row"
         },
         {
-          "datasource": { "type": "loki", "uid": "loki" },
+          "datasource": "Loki",
           "gridPos": { "h": 12, "w": 24, "x": 0, "y": 31 },
           "id": 20,
           "options": {
@@ -198,7 +198,7 @@ data:
             "wrapLogMessage": true
           },
           "targets": [
-            { "datasource": { "type": "loki", "uid": "loki" }, "expr": "{namespace=\"blog-system\", container=\"spring-boot\"}", "legendFormat": "", "refId": "A" }
+            { "datasource": "Loki", "expr": "{namespace=\"blog-system\", container=\"spring-boot\"}", "legendFormat": "", "refId": "A" }
           ],
           "title": "WAS 전체 로그",
           "type": "logs"
@@ -212,7 +212,7 @@ data:
           "type": "row"
         },
         {
-          "datasource": { "type": "loki", "uid": "loki" },
+          "datasource": "Loki",
           "gridPos": { "h": 10, "w": 24, "x": 0, "y": 44 },
           "id": 30,
           "options": {
@@ -226,7 +226,7 @@ data:
             "wrapLogMessage": true
           },
           "targets": [
-            { "datasource": { "type": "loki", "uid": "loki" }, "expr": "{namespace=\"blog-system\", container=\"mysql\"}", "legendFormat": "", "refId": "A" }
+            { "datasource": "Loki", "expr": "{namespace=\"blog-system\", container=\"mysql\"}", "legendFormat": "", "refId": "A" }
           ],
           "title": "MySQL 로그",
           "type": "logs"
@@ -240,7 +240,7 @@ data:
           "type": "row"
         },
         {
-          "datasource": { "type": "loki", "uid": "loki" },
+          "datasource": "Loki",
           "gridPos": { "h": 10, "w": 24, "x": 0, "y": 55 },
           "id": 40,
           "options": {
@@ -254,7 +254,7 @@ data:
             "wrapLogMessage": true
           },
           "targets": [
-            { "datasource": { "type": "loki", "uid": "loki" }, "expr": "{namespace=\"blog-system\", container=\"nginx\"}", "legendFormat": "", "refId": "A" }
+            { "datasource": "Loki", "expr": "{namespace=\"blog-system\", container=\"nginx\"}", "legendFormat": "", "refId": "A" }
           ],
           "title": "Nginx 접근 로그",
           "type": "logs"
@@ -268,7 +268,7 @@ data:
           "type": "row"
         },
         {
-          "datasource": { "type": "loki", "uid": "loki" },
+          "datasource": "Loki",
           "gridPos": { "h": 10, "w": 24, "x": 0, "y": 66 },
           "id": 50,
           "options": {
@@ -282,7 +282,7 @@ data:
             "wrapLogMessage": true
           },
           "targets": [
-            { "datasource": { "type": "loki", "uid": "loki" }, "expr": "{namespace=\"blog-system\", container=\"istio-proxy\"} |~ \"(?i)error|warn\"", "legendFormat": "", "refId": "A" }
+            { "datasource": "Loki", "expr": "{namespace=\"blog-system\", container=\"istio-proxy\"} |~ \"(?i)error|warn\"", "legendFormat": "", "refId": "A" }
           ],
           "title": "Istio Proxy 에러/경고 로그",
           "type": "logs"
