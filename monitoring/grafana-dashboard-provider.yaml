@@ -1,0 +1,26 @@
+# ==============================================================================
+# Grafana Dashboard Provider ConfigMap
+# ==============================================================================
+# 목적: Grafana에서 ConfigMap 기반 대시보드 자동 로드
+# ==============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-provider
+  namespace: monitoring
+  labels:
+    app: grafana
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: 'blog-system-dashboards'
+        orgId: 1
+        folder: 'Blog System'
+        folderUid: 'blog-system'
+        type: file
+        disableDeletion: false
+        editable: true
+        updateIntervalSeconds: 30
+        options:
+          path: /etc/grafana/dashboards

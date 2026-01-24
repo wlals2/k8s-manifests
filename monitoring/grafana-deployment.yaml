@@ -1,0 +1,80 @@
+# ==============================================================================
+# Grafana Deployment with Dashboard Provisioning
+# ==============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: monitoring
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      securityContext:
+        fsGroup: 472
+        runAsNonRoot: true
+        runAsUser: 472
+      containers:
+      - name: grafana
+        image: grafana/grafana:latest
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: GF_SECURITY_ADMIN_USER
+          value: admin
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          value: admin
+        - name: GF_USERS_ALLOW_SIGN_UP
+          value: "false"
+        - name: GF_SERVER_ROOT_URL
+          value: http://localhost:3000
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        volumeMounts:
+        # Persistent data
+        - name: grafana-data
+          mountPath: /var/lib/grafana
+        # Datasource provisioning
+        - name: grafana-datasources
+          mountPath: /etc/grafana/provisioning/datasources
+        # Dashboard provider provisioning
+        - name: grafana-dashboard-provider
+          mountPath: /etc/grafana/provisioning/dashboards
+        # Dashboard JSON files - HPA
+        - name: dashboard-hpa
+          mountPath: /etc/grafana/dashboards/blog-hpa-monitoring.json
+          subPath: blog-hpa-monitoring.json
+        # Dashboard JSON files - Overview
+        - name: dashboard-overview
+          mountPath: /etc/grafana/dashboards/blog-system-overview.json
+          subPath: blog-system-overview.json
+      volumes:
+      - name: grafana-data
+        persistentVolumeClaim:
+          claimName: grafana-data-pvc
+      - name: grafana-datasources
+        configMap:
+          name: grafana-datasources
+      - name: grafana-dashboard-provider
+        configMap:
+          name: grafana-dashboard-provider
+      - name: dashboard-hpa
+        configMap:
+          name: grafana-dashboard-hpa
+      - name: dashboard-overview
+        configMap:
+          name: grafana-dashboard-overview
