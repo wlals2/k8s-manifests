@@ -70,6 +70,10 @@ spec:
         - name: dashboard-logs
           mountPath: /etc/grafana/dashboards/logs-dashboard.json
           subPath: logs-dashboard.json
+        # Dashboard JSON files - CronJob
+        - name: dashboard-cronjob
+          mountPath: /etc/grafana/dashboards/cronjob-dashboard.json
+          subPath: cronjob-dashboard.json
       volumes:
       - name: grafana-data
         persistentVolumeClaim:
@@ -92,3 +96,6 @@ spec:
       - name: dashboard-logs
         configMap:
           name: grafana-dashboard-logs
+      - name: dashboard-cronjob
+        configMap:
+          name: grafana-dashboard-cronjob
