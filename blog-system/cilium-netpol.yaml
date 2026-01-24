@@ -291,19 +291,14 @@ spec:
 
   # Ingress
   ingress:
-  # Rule 1: monitoring/prometheus → mysql-exporter:9104 허용
+  # Rule 1: monitoring namespace → mysql-exporter:9104 허용
   - fromEndpoints:
     - matchLabels:
-        app: prometheus
-        io.kubernetes.pod.namespace: monitoring
+        k8s:io.kubernetes.pod.namespace: monitoring
     toPorts:
     - ports:
       - port: "9104"
         protocol: TCP
-      rules:
-        http:
-        - method: "GET"
-          path: "/metrics"
 
   # Rule 2: 같은 Pod 내부 통신 허용 (헬스체크)
   - fromEndpoints:
