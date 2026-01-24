@@ -42,7 +42,7 @@ data:
           "id": 1,
           "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
           "pluginVersion": "10.0.0",
-          "targets": [{ "expr": "up{job=\"kubernetes-pods\",kubernetes_namespace=\"blog-system\",app=\"was\"}", "legendFormat": "WAS", "refId": "A" }],
+          "targets": [{ "expr": "clamp_max(sum(kube_pod_status_ready{namespace=\"blog-system\",pod=~\"was.*\",condition=\"true\"}),1)", "legendFormat": "WAS", "refId": "A" }],
           "title": "WAS 상태",
           "type": "stat"
         },
@@ -61,7 +61,7 @@ data:
           "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
           "id": 2,
           "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-          "targets": [{ "expr": "up{job=\"kubernetes-pods\",kubernetes_namespace=\"blog-system\",app=\"web\"}", "legendFormat": "WEB", "refId": "A" }],
+          "targets": [{ "expr": "clamp_max(sum(kube_pod_status_ready{namespace=\"blog-system\",pod=~\"web.*\",condition=\"true\"}),1)", "legendFormat": "WEB", "refId": "A" }],
           "title": "WEB 상태",
           "type": "stat"
         },
