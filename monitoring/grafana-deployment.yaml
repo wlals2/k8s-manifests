@@ -74,6 +74,10 @@ spec:
         - name: dashboard-cronjob
           mountPath: /etc/grafana/dashboards/cronjob-dashboard.json
           subPath: cronjob-dashboard.json
+        # Dashboard JSON files - Blackbox Exporter
+        - name: dashboard-blackbox
+          mountPath: /etc/grafana/dashboards/blackbox-dashboard.json
+          subPath: blackbox-dashboard.json
       volumes:
       - name: grafana-data
         persistentVolumeClaim:
@@ -99,3 +103,6 @@ spec:
       - name: dashboard-cronjob
         configMap:
           name: grafana-dashboard-cronjob
+      - name: dashboard-blackbox
+        configMap:
+          name: grafana-dashboard-blackbox

@@ -1,0 +1,337 @@
+# ==============================================================================
+# Grafana Dashboard ConfigMap - Blackbox Exporter
+# ==============================================================================
+# 목적: 외부 서비스 가용성 및 응답 시간 모니터링
+#
+# 포함된 패널:
+# 1. 서비스 가용성 상태 (UP/DOWN)
+# 2. HTTP 응답 시간 (WEB, WAS)
+# 3. SSL 인증서 만료일
+# 4. TCP 연결 상태 (MySQL)
+# 5. Probe 히스토리
+# ==============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-blackbox
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+    tier: monitoring
+data:
+  blackbox-dashboard.json: |
+    {
+      "annotations": { "list": [] },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "id": null,
+      "links": [],
+      "liveNow": false,
+      "panels": [
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "id": 100,
+          "panels": [],
+          "title": "서비스 가용성 상태",
+          "type": "row"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "mappings": [
+                { "options": { "0": { "color": "red", "index": 1, "text": "DOWN" } }, "type": "value" },
+                { "options": { "1": { "color": "green", "index": 0, "text": "UP" } }, "type": "value" }
+              ],
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] }
+            }
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+          "id": 1,
+          "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+          "targets": [{ "expr": "probe_success{job=\"blackbox-http\",instance=~\".*web-service.*\"}", "legendFormat": "WEB", "refId": "A" }],
+          "title": "WEB 서비스",
+          "type": "stat"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "mappings": [
+                { "options": { "0": { "color": "red", "index": 1, "text": "DOWN" } }, "type": "value" },
+                { "options": { "1": { "color": "green", "index": 0, "text": "UP" } }, "type": "value" }
+              ],
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] }
+            }
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+          "id": 2,
+          "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+          "targets": [{ "expr": "probe_success{job=\"blackbox-http\",instance=~\".*was-service.*\"}", "legendFormat": "WAS", "refId": "A" }],
+          "title": "WAS 서비스",
+          "type": "stat"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "mappings": [
+                { "options": { "0": { "color": "red", "index": 1, "text": "DOWN" } }, "type": "value" },
+                { "options": { "1": { "color": "green", "index": 0, "text": "UP" } }, "type": "value" }
+              ],
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] }
+            }
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+          "id": 3,
+          "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+          "targets": [{ "expr": "probe_success{job=\"blackbox-tcp\",instance=~\".*mysql.*\"}", "legendFormat": "MySQL", "refId": "A" }],
+          "title": "MySQL (TCP)",
+          "type": "stat"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "unit": "percentunit",
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "yellow", "value": 0.9 }, { "color": "green", "value": 0.99 } ] }
+            }
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+          "id": 4,
+          "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false }, "textMode": "auto" },
+          "targets": [{ "expr": "avg(avg_over_time(probe_success[24h]))", "legendFormat": "Availability", "refId": "A" }],
+          "title": "전체 가용성 (24h)",
+          "type": "stat"
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+          "id": 101,
+          "panels": [],
+          "title": "HTTP 응답 시간",
+          "type": "row"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "barAlignment": 0, "drawStyle": "line", "fillOpacity": 10, "gradientMode": "none", "hideFrom": { "legend": false, "tooltip": false, "viz": false }, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5, "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": false, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "line" } },
+              "unit": "s",
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 0.5 }, { "color": "red", "value": 1 } ] }
+            }
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+          "id": 10,
+          "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [
+            { "expr": "probe_http_duration_seconds{job=\"blackbox-http\",phase=\"resolve\"}", "legendFormat": "{{instance}} - DNS", "refId": "A" },
+            { "expr": "probe_http_duration_seconds{job=\"blackbox-http\",phase=\"connect\"}", "legendFormat": "{{instance}} - Connect", "refId": "B" },
+            { "expr": "probe_http_duration_seconds{job=\"blackbox-http\",phase=\"tls\"}", "legendFormat": "{{instance}} - TLS", "refId": "C" },
+            { "expr": "probe_http_duration_seconds{job=\"blackbox-http\",phase=\"processing\"}", "legendFormat": "{{instance}} - Processing", "refId": "D" },
+            { "expr": "probe_http_duration_seconds{job=\"blackbox-http\",phase=\"transfer\"}", "legendFormat": "{{instance}} - Transfer", "refId": "E" }
+          ],
+          "title": "HTTP 응답 시간 (Phase별)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "barAlignment": 0, "drawStyle": "line", "fillOpacity": 20, "gradientMode": "none", "hideFrom": { "legend": false, "tooltip": false, "viz": false }, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5, "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": false, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "off" } },
+              "unit": "s"
+            }
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+          "id": 11,
+          "options": { "legend": { "calcs": ["mean", "max", "last"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [
+            { "expr": "probe_duration_seconds{job=\"blackbox-http\"}", "legendFormat": "{{instance}}", "refId": "A" }
+          ],
+          "title": "전체 Probe 시간",
+          "type": "timeseries"
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+          "id": 102,
+          "panels": [],
+          "title": "HTTP 상태 코드",
+          "type": "row"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "mappings": [
+                { "options": { "200": { "color": "green", "index": 0, "text": "200 OK" } }, "type": "value" },
+                { "options": { "301": { "color": "blue", "index": 1, "text": "301 Moved" } }, "type": "value" },
+                { "options": { "302": { "color": "blue", "index": 2, "text": "302 Found" } }, "type": "value" },
+                { "options": { "404": { "color": "orange", "index": 3, "text": "404 Not Found" } }, "type": "value" },
+                { "options": { "500": { "color": "red", "index": 4, "text": "500 Error" } }, "type": "value" },
+                { "options": { "502": { "color": "red", "index": 5, "text": "502 Bad Gateway" } }, "type": "value" },
+                { "options": { "503": { "color": "red", "index": 6, "text": "503 Unavailable" } }, "type": "value" }
+              ],
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 400 }, { "color": "red", "value": 500 } ] }
+            }
+          },
+          "gridPos": { "h": 4, "w": 8, "x": 0, "y": 15 },
+          "id": 20,
+          "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+          "targets": [{ "expr": "probe_http_status_code{job=\"blackbox-http\",instance=~\".*web-service.*\"}", "legendFormat": "WEB", "refId": "A" }],
+          "title": "WEB HTTP 상태",
+          "type": "stat"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "mappings": [
+                { "options": { "200": { "color": "green", "index": 0, "text": "200 OK" } }, "type": "value" },
+                { "options": { "301": { "color": "blue", "index": 1, "text": "301 Moved" } }, "type": "value" },
+                { "options": { "302": { "color": "blue", "index": 2, "text": "302 Found" } }, "type": "value" },
+                { "options": { "404": { "color": "orange", "index": 3, "text": "404 Not Found" } }, "type": "value" },
+                { "options": { "500": { "color": "red", "index": 4, "text": "500 Error" } }, "type": "value" },
+                { "options": { "502": { "color": "red", "index": 5, "text": "502 Bad Gateway" } }, "type": "value" },
+                { "options": { "503": { "color": "red", "index": 6, "text": "503 Unavailable" } }, "type": "value" }
+              ],
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 400 }, { "color": "red", "value": 500 } ] }
+            }
+          },
+          "gridPos": { "h": 4, "w": 8, "x": 8, "y": 15 },
+          "id": 21,
+          "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+          "targets": [{ "expr": "probe_http_status_code{job=\"blackbox-http\",instance=~\".*was-service.*\"}", "legendFormat": "WAS", "refId": "A" }],
+          "title": "WAS HTTP 상태",
+          "type": "stat"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "unit": "short",
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] }
+            }
+          },
+          "gridPos": { "h": 4, "w": 8, "x": 16, "y": 15 },
+          "id": 22,
+          "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+          "targets": [{ "expr": "probe_http_version{job=\"blackbox-http\"}", "legendFormat": "{{instance}}", "refId": "A" }],
+          "title": "HTTP Version",
+          "type": "stat"
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 19 },
+          "id": 103,
+          "panels": [],
+          "title": "Probe 히스토리",
+          "type": "row"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "barAlignment": 0, "drawStyle": "line", "fillOpacity": 30, "gradientMode": "none", "hideFrom": { "legend": false, "tooltip": false, "viz": false }, "lineInterpolation": "stepAfter", "lineWidth": 2, "pointSize": 5, "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": false, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "off" } },
+              "mappings": [
+                { "options": { "0": { "color": "red", "index": 1, "text": "DOWN" } }, "type": "value" },
+                { "options": { "1": { "color": "green", "index": 0, "text": "UP" } }, "type": "value" }
+              ],
+              "max": 1,
+              "min": 0
+            },
+            "overrides": [
+              { "matcher": { "id": "byRegexp", "options": ".*web.*" }, "properties": [ { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } } ] },
+              { "matcher": { "id": "byRegexp", "options": ".*was.*" }, "properties": [ { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } } ] },
+              { "matcher": { "id": "byRegexp", "options": ".*mysql.*" }, "properties": [ { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } } ] }
+            ]
+          },
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+          "id": 30,
+          "options": { "legend": { "calcs": ["mean"], "displayMode": "table", "placement": "right", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [
+            { "expr": "probe_success{job=~\"blackbox.*\"}", "legendFormat": "{{instance}}", "refId": "A" }
+          ],
+          "title": "Probe 성공/실패 히스토리",
+          "type": "timeseries"
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 },
+          "id": 104,
+          "panels": [],
+          "title": "TCP 연결 상세",
+          "type": "row"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "barAlignment": 0, "drawStyle": "line", "fillOpacity": 10, "gradientMode": "none", "hideFrom": { "legend": false, "tooltip": false, "viz": false }, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5, "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": false, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "off" } },
+              "unit": "s"
+            }
+          },
+          "gridPos": { "h": 6, "w": 12, "x": 0, "y": 29 },
+          "id": 40,
+          "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [
+            { "expr": "probe_duration_seconds{job=\"blackbox-tcp\"}", "legendFormat": "{{instance}}", "refId": "A" }
+          ],
+          "title": "TCP 연결 시간",
+          "type": "timeseries"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "custom": { "align": "auto", "displayMode": "auto" },
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] }
+            },
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "Status" }, "properties": [ { "id": "mappings", "value": [ { "options": { "0": { "color": "red", "index": 1, "text": "DOWN" }, "1": { "color": "green", "index": 0, "text": "UP" } }, "type": "value" } ] }, { "id": "custom.displayMode", "value": "color-background" } ] },
+              { "matcher": { "id": "byName", "options": "Duration" }, "properties": [ { "id": "unit", "value": "s" } ] }
+            ]
+          },
+          "gridPos": { "h": 6, "w": 12, "x": 12, "y": 29 },
+          "id": 41,
+          "options": { "showHeader": true, "cellHeight": "sm" },
+          "targets": [
+            { "expr": "probe_success{job=~\"blackbox.*\"}", "format": "table", "instant": true, "refId": "A" },
+            { "expr": "probe_duration_seconds{job=~\"blackbox.*\"}", "format": "table", "instant": true, "refId": "B" }
+          ],
+          "title": "Probe 상태 테이블",
+          "transformations": [
+            { "id": "merge", "options": {} },
+            { "id": "organize", "options": { "excludeByName": { "Time": true, "__name__": true }, "indexByName": {}, "renameByName": { "instance": "Target", "job": "Job", "Value #A": "Status", "Value #B": "Duration" } } }
+          ],
+          "type": "table"
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 38,
+      "style": "dark",
+      "tags": ["blackbox", "availability", "probe", "http"],
+      "templating": { "list": [] },
+      "time": { "from": "now-6h", "to": "now" },
+      "timepicker": {},
+      "timezone": "Asia/Seoul",
+      "title": "Blackbox Exporter - Service Availability",
+      "uid": "blackbox-exporter",
+      "version": 1,
+      "weekStart": ""
+    }
