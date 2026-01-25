@@ -162,6 +162,16 @@ spec:
       - port: "15021"  # Istio health check
         protocol: TCP
 
+  # Rule 4: blackbox-exporter → was:8080 허용 (서비스 가용성 모니터링)
+  - fromEndpoints:
+    - matchLabels:
+        app: blackbox-exporter
+        io.kubernetes.pod.namespace: monitoring
+    toPorts:
+    - ports:
+      - port: "8080"
+        protocol: TCP
+
   # Egress
   egress:
   # Rule 1: was → mysql:3306 허용
