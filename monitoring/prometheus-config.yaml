@@ -20,6 +20,25 @@ data:
         static_configs:
           - targets: ['localhost:9090']
 
+      # Grafana Alloy - 로그 + 시스템 메트릭 통합 (Promtail + node-exporter 대체)
+      - job_name: 'alloy'
+        metrics_path: '/api/v0/component/prometheus.exporter.unix.system/metrics'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - monitoring
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: alloy
+          - source_labels: [__meta_kubernetes_pod_node_name]
+            target_label: instance
+          - source_labels: [__address__]
+            target_label: __address__
+            regex: '([^:]+)(?::\d+)?'
+            replacement: '${1}:12345'
+
       # 시스템 메트릭 (CPU, 메모리, 디스크) - DaemonSet이므로 서비스 디스커버리 사용
       - job_name: 'node-exporter'
         kubernetes_sd_configs:

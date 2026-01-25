@@ -1,0 +1,199 @@
+# ==============================================================================
+# Grafana Alloy DaemonSet - 완전 통합 버전
+# ==============================================================================
+# 통합 기능:
+#   1. Promtail 대체 - Pod 로그 수집 → Loki
+#   2. node-exporter 대체 - 시스템 메트릭 → Prometheus
+#   3. cadvisor 대체 - 컨테이너 메트릭 → Prometheus
+# ==============================================================================
+
+---
+# ServiceAccount for Kubernetes API access
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: alloy
+  namespace: monitoring
+  labels:
+    app: alloy
+
+---
+# ClusterRole for reading Kubernetes resources
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: alloy
+  labels:
+    app: alloy
+rules:
+  - apiGroups: [""]
+    resources:
+      - nodes
+      - nodes/proxy
+      - nodes/metrics
+      - services
+      - endpoints
+      - pods
+      - pods/log  # 로그 수집 권한 추가
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources:
+      - configmaps
+    verbs: ["get"]
+  - nonResourceURLs:
+      - /metrics
+      - /metrics/cadvisor
+    verbs: ["get"]
+
+---
+# ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: alloy
+  labels:
+    app: alloy
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: alloy
+subjects:
+  - kind: ServiceAccount
+    name: alloy
+    namespace: monitoring
+
+---
+# DaemonSet - 각 노드에 1개씩 실행
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: alloy
+  namespace: monitoring
+  labels:
+    app: alloy
+spec:
+  selector:
+    matchLabels:
+      app: alloy
+  template:
+    metadata:
+      labels:
+        app: alloy
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "12345"
+    spec:
+      serviceAccountName: alloy
+      hostNetwork: true  # 시스템 메트릭 수집을 위해 필요
+      hostPID: true      # 프로세스 메트릭 수집을 위해 필요
+      dnsPolicy: ClusterFirstWithHostNet
+
+      containers:
+      - name: alloy
+        image: grafana/alloy:latest
+        imagePullPolicy: IfNotPresent
+
+        args:
+          - run
+          - /etc/alloy/config.alloy
+          - --server.http.listen-addr=0.0.0.0:12345
+          - --storage.path=/var/lib/alloy/data
+          - --stability.level=generally-available
+
+        ports:
+        - containerPort: 12345
+          name: http-metrics
+          protocol: TCP
+
+        env:
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+
+        # 리소스 설정
+        resources:
+          requests:
+            cpu: 500m
+            memory: 512Mi  # 시작은 512Mi로 (테스트 후 조정)
+          limits:
+            cpu: 1000m
+            memory: 1Gi    # 최대 1Gi (필요시 2Gi로 증가)
+
+        # Security Context - 시스템 메트릭 수집을 위해 필요
+        securityContext:
+          privileged: true
+          runAsUser: 0
+
+        volumeMounts:
+        # Alloy 설정 파일
+        - name: config
+          mountPath: /etc/alloy
+
+        # Alloy 데이터 저장소
+        - name: alloy-data
+          mountPath: /var/lib/alloy/data
+
+        # Pod 로그 수집을 위한 마운트
+        - name: varlog
+          mountPath: /var/log
+          readOnly: true
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+
+        # 시스템 메트릭 수집을 위한 마운트 (node-exporter 역할)
+        - name: sys
+          mountPath: /sys
+          readOnly: true
+        - name: root
+          mountPath: /host/root
+          readOnly: true
+          mountPropagation: HostToContainer
+
+      volumes:
+      - name: config
+        configMap:
+          name: alloy-config
+
+      - name: alloy-data
+        emptyDir: {}
+
+      # 로그 수집용 볼륨
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+
+      # 시스템 메트릭 수집용 볼륨
+      - name: sys
+        hostPath:
+          path: /sys
+      - name: root
+        hostPath:
+          path: /
+
+      tolerations:
+      - effect: NoSchedule
+        operator: Exists
+
+---
+# Service for Alloy metrics endpoint
+apiVersion: v1
+kind: Service
+metadata:
+  name: alloy
+  namespace: monitoring
+  labels:
+    app: alloy
+spec:
+  clusterIP: None  # Headless service
+  selector:
+    app: alloy
+  ports:
+  - name: http-metrics
+    port: 12345
+    targetPort: 12345
+    protocol: TCP

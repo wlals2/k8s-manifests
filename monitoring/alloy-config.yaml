@@ -1,0 +1,71 @@
+# ==============================================================================
+# Grafana Alloy 완전 통합 설정 (최종 버전)
+# ==============================================================================
+# 목적: Promtail + node-exporter + cadvisor를 하나의 Agent로 통합
+# 기능:
+#   1. Loki로 로그 전송 (Promtail 역할)
+#   2. Unix 시스템 메트릭 노출 (node-exporter 역할)
+#   3. Alloy 자체 메트릭 노출
+# ==============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alloy-config
+  namespace: monitoring
+  labels:
+    app: alloy
+data:
+  config.alloy: |
+    // =========================================================================
+    // 1. 로그 수집 - Loki (Promtail 대체)
+    // =========================================================================
+
+    // Kubernetes Pod 로그 수집
+    loki.source.kubernetes "pods" {
+      targets    = discovery.kubernetes.pods.targets
+      forward_to = [loki.write.default.receiver]
+    }
+
+    // Kubernetes Service Discovery - Pods
+    discovery.kubernetes "pods" {
+      role = "pod"
+    }
+
+    // Loki로 로그 전송
+    loki.write "default" {
+      endpoint {
+        url = "http://loki-stack.monitoring.svc.cluster.local:3100/loki/api/v1/push"
+      }
+    }
+
+    // =========================================================================
+    // 2. 시스템 메트릭 수집 (node-exporter 대체)
+    // =========================================================================
+
+    // Unix/Linux 시스템 메트릭 Exporter (node-exporter 역할)
+    prometheus.exporter.unix "system" {
+      include_exporter_metrics = true
+      // 자동으로 다음 메트릭 수집:
+      // - node_cpu_seconds_total
+      // - node_memory_*
+      // - node_filesystem_*
+      // - node_network_*
+      // - node_disk_*
+    }
+
+    // Unix Exporter 메트릭을 Alloy 내부에서 수집
+    // forward_to가 빈 배열이면, 메트릭이 /metrics 엔드포인트에 노출됨
+    prometheus.scrape "system" {
+      targets    = prometheus.exporter.unix.system.targets
+      forward_to = []
+    }
+
+    // =========================================================================
+    // Note: Prometheus가 Alloy의 /metrics 엔드포인트를 scrape
+    // =========================================================================
+    // Alloy는 자동으로 http://alloy:12345/metrics 에 다음을 노출:
+    //   1. prometheus.exporter.unix.system 메트릭 (node_*)
+    //   2. loki.source.kubernetes 상태 메트릭
+    //   3. loki.write 상태 메트릭
+    //   4. Alloy 내부 메트릭 (alloy_*)

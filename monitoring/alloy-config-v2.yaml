@@ -1,0 +1,55 @@
+# ==============================================================================
+# Grafana Alloy 완전 통합 설정 v2 (Prometheus Scrape 방식)
+# ==============================================================================
+# 목적: Promtail + node-exporter + cadvisor를 하나의 Agent로 통합
+# 변경사항: Remote Write → Prometheus Scrape 방식
+# ==============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alloy-config
+  namespace: monitoring
+  labels:
+    app: alloy
+data:
+  config.alloy: |
+    // =========================================================================
+    // 1. 로그 수집 - Loki (Promtail 대체)
+    // =========================================================================
+
+    // Kubernetes Pod 로그 수집
+    loki.source.kubernetes "pods" {
+      targets    = discovery.kubernetes.pods.targets
+      forward_to = [loki.write.default.receiver]
+    }
+
+    // Kubernetes Service Discovery - Pods
+    discovery.kubernetes "pods" {
+      role = "pod"
+    }
+
+    // Loki로 로그 전송
+    loki.write "default" {
+      endpoint {
+        url = "http://loki-stack.monitoring.svc.cluster.local:3100/loki/api/v1/push"
+      }
+    }
+
+    // =========================================================================
+    // 2. 시스템 메트릭 수집 - Prometheus (node-exporter 대체)
+    // =========================================================================
+
+    // Unix/Linux 시스템 메트릭 Exporter
+    prometheus.exporter.unix "system" {
+      // node-exporter와 동일한 메트릭 수집
+    }
+
+    // =========================================================================
+    // 3. Alloy 자체 메트릭 노출 (Prometheus가 scrape)
+    // =========================================================================
+
+    // Prometheus가 http://alloy:12345/metrics를 scrape하도록 설정됨
+    // 메트릭 포함:
+    //   - prometheus.exporter.unix.system (node-exporter 역할)
+    //   - Alloy 자체 메트릭 (loki.source, loki.write 상태 등)
