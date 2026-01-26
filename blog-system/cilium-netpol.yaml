@@ -206,6 +206,26 @@ spec:
       - port: "15012"  # Istio xDS
         protocol: TCP
 
+  # Rule 4: Tempo (OpenTelemetry Collector) - Trace 전송
+  - toEndpoints:
+    - matchLabels:
+        app: tempo
+        io.kubernetes.pod.namespace: monitoring
+    toPorts:
+    - ports:
+      - port: "4317"  # OTLP gRPC
+        protocol: TCP
+
+  # Rule 5: GitHub HTTPS (OpenTelemetry Agent 다운로드용 - 초기화 시에만)
+  - toFQDNs:
+    - matchPattern: "*.github.com"
+    - matchPattern: "github.com"
+    - matchName: "objects.githubusercontent.com"
+    toPorts:
+    - ports:
+      - port: "443"
+        protocol: TCP
+
 ---
 # ==============================================================================
 # WEB 보호
