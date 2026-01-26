@@ -36,7 +36,40 @@ data:
         jsonData:
           maxLines: 1000
           derivedFields:
-            - datasourceName: Prometheus
-              matcherRegex: "traceID=(\\w+)"
+            - datasourceName: Tempo
+              matcherRegex: "trace_id=(\\w+)"
               name: TraceID
               url: "$${__value.raw}"
+
+      # Tempo - 분산 추적 데이터 소스
+      - name: Tempo
+        type: tempo
+        access: proxy
+        url: http://tempo:3200
+        isDefault: false
+        editable: false
+        jsonData:
+          httpMethod: GET
+          tracesToLogs:
+            datasourceUid: "Loki"
+            tags: ['job', 'instance', 'pod', 'namespace']
+            mappedTags: [{ key: 'service.name', value: 'job' }]
+            mapTagNamesEnabled: false
+            spanStartTimeShift: '1h'
+            spanEndTimeShift: '1h'
+            filterByTraceID: false
+            filterBySpanID: false
+          tracesToMetrics:
+            datasourceUid: "Prometheus"
+            tags: [{ key: 'service.name', value: 'job' }, { key: 'job' }]
+            queries:
+              - name: 'Sample query'
+                query: 'sum(rate(tempo_spanmetrics_latency_bucket{$$__tags}[5m]))'
+          serviceMap:
+            datasourceUid: "Prometheus"
+          nodeGraph:
+            enabled: true
+          search:
+            hide: false
+          lokiSearch:
+            datasourceUid: "Loki"
