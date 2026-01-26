@@ -62,11 +62,9 @@ data:
           max_workers: 100
           queue_depth: 10000
 
-    # 쿼리 최적화
+    # 쿼리 최적화 (monolithic 모드)
     querier:
       max_concurrent_queries: 20
-      frontend_worker:
-        frontend_address: tempo:9095
 
     # 메트릭
     metrics_generator:

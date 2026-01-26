@@ -1,0 +1,42 @@
+# ==============================================================================
+# Istio Ingress Gateway - Tracing EnvoyFilter
+# ==============================================================================
+# 목적: Istio Ingress Gateway에서 trace를 강제로 생성
+#
+# 설정:
+# - start_child_span: true (항상 새 trace 시작)
+# - spawn_upstream_span: true (upstream span 생성)
+# - operation_name: INGRESS (Gateway 식별)
+#
+# 적용 대상: istio-ingressgateway (istio-system namespace)
+# ==============================================================================
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: gateway-tracing
+  namespace: istio-system
+spec:
+  # Istio Ingress Gateway에만 적용
+  workloadSelector:
+    labels:
+      istio: ingressgateway
+
+  configPatches:
+  # HTTP Connection Manager의 tracing 설정 패치
+  - applyTo: NETWORK_FILTER
+    match:
+      context: GATEWAY
+      listener:
+        filterChain:
+          filter:
+            name: "envoy.filters.network.http_connection_manager"
+    patch:
+      operation: MERGE
+      value:
+        typed_config:
+          "@type": "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
+          tracing:
+            # Provider는 Telemetry 리소스에서 지정됨 (otel-tracing → Tempo)
+            # Gateway에서 upstream (WEB) span 생성
+            spawn_upstream_span: true
+            # Sampling은 Telemetry 리소스 설정 사용 (100%)

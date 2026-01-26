@@ -1,15 +1,22 @@
+# ==============================================================================
+# Istio Telemetry - Distributed Tracing Configuration
+# ==============================================================================
+# 목적: Istio Service Mesh에서 Tempo로 Trace 전송
+#
+# 설정:
+# - randomSamplingPercentage: 100 (모든 요청 추적)
+# - providers: otel-tracing (Tempo OTLP gRPC)
+# - match.mode: CLIENT_AND_SERVER (양방향 추적)
+# ==============================================================================
 apiVersion: telemetry.istio.io/v1
 kind: Telemetry
 metadata:
-  annotations:
-    kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"telemetry.istio.io/v1alpha1","kind":"Telemetry","metadata":{"annotations":{},"name":"tracing-default","namespace":"istio-system"},"spec":{"tracing":[{"randomSamplingPercentage":100}]}}
-  creationTimestamp: "2026-01-20T13:37:56Z"
-  generation: 1
   name: tracing-default
   namespace: istio-system
-  resourceVersion: "3963999"
-  uid: 8bb1a48d-7efc-48b7-9d4a-7e38b41eee3d
 spec:
   tracing:
   - randomSamplingPercentage: 100
+    providers:
+    - name: otel-tracing
+    match:
+      mode: CLIENT_AND_SERVER
