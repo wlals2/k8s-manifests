@@ -220,7 +220,7 @@ spec:
   - toFQDNs:
     - matchPattern: "*.github.com"
     - matchPattern: "github.com"
-    - matchName: "objects.githubusercontent.com"
+    - matchPattern: "*.githubusercontent.com"
     toPorts:
     - ports:
       - port: "443"
