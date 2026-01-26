@@ -54,12 +54,11 @@ spec:
       # ==============================================================================
       initContainers:
         - name: otel-agent-download
-          image: alpine:3.19
+          image: curlimages/curl:8.5.0
           command:
             - sh
             - -c
             - |
-              apk add --no-cache curl
               curl -L -f -o /otel/opentelemetry-javaagent.jar \
                 --connect-timeout 30 \
                 --max-time 300 \
