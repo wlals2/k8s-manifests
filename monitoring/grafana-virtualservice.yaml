@@ -1,0 +1,16 @@
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: grafana-vsvc
+  namespace: monitoring
+spec:
+  hosts:
+  - monitoring.jiminhome.shop
+  gateways:
+  - blog-system/blog-gateway
+  http:
+  - route:
+    - destination:
+        host: grafana.monitoring.svc.cluster.local
+        port:
+          number: 3000
