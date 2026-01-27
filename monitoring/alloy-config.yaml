@@ -32,12 +32,14 @@ data:
       role = "pod"
     }
 
-    // Label relabeling: __meta_kubernetes_namespace → namespace
+    // Label relabeling: instance label에서 namespace 추출
+    // instance="namespace/pod-name:container" → namespace="namespace"
     loki.relabel "add_namespace" {
       forward_to = [loki.write.default.receiver]
 
       rule {
-        source_labels = ["__meta_kubernetes_namespace"]
+        source_labels = ["instance"]
+        regex         = "^([^/]+)/.*"
         target_label  = "namespace"
       }
     }
