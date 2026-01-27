@@ -24,7 +24,7 @@ data:
     // Kubernetes Pod 로그 수집
     loki.source.kubernetes "pods" {
       targets    = discovery.kubernetes.pods.targets
-      forward_to = [loki.process.add_namespace.receiver]
+      forward_to = [loki.relabel.add_namespace.receiver]
     }
 
     // Kubernetes Service Discovery - Pods
@@ -32,14 +32,13 @@ data:
       role = "pod"
     }
 
-    // 로그 처리: instance label에서 namespace 추출
-    loki.process "add_namespace" {
+    // Label relabeling: __meta_kubernetes_namespace → namespace
+    loki.relabel "add_namespace" {
       forward_to = [loki.write.default.receiver]
 
-      stage.label_extract {
-        source = "instance"
-        // instance="namespace/pod-name:container" → namespace="namespace"
-        regex  = "^(?P<namespace>[^/]+)/"
+      rule {
+        source_labels = ["__meta_kubernetes_namespace"]
+        target_label  = "namespace"
       }
     }
 
