@@ -46,3 +46,18 @@ spec:
     jsonPointers:
     - /spec/subsets/0/labels
     - /spec/subsets/1/labels
+
+  # WEB VirtualService - Rollouts가 weight 동적 수정
+  - group: networking.istio.io
+    kind: VirtualService
+    name: web-vsvc
+    jsonPointers:
+    - /spec/http/0/route
+    - /spec/http/1/route
+
+  # WAS VirtualService - Rollouts가 weight 동적 수정
+  - group: networking.istio.io
+    kind: VirtualService
+    name: was-vsvc
+    jsonPointers:
+    - /spec/http/0/route
