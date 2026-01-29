@@ -29,6 +29,22 @@ spec:
       retryOn: 5xx,reset,connect-failure
     timeout: 15s
 
+  # Route 1.5: OAuth 인증 → WAS Service (Decap CMS OAuth)
+  - match:
+    - uri:
+        prefix: "/auth"
+    route:
+    - destination:
+        host: was-service  # WAS로 직접 라우팅
+        subset: stable
+        port:
+          number: 8080
+    retries:
+      attempts: 3
+      perTryTimeout: 3s
+      retryOn: 5xx,reset,connect-failure
+    timeout: 15s
+
   # Route 2: Board 요청 → WEB Service
   - match:
     - uri:
