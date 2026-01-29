@@ -105,6 +105,16 @@ spec:
                 secretKeyRef:
                   name: mysql-secret
                   key: mysql-root-password
+            # GitHub OAuth (Decap CMS)
+            - name: GITHUB_OAUTH_CLIENT_ID
+              value: "Ov23liUDXOW2o62lb8a3"
+            - name: GITHUB_OAUTH_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: github-oauth-secret
+                  key: client-secret
+            - name: GITHUB_OAUTH_REDIRECT_URI
+              value: "https://blog.jiminhome.shop/auth/callback"
             # OpenTelemetry Java Agent 활성화
             - name: JAVA_TOOL_OPTIONS
               value: "-javaagent:/otel/opentelemetry-javaagent.jar"
