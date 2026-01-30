@@ -29,6 +29,22 @@ spec:
       retryOn: 5xx,reset,connect-failure
     timeout: 15s
 
+  # Route 1.5: OAuth 요청 → WEB Service (Nginx가 WAS로 프록시)
+  - match:
+    - uri:
+        prefix: "/auth"
+    route:
+    - destination:
+        host: web-service
+        subset: stable
+        port:
+          number: 80
+    retries:
+      attempts: 3
+      perTryTimeout: 3s
+      retryOn: 5xx,reset,connect-failure
+    timeout: 15s
+
   # Route 2: Board 요청 → WEB Service
   - match:
     - uri:
