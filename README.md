@@ -2,6 +2,45 @@
 
 > Kubernetes manifest repository for ArgoCD GitOps
 
+**최종 업데이트**: 2026-01-30
+
+---
+
+## ⚠️ 핵심 원칙 (MANDATORY)
+
+### 1. 이 저장소는 YAML만 포함
+
+- ✅ Kubernetes manifest YAML 파일
+- ❌ 문서 파일 (MD, TXT 등) → `/home/jimin/docs/`로 이동
+- ❌ 백업 파일 (.bak, .old 등) → 아카이브
+
+### 2. 직접 kubectl 수정 절대 금지
+
+```bash
+❌ kubectl edit deployment web -n blog-system
+❌ kubectl patch service mysql -n blog-system
+❌ kubectl apply -f temp.yaml
+
+✅ 1. Git에서 YAML 수정
+✅ 2. git commit & push
+✅ 3. ArgoCD 자동 동기화 (3초)
+```
+
+**이유**: ArgoCD SelfHeal이 Git 상태로 자동 복구
+
+### 3. Git = Single Source of Truth
+
+- 클러스터 상태 ≠ Git → Git이 정답
+- 모든 변경은 Git에 먼저 기록
+
+**📚 상세 문서**: `/home/jimin/docs/`
+- `01-ARCHITECTURE.md` - 아키텍처 원칙
+- `05-AUTOSCALING.md` - HPA/VPA 가이드
+- `06-CANARY-DEPLOYMENT.md` - Rollouts 전략
+- `components/argocd/` - GitOps 가이드
+
+---
+
 ## Structure
 
 ```

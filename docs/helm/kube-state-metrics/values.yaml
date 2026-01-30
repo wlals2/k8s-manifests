@@ -1,9 +1,0 @@
-# Kube State Metrics Custom Values
-# 기본값으로 설치 (오버라이드 없음)
-
-# 필요 시 아래 설정 추가
-# replicas: 1
-# resources:
-#   requests:
-#     cpu: 10m
-#     memory: 32Mi

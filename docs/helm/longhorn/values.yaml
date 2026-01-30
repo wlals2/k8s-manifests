@@ -1,8 +1,0 @@
-# Longhorn Custom Values
-# 기본값 외 변경사항만 기록
-
-defaultSettings:
-  # 노드 2개이므로 replica 2로 설정
-  defaultReplicaCount: 2
-  # 노드 장애 시 자동 failover (Pod 자동 삭제 → 다른 노드에 재스케줄링)
-  nodeDownPodDeletionPolicy: delete-both-statefulset-and-deployment-pod
