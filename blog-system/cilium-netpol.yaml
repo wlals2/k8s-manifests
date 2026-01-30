@@ -142,6 +142,8 @@ spec:
           path: "/api/.*"
         - method: "GET"
           path: "/actuator/.*"
+        - method: "GET"
+          path: "/auth/.*"
 
   # Rule 2: 같은 Pod 내부 통신 허용
   - fromEndpoints:
