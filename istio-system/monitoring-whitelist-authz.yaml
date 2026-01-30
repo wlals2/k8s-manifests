@@ -1,0 +1,33 @@
+---
+# 모니터링 도구 접근 제어 (L7 - Host 헤더 기반)
+# ADR 001 원칙: Cilium(L3/L4) 개방, Istio(L7) Host별 IP 제한
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: monitoring-whitelist
+  namespace: istio-system
+  annotations:
+    description: "Host별 IP 제어: blog는 모두 허용, 모니터링 도구는 192.168.1.0/24만"
+spec:
+  selector:
+    matchLabels:
+      app: istio-ingressgateway  # Gateway에 적용
+  action: ALLOW
+  rules:
+  # 1. blog는 모두 허용 (전세계 공개)
+  - to:
+    - operation:
+        hosts: ["blog.jiminhome.shop"]
+    # from 없음 → 모든 소스 IP 허용
+
+  # 2. 모니터링 도구는 192.168.1.0/24만 허용 (내부 전용)
+  - to:
+    - operation:
+        hosts:
+        - "hubble.jiminhome.shop"
+        - "kiali.jiminhome.shop"
+        - "argocd.jiminhome.shop"
+        - "monitoring.jiminhome.shop"
+    from:
+    - source:
+        remoteIpBlocks: ["192.168.1.0/24"]  # 사내 IP만

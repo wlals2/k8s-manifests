@@ -1,7 +1,7 @@
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
-  name: huuble-ui-routes
+  name: hubble-ui-routes
   namespace: istio-system
   labels:
     app: hubble-ui
@@ -18,7 +18,7 @@ spec:
         prefix: "/"
     route:
     - destination:
-        host: hubble-ui  # 같은 namespace 내 서비스
+        host: hubble-ui.kube-system.svc.cluster.local  # kube-system namespace의 서비스 (FQDN)
         port:
           number: 80
     timeout: 30s

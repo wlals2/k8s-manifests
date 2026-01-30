@@ -11,6 +11,7 @@ metadata:
     metallb.universe.tf/loadBalancerIPs: 192.168.1.200  # Nginx Ingress IP 재사용
 spec:
   type: LoadBalancer
+  externalTrafficPolicy: Local  # 원본 IP 보존 (Istio AuthZ 위해 필수)
   selector:
     app: istio-ingressgateway
     istio: ingressgateway
