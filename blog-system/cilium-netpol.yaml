@@ -121,7 +121,7 @@ spec:
 
   # Ingress
   ingress:
-  # Rule 1: web → was:8080 허용
+  # Rule 1: web → was:8080 허용 (L3/L4만 검사, L7은 Istio가 담당)
   - fromEndpoints:
     - matchLabels:
         app: web  # web Pod에서만
@@ -130,22 +130,6 @@ spec:
     - ports:
       - port: "8080"
         protocol: TCP
-      rules:
-        http:
-        - method: "GET"
-          path: "/api/.*"
-        - method: "POST"
-          path: "/api/.*"
-        - method: "PUT"
-          path: "/api/.*"
-        - method: "DELETE"
-          path: "/api/.*"
-        - method: "GET"
-          path: "/actuator/.*"
-        - method: "GET"
-          path: "/auth"
-        - method: "GET"
-          path: "/auth/.*"
 
   # Rule 2: 같은 Pod 내부 통신 허용
   - fromEndpoints:
