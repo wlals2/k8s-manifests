@@ -37,4 +37,4 @@ spec:
   - to:
     - operation:
         ports: ["8080"]  # WAS 포트만 허용
-        paths: ["/api/*", "/actuator/*"]  # API 및 모니터링 경로만
+        paths: ["/api/*", "/actuator/*", "/auth/*"]  # API, 모니터링, OAuth 경로만
