@@ -35,8 +35,7 @@ spec:
         prefix: "/auth"
     route:
     - destination:
-        host: was-service  # WAS로 직접 라우팅
-        subset: stable
+        host: was-service  # WAS로 직접 라우팅 (subset 제거 - Rollouts 충돌 방지)
         port:
           number: 8080
     retries:
