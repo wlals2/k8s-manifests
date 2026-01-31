@@ -1,0 +1,12 @@
+apiVersion: v2
+name: my-falco
+description: Wrapper chart for Falco security monitoring
+type: application
+version: 0.1.0        # 이 Wrapper Chart 자체의 버전 (내 마음대로)
+appVersion: "0.42.1"  # Falco 애플리케이션 버전
+
+# 외부 차트를 dependency로 가져오기
+dependencies:
+  - name: falco
+    version: 7.2.1  # ✅ 현재 사용 중인 버전 (helm list 확인)
+    repository: https://falcosecurity.github.io/charts

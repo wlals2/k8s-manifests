@@ -25,3 +25,7 @@ Thumbs.db
 # 임시 파일
 *.log
 *.pid
+
+# Helm dependency (ArgoCD가 자동 다운로드)
+**/charts/
+**/Chart.lock

