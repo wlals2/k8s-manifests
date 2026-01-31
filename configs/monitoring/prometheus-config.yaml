@@ -173,6 +173,7 @@ data:
           module: [http_2xx]
         static_configs:
           - targets:
+            - http://blog.jiminhome.shop  # ✨ 외부 접근 (가장 중요! 사용자 관점)
             - http://web-service.blog-system.svc.cluster.local
             - http://was-service.blog-system.svc.cluster.local:8080/api/posts
         relabel_configs:

@@ -1,0 +1,85 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: monitoring
+data:
+  alertmanager.yml: |
+    global:
+      resolve_timeout: 5m
+      # Discord Webhook (Slack 호환 모드)
+      slack_api_url: 'https://discordapp.com/api/webhooks/1467150664336408668/L8uFfxn5O8WXLpt99Q1oeWmhp6H9ae8OOb0oUMzmWojIGDuufs-zDbZ2JnrSE7Mm9Ya-/slack'
+
+    route:
+      group_by: ['alertname', 'namespace', 'severity']
+      group_wait: 30s          # ✨ 30초 동안 모아서 전송
+      group_interval: 30s      # ✨ 같은 그룹 알람 30초 간격
+      repeat_interval: 4h      # ✨ 4시간 동안 중복 방지
+      receiver: 'discord-homelab'
+      routes:
+        - match:
+            severity: critical
+          receiver: 'discord-critical'
+        - match:
+            severity: warning
+          receiver: 'discord-warning'
+
+    receivers:
+      # ℹ️ INFO 레벨 (기본)
+      - name: 'discord-homelab'
+        slack_configs:
+          - channel: '#alerts'  # Discord에서는 무시됨 (Webhook이 채널 결정)
+            username: 'Homelab Alert'
+            icon_emoji: ':information_source:'
+            title: 'ℹ️ [정보] {{ .GroupLabels.alertname }}'
+            text: |
+              **요약:** {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}
+              **상세:** {{ range .Alerts }}{{ .Annotations.description }}{{ end }}
+              **심각도:** {{ .CommonLabels.severity }}
+              **네임스페이스:** {{ .CommonLabels.namespace }}
+              **시작:** {{ range .Alerts }}{{ .StartsAt }}{{ end }}
+            send_resolved: true
+
+      # 🔥 CRITICAL 레벨
+      - name: 'discord-critical'
+        slack_configs:
+          - channel: '#alerts'
+            username: 'Homelab Alert - CRITICAL'
+            icon_emoji: ':fire:'
+            title: '🔥 [심각] {{ .GroupLabels.alertname }}'
+            color: 'danger'  # 빨간색
+            text: |
+              **⚠️ 즉시 확인 필요!**
+
+              **요약:** {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}
+              **상세:** {{ range .Alerts }}{{ .Annotations.description }}{{ end }}
+              **심각도:** {{ .CommonLabels.severity }}
+              **네임스페이스:** {{ .CommonLabels.namespace }}
+              **시작:** {{ range .Alerts }}{{ .StartsAt }}{{ end }}
+
+              **Prometheus:** http://prom.jiminhome.shop
+            send_resolved: true
+
+      # ⚠️ WARNING 레벨
+      - name: 'discord-warning'
+        slack_configs:
+          - channel: '#alerts'
+            username: 'Homelab Alert - Warning'
+            icon_emoji: ':warning:'
+            title: '⚠️ [주의] {{ .GroupLabels.alertname }}'
+            color: 'warning'  # 주황색
+            text: |
+              **요약:** {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}
+              **상세:** {{ range .Alerts }}{{ .Annotations.description }}{{ end }}
+              **심각도:** {{ .CommonLabels.severity }}
+              **네임스페이스:** {{ .CommonLabels.namespace }}
+              **시작:** {{ range .Alerts }}{{ .StartsAt }}{{ end }}
+            send_resolved: true
+
+    inhibit_rules:
+      # Critical 알람 발생 시 Warning 알람 억제
+      - source_match:
+          severity: 'critical'
+        target_match:
+          severity: 'warning'
+        equal: ['alertname', 'namespace']

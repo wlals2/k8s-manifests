@@ -2,7 +2,7 @@ apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
   name: hubble-ui-routes
-  namespace: istio-system
+  namespace: monitoring
   labels:
     app: hubble-ui
 spec:
@@ -10,7 +10,7 @@ spec:
   - "hubble.jiminhome.shop"
 
   gateways:
-  - blog-system/blog-gateway  # blog-system namespace의 Gateway 참조
+  - blog-system/blog-gateway
 
   http:
   - match:
@@ -18,7 +18,7 @@ spec:
         prefix: "/"
     route:
     - destination:
-        host: hubble-ui.kube-system.svc.cluster.local  # kube-system namespace의 서비스 (FQDN)
+        host: hubble-ui.kube-system.svc.cluster.local  # Hubble UI는 kube-system에 배포됨
         port:
           number: 80
     timeout: 30s

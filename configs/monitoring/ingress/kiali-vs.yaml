@@ -2,7 +2,7 @@ apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
   name: kiali-routes
-  namespace: istio-system
+  namespace: monitoring
   labels:
     app: kiali
 spec:
@@ -10,7 +10,7 @@ spec:
   - "kiali.jiminhome.shop"
 
   gateways:
-  - blog-system/blog-gateway  # blog-system namespace의 Gateway 참조
+  - blog-system/blog-gateway
 
   http:
   - match:
@@ -18,7 +18,7 @@ spec:
         prefix: "/"
     route:
     - destination:
-        host: kiali  # 같은 namespace 내 서비스
+        host: kiali.istio-system.svc.cluster.local  # Kiali는 istio-system에 배포됨
         port:
           number: 20001
     timeout: 30s

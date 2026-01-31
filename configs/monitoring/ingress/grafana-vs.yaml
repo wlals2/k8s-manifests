@@ -1,16 +1,24 @@
-apiVersion: networking.istio.io/v1
+apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
-  name: grafana-vsvc
+  name: grafana-routes
   namespace: monitoring
+  labels:
+    app: grafana
 spec:
   hosts:
-  - monitoring.jiminhome.shop
+  - "grafana.jiminhome.shop"
+
   gateways:
   - blog-system/blog-gateway
+
   http:
-  - route:
+  - match:
+    - uri:
+        prefix: "/"
+    route:
     - destination:
         host: grafana.monitoring.svc.cluster.local
         port:
           number: 3000
+    timeout: 30s
