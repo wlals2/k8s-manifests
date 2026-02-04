@@ -2,4 +2,12 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - namespace.yaml
+  - blog-ingress.yaml
+  - blog-routes.yaml
+  - cilium-netpol.yaml
+  - hpa.yaml
+  - istio-gateway.yaml
+  - mtls-peerauthentication.yaml
+  - pdb.yaml
+  - resource-limits.yaml
+  - vpa.yaml
