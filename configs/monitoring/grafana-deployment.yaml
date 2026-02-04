@@ -36,7 +36,7 @@ spec:
         - name: GF_USERS_ALLOW_SIGN_UP
           value: "false"
         - name: GF_SERVER_ROOT_URL
-          value: http://localhost:3000
+          value: http://grafana.jiminhome.shop
         resources:
           requests:
             cpu: 100m

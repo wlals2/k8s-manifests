@@ -146,5 +146,16 @@ data:
               summary: "HPA 스케일 이벤트"
               description: "{{ $labels.horizontalpodautoscaler }}가 스케일되었습니다. 현재 Replica: {{ $value }}"
 
+          # 🧪 Discord 통합 테스트 알람 (임시)
+          - alert: DiscordIntegrationTest
+            expr: vector(1)  # 항상 true (즉시 발생)
+            for: 0s          # 대기 시간 없음
+            labels:
+              severity: info
+              namespace: monitoring
+            annotations:
+              summary: "Discord 통합 테스트"
+              description: "Prometheus → AlertManager → Discord 전체 플로우 테스트입니다. 이 메시지가 보이면 알람 시스템이 정상 작동합니다."
+
           # ArgoCD 배포 완료
           # (ArgoCD Prometheus metrics가 있을 경우)
