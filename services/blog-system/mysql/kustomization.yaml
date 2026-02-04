@@ -2,7 +2,11 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - mysql-statefulset.yaml
+  - mysql-deployment.yaml
   - mysql-service.yaml
   - mysql-pvc.yaml
-  - mysql-virtualservice.yaml
+  - mysql-circuit-breaker.yaml
+  - mysql-exporter.yaml
+  - mysql-exporter-sealedsecret.yaml
+  - mysql-sealedsecret.yaml
+  - mysql-mtls-exception.yaml

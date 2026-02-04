@@ -4,7 +4,8 @@ kind: Kustomization
 resources:
   - was-rollout.yaml
   - was-service.yaml
-  - was-hpa.yaml
-  - was-virtualservice.yaml
+  - was-configmap.yaml
   - was-destinationrule.yaml
+  - was-retry-timeout.yaml
   - authz-was.yaml
+  - github-oauth-sealedsecret.yaml
