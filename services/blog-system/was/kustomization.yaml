@@ -1,11 +1,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+# WAS (백엔드 API) - Spring Boot 애플리케이션
 resources:
-  - was-rollout.yaml
-  - was-service.yaml
-  - was-configmap.yaml
-  - was-destinationrule.yaml
-  - was-retry-timeout.yaml
-  - authz-was.yaml
-  - github-oauth-sealedsecret.yaml
+  - was-rollout.yaml                # Argo Rollouts (Canary 배포)
+  - was-service.yaml                # ClusterIP Service (8080)
+  - was-configmap.yaml              # 애플리케이션 설정
+  - was-destinationrule.yaml        # Istio DestinationRule (서비스 메시)
+  - was-retry-timeout.yaml          # 재시도 및 타임아웃 설정
+  - authz-was.yaml                  # Istio AuthorizationPolicy (접근 제어)
+  - github-oauth-sealedsecret.yaml  # GitHub OAuth Secret (Sealed)

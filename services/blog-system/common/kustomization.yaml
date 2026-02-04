@@ -1,13 +1,14 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+# Common 리소스: 애플리케이션 전체에 적용되는 설정
 resources:
-  - blog-ingress.yaml
-  - blog-routes.yaml
-  - cilium-netpol.yaml
-  - hpa.yaml
-  - istio-gateway.yaml
-  - mtls-peerauthentication.yaml
-  - pdb.yaml
-  - resource-limits.yaml
-  - vpa.yaml
+  - blog-ingress.yaml              # Istio VirtualService (라우팅)
+  - blog-routes.yaml               # HTTP 라우트 설정
+  - cilium-netpol.yaml            # Cilium NetworkPolicy (L3/L4)
+  - hpa.yaml                      # HorizontalPodAutoscaler
+  - istio-gateway.yaml            # Istio Gateway
+  - mtls-peerauthentication.yaml  # mTLS 설정 (PERMISSIVE)
+  - pdb.yaml                      # PodDisruptionBudget
+  - resource-limits.yaml          # LimitRange
+  - vpa.yaml                      # VerticalPodAutoscaler

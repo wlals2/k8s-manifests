@@ -1,12 +1,13 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+# MySQL 데이터베이스 (Istio sidecar 주입 금지)
 resources:
-  - mysql-deployment.yaml
-  - mysql-service.yaml
-  - mysql-pvc.yaml
-  - mysql-circuit-breaker.yaml
-  - mysql-exporter.yaml
-  - mysql-exporter-sealedsecret.yaml
-  - mysql-sealedsecret.yaml
-  - mysql-mtls-exception.yaml
+  - mysql-deployment.yaml           # MySQL 8.0 Deployment
+  - mysql-service.yaml              # ClusterIP Service (3306)
+  - mysql-pvc.yaml                  # Longhorn PVC (50Gi)
+  - mysql-circuit-breaker.yaml      # Istio DestinationRule (회로 차단)
+  - mysql-exporter.yaml             # Prometheus Exporter
+  - mysql-exporter-sealedsecret.yaml  # Exporter Secret (Sealed)
+  - mysql-sealedsecret.yaml         # MySQL Root Password (Sealed)
+  - mysql-mtls-exception.yaml       # mTLS 제외 설정 (DISABLE)

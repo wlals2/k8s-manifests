@@ -1,10 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+# Web (프론트엔드) - Hugo 정적 사이트 (Nginx)
 resources:
-  - web-rollout.yaml
-  - web-service.yaml
-  - web-nginx-config.yaml
-  - web-virtualservice.yaml
-  - web-destinationrule.yaml
-  - authz-web.yaml
+  - web-rollout.yaml           # Argo Rollouts (Canary 배포)
+  - web-service.yaml           # ClusterIP Service (80)
+  - web-nginx-config.yaml      # Nginx 설정 (gzip, cache 등)
+  - web-virtualservice.yaml    # Istio VirtualService (blog.jiminhome.shop)
+  - web-destinationrule.yaml   # Istio DestinationRule (서비스 메시)
+  - authz-web.yaml             # Istio AuthorizationPolicy (접근 제어)

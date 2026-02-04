@@ -1,8 +1,18 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+# Namespace 명시 (모든 리소스에 자동 적용)
+namespace: blog-system
+
+# 공통 라벨 (모든 리소스에 자동 추가)
+commonLabels:
+  app: blog-system
+  managed-by: argocd
+  environment: production
+
+# 리소스 그룹 (컴포넌트별 디렉터리)
 resources:
-  - common
-  - mysql
-  - was
-  - web
+  - common   # Gateway, HPA, VPA, PDB 등 공통 리소스
+  - mysql    # MySQL 데이터베이스
+  - was      # WAS (백엔드 API)
+  - web      # Web (프론트엔드)
