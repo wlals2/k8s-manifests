@@ -37,14 +37,14 @@ data:
 
           # MySQL 서비스 다운
           - alert: MySQLDown
-            expr: probe_success{job="blackbox-tcp", instance=~".*mysql.*"} == 0
+            expr: mysql_up{namespace="blog-system"} == 0
             for: 1m
             labels:
               severity: critical
               namespace: blog-system
             annotations:
               summary: "MySQL 서비스 다운"
-              description: "MySQL Exporter에 접근할 수 없습니다. MySQL이 중단되었을 수 있습니다."
+              description: "MySQL 데이터베이스가 중단되었습니다. 즉시 확인하세요!"
 
           # Pod CrashLoopBackOff
           - alert: PodCrashLooping
