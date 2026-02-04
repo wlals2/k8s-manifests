@@ -29,3 +29,12 @@ Thumbs.db
 # Helm dependency (ArgoCD가 자동 다운로드)
 **/charts/
 **/Chart.lock
+# SealedSecret은 Git 관리 허용 (암호화되어 안전)
+!*-sealedsecret.yaml
+
+# SealedSecret은 Git 관리 허용 (암호화되어 안전)
+!*-sealedsecret.yaml
+
+# 임시 파일
+/tmp/
+*.tmp
