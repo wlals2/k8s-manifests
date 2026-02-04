@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - was-rollout.yaml
+  - was-service.yaml
+  - was-hpa.yaml
+  - was-virtualservice.yaml
+  - was-destinationrule.yaml
+  - authz-was.yaml
