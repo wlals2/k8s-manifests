@@ -1,0 +1,42 @@
+# Sealed Secrets Controller 설정
+
+sealed-secrets:
+  # Controller 배포 설정
+  fullnameOverride: "sealed-secrets-controller"
+  
+  # Namespace
+  # kube-system: 시스템 컴포넌트와 함께 관리
+  namespaceOverride: "kube-system"
+  
+  # Resources
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  
+  # RBAC
+  rbac:
+    create: true
+    clusterRole: true
+    clusterRoleName: "secrets-unsealer"
+  
+  # Service Account
+  serviceAccount:
+    create: true
+    name: "sealed-secrets-controller"
+  
+  # 로그 레벨
+  commandArgs:
+    - "--update-status"
+    - "--key-renew-period=720h"  # 30일마다 키 갱신
+  
+  # Metrics (Prometheus)
+  metrics:
+    serviceMonitor:
+      enabled: true
+      namespace: monitoring
+      labels:
+        release: prometheus
