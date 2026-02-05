@@ -74,10 +74,10 @@ spec:
               echo "etcd Backup to S3 Started"
 
               # etcdctl 설치
-              # apk: Alpine Linux 패키지 관리자
-              # --no-cache: 캐시 사용 안 함 (이미지 크기 최소화)
-              # etcd-ctl: etcd snapshot 생성 도구
-              apk add --no-cache etcd-ctl curl
+              # yum: Amazon Linux 패키지 관리자
+              # -y: 자동 yes (상호작용 없음)
+              # etcd: etcd snapshot 생성 도구
+              yum install -y etcd curl
 
               # 환경 변수 설정
               # DATE: 백업 날짜 (YYYY-MM-DD 형식)
@@ -221,10 +221,10 @@ spec:
               echo "MySQL Backup to S3 Started"
 
               # mysql-client 설치
-              # mysql-client: mysqldump 도구 포함
+              # mysql: mysqldump 도구 포함
               # gzip: SQL 파일 압축 도구
               # 이유: 백업 파일 크기 최소화 (S3 비용 절감)
-              apk add --no-cache mysql-client gzip curl
+              yum install -y mysql gzip curl
 
               DATE=$(date +%Y-%m-%d)
               TIMESTAMP=$(date +%Y%m%d-%H%M%S)
