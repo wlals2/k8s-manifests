@@ -1,0 +1,219 @@
+---
+# ==============================================================================
+# Unified Backup to S3 (etcd + MySQL)
+# ==============================================================================
+# 목적: etcd와 MySQL을 S3에 백업 (7일 보관)
+#
+# 사전 준비:
+# 1. S3 bucket 생성 (예: my-k8s-backups)
+# 2. S3 Lifecycle 정책 적용 (7일 후 삭제)
+# 3. aws-s3-credentials Secret 존재 확인 (blog-system namespace)
+#
+# 배포:
+# 1. YAML에서 "YOUR_S3_BUCKET_NAME"을 실제 bucket 이름으로 변경
+# 2. kubectl apply -f backup-to-s3-final.yaml
+# 3. 수동 테스트: kubectl create job etcd-backup-test --from=cronjob/etcd-backup-to-s3 -n backup-system
+# ==============================================================================
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: backup-system
+  labels:
+    name: backup-system
+
+---
+# etcd Backup CronJob
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: etcd-backup-to-s3
+  namespace: backup-system
+  labels:
+    app: etcd-backup
+spec:
+  schedule: "0 2 * * *"  # 매일 새벽 2시
+  successfulJobsHistoryLimit: 7
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid  # 중복 실행 방지
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: etcd-backup
+        spec:
+          hostNetwork: true
+          nodeName: k8s-cp  # Control Plane 노드에서만 실행
+          restartPolicy: OnFailure
+          containers:
+          - name: etcd-backup
+            image: amazon/aws-cli:2.15.17
+            command:
+            - /bin/sh
+            - -ec
+            - |
+              echo "🚀 etcd Backup to S3 Started"
+
+              # Install etcdctl
+              apk add --no-cache etcd-ctl curl
+
+              DATE=$(date +%Y-%m-%d)
+              TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+              BACKUP_FILE="/tmp/etcd-snapshot-$TIMESTAMP.db"
+              S3_BUCKET="YOUR_S3_BUCKET_NAME"  # ← 여기를 수정하세요!
+              S3_PATH="s3://$S3_BUCKET/etcd/$DATE/snapshot-$TIMESTAMP.db"
+
+              # 1. etcd snapshot 생성
+              echo "📸 Creating etcd snapshot..."
+              ETCDCTL_API=3 etcdctl snapshot save $BACKUP_FILE \
+                --endpoints=https://127.0.0.1:2379 \
+                --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+                --cert=/etc/kubernetes/pki/etcd/server.crt \
+                --key=/etc/kubernetes/pki/etcd/server.key
+
+              # 2. 백업 검증
+              echo "✅ Verifying snapshot..."
+              ETCDCTL_API=3 etcdctl snapshot status $BACKUP_FILE -w table
+
+              # 3. S3 업로드
+              echo "📤 Uploading to S3: $S3_PATH"
+              aws s3 cp $BACKUP_FILE $S3_PATH \
+                --region ${AWS_DEFAULT_REGION} \
+                --no-progress
+
+              # 4. 업로드 검증
+              if aws s3 ls $S3_PATH --region ${AWS_DEFAULT_REGION}; then
+                echo "✅ Backup completed successfully!"
+                echo "   Location: $S3_PATH"
+                echo "   Size: $(ls -lh $BACKUP_FILE | awk '{print $5}')"
+              else
+                echo "❌ S3 upload failed!"
+                exit 1
+              fi
+
+              # 5. 로컬 파일 정리
+              rm -f $BACKUP_FILE
+            env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: aws-s3-credentials
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-s3-credentials
+                  key: AWS_SECRET_ACCESS_KEY
+            - name: AWS_DEFAULT_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: aws-s3-credentials
+                  key: AWS_DEFAULT_REGION
+            volumeMounts:
+            - name: etcd-certs
+              mountPath: /etc/kubernetes/pki/etcd
+              readOnly: true
+          volumes:
+          - name: etcd-certs
+            hostPath:
+              path: /etc/kubernetes/pki/etcd
+              type: Directory
+
+---
+# MySQL Backup CronJob
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mysql-backup-to-s3
+  namespace: backup-system
+  labels:
+    app: mysql-backup
+spec:
+  schedule: "30 2 * * *"  # 매일 새벽 2시 30분 (etcd 백업 후)
+  successfulJobsHistoryLimit: 7
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: mysql-backup
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: mysql-backup
+            image: amazon/aws-cli:2.15.17
+            command:
+            - /bin/sh
+            - -ec
+            - |
+              echo "🚀 MySQL Backup to S3 Started"
+
+              # Install mysql-client and gzip
+              apk add --no-cache mysql-client gzip curl
+
+              DATE=$(date +%Y-%m-%d)
+              TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+              BACKUP_FILE="/tmp/blog-system-$TIMESTAMP.sql"
+              COMPRESSED_FILE="/tmp/blog-system-$TIMESTAMP.sql.gz"
+              S3_BUCKET="YOUR_S3_BUCKET_NAME"  # ← 여기를 수정하세요!
+              S3_PATH="s3://$S3_BUCKET/mysql/$DATE/blog-system-$TIMESTAMP.sql.gz"
+
+              # 1. MySQL backup (mysqldump)
+              echo "📸 Creating MySQL dump..."
+              mysqldump -h mysql.blog-system.svc.cluster.local \
+                -u root -p${MYSQL_ROOT_PASSWORD} \
+                --all-databases \
+                --single-transaction \
+                --quick \
+                --lock-tables=false \
+                --routines \
+                --triggers \
+                --events \
+                > $BACKUP_FILE
+
+              # 2. 압축
+              echo "🗜️ Compressing backup..."
+              gzip $BACKUP_FILE
+
+              # 3. S3 업로드
+              echo "📤 Uploading to S3: $S3_PATH"
+              aws s3 cp $COMPRESSED_FILE $S3_PATH \
+                --region ${AWS_DEFAULT_REGION} \
+                --no-progress
+
+              # 4. 업로드 검증
+              if aws s3 ls $S3_PATH --region ${AWS_DEFAULT_REGION}; then
+                echo "✅ Backup completed successfully!"
+                echo "   Location: $S3_PATH"
+                echo "   Size: $(ls -lh $COMPRESSED_FILE | awk '{print $5}')"
+              else
+                echo "❌ S3 upload failed!"
+                exit 1
+              fi
+
+              # 5. 로컬 파일 정리
+              rm -f $COMPRESSED_FILE
+            env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: mysql-root-password
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: aws-s3-credentials
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-s3-credentials
+                  key: AWS_SECRET_ACCESS_KEY
+            - name: AWS_DEFAULT_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: aws-s3-credentials
+                  key: AWS_DEFAULT_REGION
