@@ -338,21 +338,13 @@ spec:
 
   # Egress
   egress:
-  # Rule 1: mysql-exporter → mysql:3306 허용
-  - toEndpoints:
-    - matchLabels:
-        app: mysql
-        io.kubernetes.pod.namespace: blog-system
-    toPorts:
-    - ports:
-      - port: "3306"
-        protocol: TCP
-
-  # Rule 2: DNS 허용
+  # Rule 1: mysql-exporter → cluster (MySQL Service 포함)
   - toEntities:
     - cluster
     toPorts:
     - ports:
+      - port: "3306"
+        protocol: TCP
       - port: "53"
         protocol: UDP
 
