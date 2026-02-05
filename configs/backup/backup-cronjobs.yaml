@@ -62,10 +62,10 @@ spec:
 
           containers:
           - name: etcd-backup
-            # 이미지: AWS CLI 공식 이미지
-            # 버전: 2.15.17 고정 (재현성 보장)
-            # 포함 도구: aws s3 cp, date, gzip 등
-            image: amazon/aws-cli:2.15.17
+            # 이미지: Alpine Linux (경량, 100MB)
+            # 버전: 3.19 (2024년 안정 버전)
+            # 장점: 이미지 작음, apk 패키지 관리 쉬움
+            image: alpine:3.19
 
             command:
             - /bin/sh
@@ -73,11 +73,13 @@ spec:
             - |
               echo "etcd Backup to S3 Started"
 
-              # etcdctl 설치
-              # yum: Amazon Linux 패키지 관리자
-              # -y: 자동 yes (상호작용 없음)
-              # etcd: etcd snapshot 생성 도구
-              yum install -y etcd curl
+              # 필수 패키지 설치 (Alpine Linux)
+              # apk: Alpine 패키지 관리자
+              # --no-cache: 캐시 사용 안 함 (이미지 크기 최소화)
+              # etcd: etcdctl 도구 포함
+              # aws-cli: S3 업로드 도구
+              # curl: HTTP 도구 (디버깅용)
+              apk add --no-cache etcd aws-cli curl
 
               # 환경 변수 설정
               # DATE: 백업 날짜 (YYYY-MM-DD 형식)
@@ -212,7 +214,10 @@ spec:
 
           containers:
           - name: mysql-backup
-            image: amazon/aws-cli:2.15.17
+            # 이미지: Alpine Linux (경량, 100MB)
+            # 버전: 3.19 (2024년 안정 버전)
+            # 장점: 이미지 작음, apk 패키지 관리 쉬움
+            image: alpine:3.19
 
             command:
             - /bin/sh
@@ -220,11 +225,12 @@ spec:
             - |
               echo "MySQL Backup to S3 Started"
 
-              # mysql-client 설치
-              # mysql: mysqldump 도구 포함
+              # 필수 패키지 설치 (Alpine Linux)
+              # mysql-client: mysqldump 도구 포함
+              # aws-cli: S3 업로드 도구
               # gzip: SQL 파일 압축 도구
-              # 이유: 백업 파일 크기 최소화 (S3 비용 절감)
-              yum install -y mysql gzip curl
+              # curl: HTTP 도구 (디버깅용)
+              apk add --no-cache mysql-client aws-cli gzip curl
 
               DATE=$(date +%Y-%m-%d)
               TIMESTAMP=$(date +%Y%m%d-%H%M%S)
