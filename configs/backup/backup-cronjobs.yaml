@@ -76,10 +76,18 @@ spec:
               # 필수 패키지 설치 (Alpine Linux)
               # apk: Alpine 패키지 관리자
               # --no-cache: 캐시 사용 안 함 (이미지 크기 최소화)
-              # etcd: etcdctl 도구 포함
               # aws-cli: S3 업로드 도구
-              # curl: HTTP 도구 (디버깅용)
-              apk add --no-cache etcd aws-cli curl
+              # curl, wget: HTTP 도구
+              apk add --no-cache aws-cli curl wget tar
+
+              # etcdctl 설치 (GitHub Release)
+              # 이유: Alpine에 etcd 패키지 없음
+              # 버전: v3.5.11 (2024년 안정 버전)
+              ETCD_VER=v3.5.11
+              wget -q https://github.com/etcd-io/etcd/releases/download/${ETCD_VER}/etcd-${ETCD_VER}-linux-amd64.tar.gz
+              tar -xzf etcd-${ETCD_VER}-linux-amd64.tar.gz
+              cp etcd-${ETCD_VER}-linux-amd64/etcdctl /usr/local/bin/
+              rm -rf etcd-${ETCD_VER}-linux-amd64*
 
               # 환경 변수 설정
               # DATE: 백업 날짜 (YYYY-MM-DD 형식)
