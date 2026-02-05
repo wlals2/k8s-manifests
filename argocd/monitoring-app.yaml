@@ -71,3 +71,4 @@ spec:
     syncOptions:
     - CreateNamespace=true  # namespace 자동 생성
     - RespectIgnoreDifferences=true  # ignoreDifferences 필드를 apply하지 않음 (ArgoCD v2.5+)
+    - ServerSideApply=true  # Server-Side Apply 사용 (Conflict 자동 병합, K8s 1.22+)
