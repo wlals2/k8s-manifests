@@ -14,6 +14,18 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
+
+  # ignoreDifferences: 클러스터에서 동적으로 변경되는 필드 무시
+  # 이유: prometheus-config ConfigMap은 Prometheus가 자동으로 수정함
+  # 효과: ArgoCD가 이 필드 변경을 OutOfSync로 판단하지 않음
+  ignoreDifferences:
+  - group: ""  # core API group (ConfigMap)
+    kind: ConfigMap
+    name: prometheus-config
+    namespace: monitoring
+    jsonPointers:
+    - /data  # ConfigMap의 data 필드 변경 무시
+
   syncPolicy:
     automated:
       prune: true      # 삭제된 리소스 자동 제거

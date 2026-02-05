@@ -1,0 +1,132 @@
+# ==============================================================================
+# ArgoCD Root Application (App of Apps)
+# ==============================================================================
+# 목적: 모든 ArgoCD Application을 자동으로 관리하는 부모 Application
+# 패턴: App of Apps (argocd/ 디렉터리의 모든 Application 자동 배포)
+# 관리 대상:
+#   - monitoring-app.yaml  → configs/monitoring
+#   - backup-app.yaml      → configs/backup
+#   - blog-app.yaml        → services/blog-system
+#   - (추가되는 모든 *-app.yaml 자동 인식)
+#
+# 작동 방식:
+#   1. root-app.yaml을 한 번만 kubectl apply
+#   2. ArgoCD가 argocd/ 디렉터리 모니터링
+#   3. 새 *-app.yaml 추가 시 자동으로 Application 생성
+#   4. Git commit만 하면 배포 완료 (kubectl apply 불필요)
+#
+# 주의사항:
+#   - root-app.yaml 자체는 수동으로 한 번만 배포 필요
+#   - 자기 자신을 관리하지 않음 (무한 루프 방지)
+# ==============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root-app
+  namespace: argocd
+  # finalizers: Application 삭제 시 모든 자식 Application도 삭제
+  # 주의: root-app 삭제 = 전체 시스템 삭제 (monitoring, backup, blog 모두)
+  # 권장: root-app은 절대 삭제하지 말 것
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  # project: ArgoCD 프로젝트
+  # default: 모든 Application 포함
+  project: default
+
+  source:
+    # Git 저장소 URL
+    repoURL: https://github.com/wlals2/k8s-manifests.git
+
+    # 브랜치: main (항상 최신)
+    # 변경 가능: production 환경에서는 Git Tag 사용 권장
+    targetRevision: main
+
+    # 경로: argocd/ 디렉터리
+    # 이 디렉터리의 모든 YAML 파일을 읽어서 Application 생성
+    # 포함: monitoring-app.yaml, backup-app.yaml, blog-app.yaml 등
+    # 제외: root-app.yaml (자기 자신)
+    path: argocd
+
+  destination:
+    # server: Kubernetes API 서버
+    # https://kubernetes.default.svc: 클러스터 내부
+    server: https://kubernetes.default.svc
+
+    # namespace: argocd
+    # 모든 Application은 argocd namespace에 생성됨
+    # 주의: 실제 리소스는 각 Application의 destination.namespace에 배포
+    # 예: monitoring-app → monitoring namespace
+    #     backup-app → backup-system namespace
+    namespace: argocd
+
+  syncPolicy:
+    # automated: 자동 동기화
+    # Git 변경 감지 → ArgoCD가 자동으로 Application 생성/수정/삭제
+    automated:
+      # prune: true
+      # Git에서 삭제된 Application을 클러스터에서도 삭제
+      # 예: backup-app.yaml 삭제 → backup-app Application 삭제
+      # 권장: true (GitOps 완전 자동화)
+      prune: true
+
+      # selfHeal: true
+      # 클러스터 상태가 Git과 다르면 자동 복구
+      # 예: kubectl delete application backup-app → 3분 후 재생성
+      # 권장: true (수동 변경 방지)
+      selfHeal: true
+
+    syncOptions:
+    # CreateNamespace: false
+    # 설명: Application의 namespace는 생성하지 않음
+    # 이유: argocd namespace는 이미 존재하므로 불필요
+    # 각 Application은 자체 CreateNamespace 옵션 사용
+    - CreateNamespace=false
+
+# ==============================================================================
+# 사용 방법
+# ==============================================================================
+#
+# 초기 배포 (한 번만 실행):
+#   kubectl apply -f argocd/root-app.yaml
+#
+# 새 Application 추가:
+#   1. argocd/new-app.yaml 생성
+#   2. git add argocd/new-app.yaml
+#   3. git commit -m "feat: new-app 추가"
+#   4. git push
+#   5. ArgoCD가 자동으로 new-app Application 생성 (3-5초 후)
+#
+# Application 삭제:
+#   1. argocd/backup-app.yaml 삭제
+#   2. git commit -m "remove: backup-app 삭제"
+#   3. git push
+#   4. ArgoCD가 자동으로 backup-app Application 삭제
+#
+# 확인:
+#   kubectl get applications -n argocd
+#   kubectl get application root-app -n argocd -o yaml
+#
+# ==============================================================================
+# 트러블슈팅
+# ==============================================================================
+#
+# 문제 1: root-app이 자기 자신을 계속 재생성
+# 원인: root-app.yaml을 argocd/ 디렉터리에 두면 자기 자신을 관리하려고 시도
+# 해결: 정상 동작입니다. ArgoCD는 이미 존재하는 Application은 건너뜀
+#
+# 문제 2: 새 Application이 자동 생성되지 않음
+# 원인: Git push 후 ArgoCD가 변경 감지하지 못함
+# 해결:
+#   1. kubectl get application root-app -n argocd -o yaml | grep syncStatus
+#   2. Synced 상태인지 확인
+#   3. 수동 Sync: kubectl patch application root-app -n argocd --type merge -p '{"operation":{"sync":{}}}'
+#
+# 문제 3: root-app이 OutOfSync 상태
+# 원인: argocd/ 디렉터리에 잘못된 YAML 파일 존재
+# 해결:
+#   1. kubectl describe application root-app -n argocd
+#   2. ComparisonError 확인
+#   3. 잘못된 파일 수정 또는 삭제
+#
+# ==============================================================================
