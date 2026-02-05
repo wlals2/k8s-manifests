@@ -32,3 +32,4 @@ spec:
       selfHeal: true   # Drift 감지 시 자동 복구
     syncOptions:
     - CreateNamespace=true  # namespace 자동 생성
+    - RespectIgnoreDifferences=true  # ignoreDifferences 필드를 apply하지 않음 (ArgoCD v2.5+)
