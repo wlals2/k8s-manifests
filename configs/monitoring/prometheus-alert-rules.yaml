@@ -128,6 +128,17 @@ data:
             annotations:
               summary: "모니터링 도구 다운"
               description: "{{ $labels.job }} 서비스가 응답하지 않습니다."
+          # ✨ 새로 추가: MySQL Connection 사용률 70% 이상
+          - alert: MySQLHighConnectionUsage
+            expr: (mysql_global_status_threads_connected{namespace="blog-system"} / mysql_global_variables_max_connections{namespace="blog-system"}) * 100 > 70
+            for: 5m
+            labels:
+              severity: warning
+              namespace: blog-system
+            annotations:
+              summary: "MySQL Connection 사용률 70% 초과"
+              description: "MySQL Connection 사용률이 {{ $value | humanize }}%입니다. 즉시 확인하세요!"
+
 
       # ==============================================================================
       # ℹ️ INFO Alerts - 정보성 알람
