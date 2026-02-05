@@ -342,7 +342,8 @@ spec:
   - toEndpoints:
     - world  # 외부 DNS (필요시)
   - toEntities:
-    - cluster # 클러스터 내부 모든 연결 허용
+    - cluster # MySQL servcie (10.99.101.181) 허용
+    - world # 외부 DNS 허용
 
 ---
 # ==============================================================================

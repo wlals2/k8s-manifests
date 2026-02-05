@@ -5,10 +5,10 @@ kind: Kustomization
 namespace: blog-system
 
 # 공통 라벨 (모든 리소스에 자동 추가)
-commonLabels:
-  app: blog-system
-  managed-by: argocd
-  environment: production
+#commonLabels:
+#  app: blog-system
+#  managed-by: argocd
+#  environment: production
 
 # 리소스 그룹 (컴포넌트별 디렉터리)
 resources:
