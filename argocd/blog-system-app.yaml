@@ -20,3 +20,18 @@ spec:
       selfHeal: true
     syncOptions:
     - CreateNamespace=true
+
+  # Argo Rollouts가 자동으로 관리하는 필드 무시
+  ignoreDifferences:
+  - group: networking.istio.io
+    kind: DestinationRule
+    name: web-dest-rule
+    jsonPointers:
+    - /spec/subsets/0/labels
+    - /spec/subsets/1/labels
+  - group: networking.istio.io
+    kind: DestinationRule
+    name: was-dest-rule
+    jsonPointers:
+    - /spec/subsets/0/labels
+    - /spec/subsets/1/labels
