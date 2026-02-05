@@ -338,23 +338,11 @@ spec:
 
   # Egress
   egress:
-  # Rule 1: mysql-exporter → MySQL Service 직접 허용
-  - toServices:
-    - k8sService:
-        serviceName: mysql-service
-        namespace: blog-system
-    toPorts:
-    - ports:
-      - port: "3306"
-        protocol: TCP
-
-  # Rule 2: DNS 허용
+  # Rule 1: DNS 허용
+  - toEndpoints:
+    - world  # 외부 DNS (필요시)
   - toEntities:
-    - cluster
-    toPorts:
-    - ports:
-      - port: "53"
-        protocol: UDP
+    - cluster # 클러스터 내부 모든 연결 허용
 
 ---
 # ==============================================================================
