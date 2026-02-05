@@ -15,16 +15,54 @@ spec:
     server: https://kubernetes.default.svc
     namespace: monitoring
 
+  # ==============================================================================
   # ignoreDifferences: 클러스터에서 동적으로 변경되는 필드 무시
-  # 이유: prometheus-config ConfigMap은 Prometheus가 자동으로 수정함
-  # 효과: ArgoCD가 이 필드 변경을 OutOfSync로 판단하지 않음
+  # ==============================================================================
+  # 목적: 모니터링 시스템은 여러 컴포넌트가 리소스를 동적으로 수정하므로
+  #       GitOps와 충돌하지 않도록 동적 필드를 무시함
+  # 효과: ArgoCD가 동적 필드 변경을 OutOfSync로 판단하지 않음
+  # ==============================================================================
   ignoreDifferences:
-  - group: ""  # core API group (ConfigMap)
+
+  # 1. ConfigMap - 모든 ConfigMap의 data 필드 무시
+  # 이유: Prometheus/Grafana/AlertManager가 자동으로 ConfigMap 수정
+  # 예시:
+  #   - prometheus-config: ServiceMonitor 발견 시 scrape_configs 업데이트
+  #   - grafana-datasources: 데이터소스 자동 등록
+  #   - alertmanager-config: Alert rules 동적 로드
+  # 영향: ConfigMap의 data 변경을 무시 (Git 코드는 유지, 클러스터 변경만 허용)
+  - group: ""
     kind: ConfigMap
-    name: prometheus-config
     namespace: monitoring
     jsonPointers:
-    - /data  # ConfigMap의 data 필드 변경 무시
+    - /data
+
+  # 2. Deployment - replicas 필드 무시
+  # 이유: HPA (Horizontal Pod Autoscaler)가 자동으로 replicas 조정
+  # 영향: HPA가 스케일링해도 OutOfSync 발생 안 함 (Git의 replicas는 초기값)
+  - group: apps
+    kind: Deployment
+    namespace: monitoring
+    jsonPointers:
+    - /spec/replicas
+
+  # 3. Service - annotations 필드 무시
+  # 이유: MetalLB/Cloud Provider가 LoadBalancer IP를 annotations에 자동 추가
+  # 영향: Service annotations 변경 시 OutOfSync 발생 안 함
+  - group: ""
+    kind: Service
+    namespace: monitoring
+    jsonPointers:
+    - /metadata/annotations
+
+  # 4. PVC - status 필드 무시
+  # 이유: Kubernetes Controller가 PVC status를 자동 업데이트 (Bound, Pending 등)
+  # 영향: PVC 바인딩 상태 변경 시 OutOfSync 발생 안 함
+  - group: ""
+    kind: PersistentVolumeClaim
+    namespace: monitoring
+    jsonPointers:
+    - /status
 
   syncPolicy:
     automated:
