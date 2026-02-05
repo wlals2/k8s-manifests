@@ -1,0 +1,73 @@
+# ==============================================================================
+# ArgoCD Application: backup-system
+# ==============================================================================
+# 목적: etcd 및 MySQL 백업 리소스를 ArgoCD로 자동 배포
+# 관리 대상:
+#   - configs/backup/ 디렉터리의 모든 YAML
+#   - backup-system namespace
+#   - CronJobs, SealedSecrets
+# Git 저장소: https://github.com/wlals2/k8s-manifests.git
+# ==============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: backup-system
+  namespace: argocd
+  # finalizers: Application 삭제 시 리소스도 함께 삭제
+  # resources-finalizer: 클러스터의 backup-system 리소스 모두 삭제
+  # 주의: Application 삭제 = namespace 및 모든 백업 CronJob 삭제
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  # project: ArgoCD 프로젝트 (default 사용)
+  # 변경 가능: 별도 프로젝트 생성 시 수정
+  project: default
+
+  source:
+    # Git 저장소 URL
+    # 변경 금지: 이 리포지토리에서 YAML 읽어옴
+    repoURL: https://github.com/wlals2/k8s-manifests.git
+
+    # 브랜치 또는 Tag
+    # main: 항상 최신 버전 사용
+    # 변경 가능: production에서는 Git Tag 사용 권장 (예: v1.0.0)
+    targetRevision: main
+
+    # 경로: Git 저장소 내 디렉터리
+    # configs/backup: backup 관련 YAML만 포함
+    # 변경 금지: 다른 디렉터리 포함 시 의도하지 않은 리소스 배포
+    path: configs/backup
+
+  destination:
+    # server: Kubernetes API 서버
+    # https://kubernetes.default.svc: 클러스터 내부 (self-hosted ArgoCD)
+    # 변경 가능: 외부 클러스터 배포 시 URL 변경
+    server: https://kubernetes.default.svc
+
+    # namespace: 배포 대상 namespace
+    # backup-system: configs/backup/namespace.yaml에 정의됨
+    # 주의: 이 필드는 리소스의 namespace를 덮어쓰지 않음 (단순 기본값)
+    namespace: backup-system
+
+  syncPolicy:
+    # automated: 자동 동기화 정책
+    # Git 변경 감지 → ArgoCD가 자동으로 kubectl apply 실행
+    automated:
+      # prune: true
+      # 설명: Git에서 삭제된 리소스를 클러스터에서도 삭제
+      # 예: backup-cronjobs.yaml 삭제 → CronJob도 삭제
+      # 권장: true (GitOps 완전 자동화)
+      prune: true
+
+      # selfHeal: true
+      # 설명: 클러스터 상태가 Git과 다르면 자동 복구
+      # 예: kubectl edit으로 수정 → 3분 후 Git 상태로 되돌림
+      # 권장: true (수동 변경 방지)
+      selfHeal: true
+
+    syncOptions:
+    # CreateNamespace: true
+    # 설명: namespace가 없으면 자동 생성
+    # 이유: backup-system namespace를 수동으로 생성하지 않아도 됨
+    # 주의: namespace.yaml에 정의된 라벨은 적용되지 않음 (수동 생성 권장)
+    - CreateNamespace=true

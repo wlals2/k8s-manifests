@@ -1,29 +1,14 @@
----
 # ==============================================================================
-# Unified Backup to S3 (etcd + MySQL)
+# etcd 백업 CronJob
 # ==============================================================================
-# 목적: etcd와 MySQL을 S3에 백업 (7일 보관)
-#
-# 사전 준비:
-# 1. S3 bucket 생성 (예: my-k8s-backups)
-# 2. S3 Lifecycle 정책 적용 (7일 후 삭제)
-# 3. aws-s3-credentials Secret 존재 확인 (blog-system namespace)
-#
-# 배포:
-# 1. YAML에서 "YOUR_S3_BUCKET_NAME"을 실제 bucket 이름으로 변경
-# 2. kubectl apply -f backup-to-s3-final.yaml
-# 3. 수동 테스트: kubectl create job etcd-backup-test --from=cronjob/etcd-backup-to-s3 -n backup-system
+# 목적: etcd snapshot을 S3에 자동 백업 (7일 보관)
+# 실행: 매일 새벽 2시
+# 의존성:
+#   - aws-s3-credentials Secret (backup-system namespace)
+#   - etcd 인증서 (/etc/kubernetes/pki/etcd)
+#   - Control Plane 노드 (nodeName: k8s-cp)
+# S3 경로: s3://jimin-backup/etcd/YYYY-MM-DD/snapshot-TIMESTAMP.db
 # ==============================================================================
-
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: backup-system
-  labels:
-    name: backup-system
-
----
-# etcd Backup CronJob
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -32,10 +17,25 @@ metadata:
   labels:
     app: etcd-backup
 spec:
-  schedule: "0 2 * * *"  # 매일 새벽 2시
+  # 스케줄: 매일 새벽 2시에 실행
+  # 형식: "분 시 일 월 요일" (Cron 표현식)
+  # 예: "0 2 * * *" = 매일 02:00
+  # 변경 가능: 백업 시간대 조정 시 수정
+  schedule: "0 2 * * *"
+
+  # Job 이력 보관 개수
+  # successfulJobsHistoryLimit: 최근 7개 성공 Job 보관
+  # failedJobsHistoryLimit: 최근 3개 실패 Job 보관
+  # 이유: 디버깅 및 모니터링용
   successfulJobsHistoryLimit: 7
   failedJobsHistoryLimit: 3
-  concurrencyPolicy: Forbid  # 중복 실행 방지
+
+  # 중복 실행 정책
+  # Forbid: 이전 백업이 진행 중이면 새 백업 시작 안 함
+  # 옵션: Allow (병렬 실행), Replace (기존 종료 후 시작)
+  # 권장: Forbid (백업 파일 충돌 및 etcd 부하 방지)
+  concurrencyPolicy: Forbid
+
   jobTemplate:
     spec:
       template:
@@ -43,85 +43,145 @@ spec:
           labels:
             app: etcd-backup
         spec:
+          # hostNetwork: true
+          # 설명: Host 네트워크 사용 (Pod가 Node IP 사용)
+          # 이유: etcd는 127.0.0.1:2379에서만 접근 가능
+          # 영향: Pod IP가 아닌 Node IP로 etcd 접근
           hostNetwork: true
-          nodeName: k8s-cp  # Control Plane 노드에서만 실행
+
+          # nodeName: Control Plane 노드 지정
+          # 이유: etcd는 Control Plane 노드에서만 실행 중
+          # 변경 금지: k8s-cp가 아닌 다른 노드에서 실행 불가
+          nodeName: k8s-cp
+
+          # restartPolicy: Job 실패 시 재시도
+          # OnFailure: 실패 시 Pod 재시작 (최대 6회)
+          # Never: 실패 시 재시작 안 함
+          # 권장: OnFailure (일시적 네트워크 오류 대응)
           restartPolicy: OnFailure
+
           containers:
           - name: etcd-backup
+            # 이미지: AWS CLI 공식 이미지
+            # 버전: 2.15.17 고정 (재현성 보장)
+            # 포함 도구: aws s3 cp, date, gzip 등
             image: amazon/aws-cli:2.15.17
+
             command:
             - /bin/sh
-            - -ec
+            - -ec  # -e: 에러 시 즉시 종료, -c: 명령어 실행
             - |
-              echo "🚀 etcd Backup to S3 Started"
+              echo "etcd Backup to S3 Started"
 
-              # Install etcdctl
+              # etcdctl 설치
+              # apk: Alpine Linux 패키지 관리자
+              # --no-cache: 캐시 사용 안 함 (이미지 크기 최소화)
+              # etcd-ctl: etcd snapshot 생성 도구
               apk add --no-cache etcd-ctl curl
 
+              # 환경 변수 설정
+              # DATE: 백업 날짜 (YYYY-MM-DD 형식)
+              # TIMESTAMP: 고유 백업 파일명 (YYYYMMDD-HHMMSS)
               DATE=$(date +%Y-%m-%d)
               TIMESTAMP=$(date +%Y%m%d-%H%M%S)
               BACKUP_FILE="/tmp/etcd-snapshot-$TIMESTAMP.db"
-              S3_BUCKET="YOUR_S3_BUCKET_NAME"  # ← 여기를 수정하세요!
+              S3_BUCKET="jimin-backup"  # S3 버킷 이름 (실제 버킷과 일치해야 함)
               S3_PATH="s3://$S3_BUCKET/etcd/$DATE/snapshot-$TIMESTAMP.db"
 
-              # 1. etcd snapshot 생성
-              echo "📸 Creating etcd snapshot..."
+              # Step 1: etcd snapshot 생성
+              echo "Creating etcd snapshot..."
+              # ETCDCTL_API=3: etcd v3 API 사용
+              # --endpoints: etcd 서버 주소 (127.0.0.1:2379, hostNetwork 필요)
+              # --cacert, --cert, --key: TLS 인증서 (etcd는 TLS 필수)
               ETCDCTL_API=3 etcdctl snapshot save $BACKUP_FILE \
                 --endpoints=https://127.0.0.1:2379 \
                 --cacert=/etc/kubernetes/pki/etcd/ca.crt \
                 --cert=/etc/kubernetes/pki/etcd/server.crt \
                 --key=/etc/kubernetes/pki/etcd/server.key
 
-              # 2. 백업 검증
-              echo "✅ Verifying snapshot..."
+              # Step 2: snapshot 검증
+              echo "Verifying snapshot..."
+              # -w table: 테이블 형식 출력
+              # 이유: snapshot 무결성 확인 (손상된 백업 방지)
               ETCDCTL_API=3 etcdctl snapshot status $BACKUP_FILE -w table
 
-              # 3. S3 업로드
-              echo "📤 Uploading to S3: $S3_PATH"
+              # Step 3: S3 업로드
+              echo "Uploading to S3: $S3_PATH"
+              # aws s3 cp: S3에 파일 복사
+              # --region: S3 리전 (환경 변수에서 가져옴)
+              # --no-progress: 진행률 표시 안 함 (로그 간결화)
               aws s3 cp $BACKUP_FILE $S3_PATH \
                 --region ${AWS_DEFAULT_REGION} \
                 --no-progress
 
-              # 4. 업로드 검증
+              # Step 4: 업로드 검증
               if aws s3 ls $S3_PATH --region ${AWS_DEFAULT_REGION}; then
-                echo "✅ Backup completed successfully!"
+                echo "Backup completed successfully!"
                 echo "   Location: $S3_PATH"
                 echo "   Size: $(ls -lh $BACKUP_FILE | awk '{print $5}')"
               else
-                echo "❌ S3 upload failed!"
-                exit 1
+                echo "S3 upload failed!"
+                exit 1  # 실패 시 Job 재시도
               fi
 
-              # 5. 로컬 파일 정리
+              # Step 5: 로컬 파일 정리
+              # 이유: Pod 디스크 사용량 최소화
               rm -f $BACKUP_FILE
+
             env:
+            # AWS 인증 정보
+            # Secret에서 가져옴: backup-system namespace의 aws-s3-credentials
+            # 주의: Secret이 없으면 Pod 생성 실패 (CreateContainerConfigError)
+            # Secret 생성: SealedSecret으로 암호화하여 Git 관리
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
                   name: aws-s3-credentials
                   key: AWS_ACCESS_KEY_ID
+
             - name: AWS_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
                   name: aws-s3-credentials
                   key: AWS_SECRET_ACCESS_KEY
+
             - name: AWS_DEFAULT_REGION
               valueFrom:
                 secretKeyRef:
                   name: aws-s3-credentials
                   key: AWS_DEFAULT_REGION
+
             volumeMounts:
+            # etcd 인증서 마운트
+            # 위치: Control Plane 노드의 /etc/kubernetes/pki/etcd
+            # 권한: 읽기 전용 (readOnly: true)
+            # 이유: etcd는 TLS 인증서로만 접근 가능
+            # 주의: Control Plane 노드에서만 사용 가능
             - name: etcd-certs
               mountPath: /etc/kubernetes/pki/etcd
-              readOnly: true
+              readOnly: true  # 보안: 인증서 수정 방지
+
           volumes:
+          # hostPath: Node의 디렉터리 마운트
+          # type: Directory (디렉터리가 존재해야 함)
+          # 경로: /etc/kubernetes/pki/etcd (kubeadm 기본 경로)
           - name: etcd-certs
             hostPath:
               path: /etc/kubernetes/pki/etcd
               type: Directory
 
 ---
-# MySQL Backup CronJob
+# ==============================================================================
+# MySQL 백업 CronJob
+# ==============================================================================
+# 목적: MySQL 데이터베이스를 S3에 자동 백업 (7일 보관)
+# 실행: 매일 새벽 2시 30분 (etcd 백업 후)
+# 의존성:
+#   - mysql-secret Secret (backup-system namespace)
+#   - aws-s3-credentials Secret (backup-system namespace)
+#   - MySQL Service (mysql.blog-system.svc.cluster.local)
+# S3 경로: s3://jimin-backup/mysql/YYYY-MM-DD/blog-system-TIMESTAMP.sql.gz
+# ==============================================================================
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -130,10 +190,15 @@ metadata:
   labels:
     app: mysql-backup
 spec:
-  schedule: "30 2 * * *"  # 매일 새벽 2시 30분 (etcd 백업 후)
+  # 스케줄: 매일 새벽 2시 30분
+  # 이유: etcd 백업 (2시) 후 30분 뒤 실행 (순차 백업)
+  # 변경 가능: etcd 백업 시간 변경 시 함께 조정
+  schedule: "30 2 * * *"
+
   successfulJobsHistoryLimit: 7
   failedJobsHistoryLimit: 3
-  concurrencyPolicy: Forbid
+  concurrencyPolicy: Forbid  # MySQL 백업 중복 방지
+
   jobTemplate:
     spec:
       template:
@@ -141,28 +206,45 @@ spec:
           labels:
             app: mysql-backup
         spec:
+          # restartPolicy: OnFailure
+          # 이유: mysqldump 일시적 실패 대응 (네트워크 오류 등)
           restartPolicy: OnFailure
+
           containers:
           - name: mysql-backup
             image: amazon/aws-cli:2.15.17
+
             command:
             - /bin/sh
             - -ec
             - |
-              echo "🚀 MySQL Backup to S3 Started"
+              echo "MySQL Backup to S3 Started"
 
-              # Install mysql-client and gzip
+              # mysql-client 설치
+              # mysql-client: mysqldump 도구 포함
+              # gzip: SQL 파일 압축 도구
+              # 이유: 백업 파일 크기 최소화 (S3 비용 절감)
               apk add --no-cache mysql-client gzip curl
 
               DATE=$(date +%Y-%m-%d)
               TIMESTAMP=$(date +%Y%m%d-%H%M%S)
               BACKUP_FILE="/tmp/blog-system-$TIMESTAMP.sql"
               COMPRESSED_FILE="/tmp/blog-system-$TIMESTAMP.sql.gz"
-              S3_BUCKET="YOUR_S3_BUCKET_NAME"  # ← 여기를 수정하세요!
+              S3_BUCKET="jimin-backup"
               S3_PATH="s3://$S3_BUCKET/mysql/$DATE/blog-system-$TIMESTAMP.sql.gz"
 
-              # 1. MySQL backup (mysqldump)
-              echo "📸 Creating MySQL dump..."
+              # Step 1: mysqldump 실행
+              echo "Creating MySQL dump..."
+              # -h: MySQL 호스트 (Kubernetes Service DNS)
+              # -u root: MySQL 사용자
+              # -p${MYSQL_ROOT_PASSWORD}: 비밀번호 (환경 변수)
+              # --all-databases: 모든 데이터베이스 백업
+              # --single-transaction: 일관성 보장 (InnoDB 테이블용)
+              # --quick: 메모리 사용 최소화 (대용량 테이블 대응)
+              # --lock-tables=false: 테이블 잠금 안 함 (서비스 중단 방지)
+              # --routines: Stored Procedures 포함
+              # --triggers: Triggers 포함
+              # --events: Events 포함
               mysqldump -h mysql.blog-system.svc.cluster.local \
                 -u root -p${MYSQL_ROOT_PASSWORD} \
                 --all-databases \
@@ -174,44 +256,54 @@ spec:
                 --events \
                 > $BACKUP_FILE
 
-              # 2. 압축
-              echo "🗜️ Compressing backup..."
+              # Step 2: gzip 압축
+              echo "Compressing backup..."
+              # 압축 비율: 평균 70-80% (100MB → 20-30MB)
+              # 이유: S3 비용 절감 및 전송 시간 단축
               gzip $BACKUP_FILE
 
-              # 3. S3 업로드
-              echo "📤 Uploading to S3: $S3_PATH"
+              # Step 3: S3 업로드
+              echo "Uploading to S3: $S3_PATH"
               aws s3 cp $COMPRESSED_FILE $S3_PATH \
                 --region ${AWS_DEFAULT_REGION} \
                 --no-progress
 
-              # 4. 업로드 검증
+              # Step 4: 업로드 검증
               if aws s3 ls $S3_PATH --region ${AWS_DEFAULT_REGION}; then
-                echo "✅ Backup completed successfully!"
+                echo "Backup completed successfully!"
                 echo "   Location: $S3_PATH"
                 echo "   Size: $(ls -lh $COMPRESSED_FILE | awk '{print $5}')"
               else
-                echo "❌ S3 upload failed!"
+                echo "S3 upload failed!"
                 exit 1
               fi
 
-              # 5. 로컬 파일 정리
+              # Step 5: 로컬 파일 정리
               rm -f $COMPRESSED_FILE
+
             env:
+            # MySQL 비밀번호
+            # Secret에서 가져옴: backup-system namespace의 mysql-secret
+            # 주의: Secret은 SealedSecret으로 관리 (평문 Git 저장 금지)
             - name: MYSQL_ROOT_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: mysql-secret
                   key: mysql-root-password
+
+            # AWS 인증 정보
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
                   name: aws-s3-credentials
                   key: AWS_ACCESS_KEY_ID
+
             - name: AWS_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
                   name: aws-s3-credentials
                   key: AWS_SECRET_ACCESS_KEY
+
             - name: AWS_DEFAULT_REGION
               valueFrom:
                 secretKeyRef:

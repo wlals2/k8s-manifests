@@ -1,0 +1,16 @@
+# ==============================================================================
+# backup-system Namespace
+# ==============================================================================
+# 목적: etcd 및 MySQL 백업 전용 namespace
+# 격리: backup 관련 리소스만 배치
+# 참고: blog-system과 독립적으로 관리
+# ==============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: backup-system
+  labels:
+    # namespace 식별용 라벨
+    # ArgoCD가 자동으로 관리
+    name: backup-system
+    managed-by: argocd
