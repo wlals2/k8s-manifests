@@ -338,9 +338,7 @@ spec:
 
   # Egress
   egress:
-  # Rule 1: DNS 허용
-  - toEndpoints:
-    - world  # 외부 DNS (필요시)
+  # Rule 1: mysql-exporter → mysql:3306 (MySQL servcie) 허용
   - toEntities:
     - cluster # MySQL servcie (10.99.101.181) 허용
     - world # 외부 DNS 허용
