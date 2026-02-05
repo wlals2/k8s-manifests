@@ -342,6 +342,7 @@ spec:
   - toEndpoints:
     - matchLabels:
         app: mysql
+        io.kubernetes.pod.namespace: blog-system
     toPorts:
     - ports:
       - port: "3306"
