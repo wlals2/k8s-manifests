@@ -15,7 +15,6 @@ metadata:
     # 이유: values.yaml의 serviceMonitorSelector.matchLabels와 일치해야 함
     # 확인: apps/kube-prometheus-stack/values.yaml:60
     prometheus: kube-prometheus          # Helm Chart 기본값 호환 (Upstream)
-    release: kube-prometheus-stack
 
     # 추가 라벨 (선택 사항)
     app: alloy

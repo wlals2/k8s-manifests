@@ -54,23 +54,24 @@ kube-prometheus-stack:
     # Prometheus 설정
     prometheusSpec:
       # ServiceMonitor 선택 규칙 (CRITICAL!)
-      # 중요: ServiceMonitor에 "release: kube-prometheus-stack" 라벨 필수!
-      # 이유: 이 라벨이 없으면 Operator가 ServiceMonitor를 무시함
+      # 중요: ServiceMonitor에 "prometheus: kube-prometheus" 라벨 필수!
+      # 이유: Helm Chart의 원래 표준 (Upstream Convention)
+      # Platform Conformity: 플랫폼이 정한 표준 라벨링 규칙을 따름
       # 예시:
       #   apiVersion: monitoring.coreos.com/v1
       #   kind: ServiceMonitor
       #   metadata:
       #     labels:
-      #       release: kube-prometheus-stack  ← 필수!
+      #       prometheus: kube-prometheus  ← 필수! (Helm Chart 기본값)
       serviceMonitorSelector:
         matchLabels:
-          release: kube-prometheus-stack
+          prometheus: kube-prometheus
 
       # PrometheusRule 선택 규칙 (CRITICAL!)
-      # 중요: PrometheusRule에도 "release: kube-prometheus-stack" 라벨 필수!
+      # 중요: PrometheusRule에도 "prometheus: kube-prometheus" 라벨 필수!
       ruleSelector:
         matchLabels:
-          release: kube-prometheus-stack
+          prometheus: kube-prometheus
 
       # 메트릭 보관 기간
       # 형식: Nd (N일), Nh (N시간)

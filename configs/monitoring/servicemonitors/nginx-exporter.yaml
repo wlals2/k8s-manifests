@@ -13,7 +13,6 @@ metadata:
     # CRITICAL: 이 라벨들이 없으면 Prometheus Operator가 무시함!
     # 이유: values.yaml의 serviceMonitorSelector.matchLabels와 일치해야 함 (AND 조건)
     # 확인: apps/kube-prometheus-stack/values.yaml:65
-    release: kube-prometheus-stack       # Helm Release 식별자
     prometheus: kube-prometheus          # Helm Chart 기본값 호환 (Upstream)
 
     # 추가 라벨 (선택 사항)
