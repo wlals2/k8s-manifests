@@ -14,6 +14,7 @@ metadata:
     # CRITICAL: 이 라벨이 없으면 Prometheus Operator가 무시함!
     # 이유: Prometheus의 serviceMonitorSelector.matchLabels와 일치해야 함
     # 실제 Prometheus 설정: release: kube-prometheus-stack
+    prometheus: kube-prometheus          # Helm Chart 기본값 호환 (Upstream)
     release: kube-prometheus-stack
 
     # 추가 라벨 (선택 사항)
