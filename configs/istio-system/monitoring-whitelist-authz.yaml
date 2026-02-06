@@ -29,6 +29,8 @@ spec:
         - "argocd.jiminhome.shop"
         - "monitoring.jiminhome.shop"
         - "grafana.jiminhome.shop"
+        - "prom.jiminhome.shop"
+        - "alert.jiminhome.shop"
     from:
     - source:
         remoteIpBlocks: ["192.168.1.0/24"]  # 사내 IP만
