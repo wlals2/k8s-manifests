@@ -73,6 +73,22 @@ kube-prometheus-stack:
         matchLabels:
           prometheus: kube-prometheus
 
+      # Probe 선택 규칙 (CRITICAL!)
+      # 중요: Probe에도 "prometheus: kube-prometheus" 라벨 필수!
+      # 이유: Helm Chart의 원래 표준 (Upstream Convention)
+      # Platform Conformity: 플랫폼이 정한 표준 라벨링 규칙을 따름
+      # 기본값: probeSelectorNilUsesHelmValues=true로 인해 release: 라벨 사용
+      # 변경: prometheus: kube-prometheus (Upstream 표준 명시)
+      # 예시:
+      #   apiVersion: monitoring.coreos.com/v1
+      #   kind: Probe
+      #   metadata:
+      #     labels:
+      #       prometheus: kube-prometheus  ← 필수! (Helm Chart 권장 표준)
+      probeSelector:
+        matchLabels:
+          prometheus: kube-prometheus
+
       # 메트릭 보관 기간
       # 형식: Nd (N일), Nh (N시간)
       # 권장: 7d (1주일) - 홈랩 환경
