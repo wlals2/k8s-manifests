@@ -1,0 +1,195 @@
+# ==============================================================================
+# Probe: blog-http-probe
+# ==============================================================================
+# 목적: Blackbox Exporter를 사용하여 blog.jiminhome.shop HTTP 가용성 모니터링
+# 역할: 외부에서 블로그 사이트에 접속 가능 여부를 주기적으로 확인
+# 생성 메트릭: probe_success (1=성공, 0=실패), probe_duration_seconds
+#
+# 의존성:
+#   - Blackbox Exporter (monitoring namespace)
+#   - http_2xx 모듈 (blackbox-exporter-config ConfigMap)
+#   - Prometheus Operator (Probe CRD 인식)
+#
+# 이전 방식 vs 현재 방식:
+#   이전 (ConfigMap): prometheus.yml에 scrape_configs 직접 작성
+#     → 문제: runtime 수정 가능, ArgoCD OutOfSync 지속
+#   현재 (Probe CRD): 선언적 리소스, Operator가 자동 변환
+#     → 해결: GitOps 가능, Always Synced
+#
+# 참고 문서:
+#   - Probe CRD Spec: https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/api.md#probe
+#   - Blackbox Exporter: https://github.com/prometheus/blackbox_exporter
+# ==============================================================================
+
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  # 리소스 이름
+  # What: Probe 리소스의 고유 식별자
+  # Why: 여러 Probe를 구분하기 위함 (blog, api, admin 등)
+  # Impact: 이름 변경 시 Prometheus가 새로운 리소스로 인식
+  # Options: blog-http-probe, blog-website-probe, blog-availability-probe
+  name: blog-http-probe
+
+  # Namespace
+  # What: 이 Probe 리소스가 배포될 namespace
+  # Why: Prometheus Operator가 monitoring namespace의 Probe를 인식하도록 설정됨
+  # Impact: 다른 namespace에 배포 시 Prometheus가 인식 못 함
+  # Options: monitoring (권장), blog-system (불가능 - Operator 범위 밖)
+  namespace: monitoring
+
+  labels:
+    # Platform Conformity 라벨 (CRITICAL!)
+    # What: Prometheus가 이 Probe를 인식하기 위한 라벨
+    # Why: Helm Chart의 기본 표준 (Upstream Convention)
+    # Impact: 이 라벨이 없으면 Prometheus가 Probe를 무시함
+    # Options: prometheus: kube-prometheus (필수, 변경 금지)
+    # 참고: apps/kube-prometheus-stack/values.yaml의 probeSelector와 일치해야 함
+    prometheus: kube-prometheus
+
+    # 추가 라벨 (선택 사항)
+    # What: 관리 목적의 메타데이터
+    # Why: Probe를 그룹화하고 필터링하기 위함
+    # Impact: Prometheus 인식에는 영향 없음 (prometheus: kube-prometheus만 필수)
+    app: blog-system
+    component: web
+    monitor-type: external-http
+
+spec:
+  # Prober 설정
+  # What: Blackbox Exporter의 주소 (실제 프로빙을 수행하는 서비스)
+  # Why: Prometheus는 직접 HTTP 요청을 보내지 않고, Blackbox Exporter에게 위임
+  # Impact: 주소가 틀리면 Blackbox Exporter에 연결 실패
+  prober:
+    # Blackbox Exporter 서비스 URL
+    # What: Blackbox Exporter의 Service DNS 이름과 포트
+    # Why: Kubernetes DNS를 사용하여 자동으로 Blackbox Exporter Pod 찾기
+    # Impact: 잘못된 주소 시 "dial tcp: lookup" 에러 발생
+    # Options:
+    #   - blackbox-exporter.monitoring.svc.cluster.local:9115 (FQDN, 권장)
+    #   - blackbox-exporter:9115 (짧은 이름, 같은 namespace만)
+    #   - blackbox-exporter.monitoring:9115 (중간 형식)
+    url: blackbox-exporter.monitoring.svc.cluster.local:9115
+
+  # Blackbox Exporter 모듈
+  # What: Blackbox Exporter ConfigMap에 정의된 모듈 이름
+  # Why: HTTP, ICMP, TCP 등 다양한 프로토콜 중 어떤 것을 사용할지 지정
+  # Impact: 존재하지 않는 모듈명 사용 시 "unknown module" 에러
+  # Options:
+  #   - http_2xx (권장): HTTP GET 요청, 200/301/302 응답 코드 허용
+  #   - http_post_2xx: HTTP POST 요청
+  #   - tcp_connect: TCP 연결만 확인
+  #   - icmp: ICMP Ping
+  # 확인: kubectl get configmap blackbox-exporter-config -n monitoring -o yaml
+  module: http_2xx
+
+  # 프로브 대상
+  # What: 실제로 확인할 URL 목록
+  # Why: 블로그 사이트의 HTTP 가용성을 확인하기 위함
+  # Impact: 여러 URL 지정 가능 (각각 별도 메트릭 생성)
+  targets:
+    # 정적 설정 (Static Config)
+    # What: 고정된 URL 목록 (변경이 거의 없는 경우)
+    # Why: 블로그 도메인은 자주 변경되지 않음
+    # Impact: URL 추가 시 이 파일을 수정하고 Git 커밋 필요
+    # Options:
+    #   - staticConfig: 고정 URL (권장)
+    #   - ingress: Ingress 리소스에서 자동 추출 (고급)
+    staticConfig:
+      static:
+        # 블로그 사이트 URL
+        # What: 외부에서 접근 가능한 블로그 도메인
+        # Why: 실제 사용자가 접속하는 URL과 동일하게 테스트
+        # Impact: 이 URL이 다운되면 probe_success=0, SLO Alert 발생
+        # Options:
+        #   - http://blog.jiminhome.shop (권장, 빠름)
+        #   - https://blog.jiminhome.shop (HTTPS, TLS 검증 포함)
+        - http://blog.jiminhome.shop
+
+  # 프로브 주기 (Scrape Interval)
+  # What: Blackbox Exporter에게 얼마나 자주 프로브를 요청할지
+  # Why: 실시간 모니터링을 위해 짧은 주기 필요
+  # Impact:
+  #   - 값이 작을수록: 빠른 장애 감지, Blackbox Exporter 부하 증가
+  #   - 값이 클수록: 장애 감지 지연, 부하 감소
+  # Options:
+  #   - 15s (빠름, 부하↑)
+  #   - 30s (권장, 균형) ← ServiceMonitor와 일관성 유지
+  #   - 1m (느림, 부하↓)
+  # 참고: Recording Rules의 interval과 일치 권장
+  interval: 30s
+
+  # Scrape Timeout
+  # What: Blackbox Exporter의 프로브 응답을 기다리는 최대 시간
+  # Why: HTTP 요청이 너무 오래 걸리면 timeout 처리
+  # Impact:
+  #   - 값이 작을수록: 느린 응답을 실패로 판단 (false positive)
+  #   - 값이 클수록: 실제 장애 감지 지연
+  # Options:
+  #   - 5s (빠름)
+  #   - 10s (권장, interval의 1/3)
+  #   - 15s (느림)
+  # 제약: interval보다 작아야 함
+  scrapeTimeout: 10s
+
+# ==============================================================================
+# 검증 명령어
+# ==============================================================================
+# 1. Probe 리소스 확인
+#    kubectl get probe blog-http-probe -n monitoring
+#
+# 2. Prometheus가 Probe를 인식했는지 확인
+#    kubectl get prometheus -n monitoring -o yaml | grep -A 5 probeSelector
+#    # 출력: matchLabels.prometheus: kube-prometheus
+#
+# 3. Prometheus Target 확인 (probe_success 메트릭 수집 여부)
+#    kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090
+#    # 브라우저: http://localhost:9090/targets
+#    # 검색: "probe/monitoring/blog-http-probe"
+#
+# 4. probe_success 메트릭 확인
+#    # Prometheus UI > Graph > Query:
+#    probe_success{job="probe/monitoring/blog-http-probe"}
+#    # 출력: 1 (성공) 또는 0 (실패)
+#
+# 5. Recording Rules 작동 확인 (SLI 메트릭)
+#    sli:availability:1m
+#    # 출력: 0.0 ~ 1.0 (평균 가용성)
+#
+# 6. Blackbox Exporter 로그 확인 (프로브 요청 수신 여부)
+#    kubectl logs -n monitoring -l app.kubernetes.io/name=prometheus-blackbox-exporter --tail=20
+#    # 출력: "probe succeeded" 또는 "probe failed"
+#
+# ==============================================================================
+# 주의사항 (IMPORTANT)
+# ==============================================================================
+# 1. Platform Conformity:
+#    - prometheus: kube-prometheus 라벨 필수! (Helm Chart 표준)
+#    - 이 라벨이 없으면 Prometheus가 Probe를 무시함
+#    - values.yaml의 probeSelector와 반드시 일치해야 함
+#
+# 2. Blackbox Exporter 모듈 존재 확인:
+#    - module: http_2xx가 blackbox-exporter-config에 정의되어 있어야 함
+#    - 확인: kubectl get configmap blackbox-exporter-config -n monitoring -o yaml
+#
+# 3. 네트워크 연결:
+#    - Blackbox Exporter Pod가 외부 인터넷에 접근 가능해야 함
+#    - NetworkPolicy로 egress 차단 시 프로브 실패
+#
+# 4. 타임아웃 설정:
+#    - scrapeTimeout < interval (필수)
+#    - 예: interval=30s면 scrapeTimeout=10s 권장
+#
+# 5. GitOps 워크플로우:
+#    - 이 파일 수정 후 Git 커밋 → ArgoCD 자동 Sync
+#    - kubectl edit로 직접 수정 금지 (ArgoCD가 되돌림)
+#
+# 6. Operator 반영 시간:
+#    - Probe 생성 후 Prometheus가 인식하기까지 1-2분 소요
+#    - Operator가 prometheus.yml을 자동 업데이트하는 시간
+#
+# 7. 메트릭 생성 확인:
+#    - Probe 생성 즉시 메트릭이 생성되지 않음
+#    - 첫 scrape interval(30s) 후에 probe_success 메트릭 생성
+#
+# ==============================================================================
