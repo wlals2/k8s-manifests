@@ -89,7 +89,7 @@ spec:
           #   - 1m (실시간, 권장)
           #   - 5m (단기 추세)
           #   - 1h (장기 추세)
-          expr: avg_over_time(probe_success{job="blackbox-http", instance="http://blog.jiminhome.shop"}[1m])
+          expr: avg_over_time(probe_success{job="probe/monitoring/blog-http-probe", instance="http://blog.jiminhome.shop"}[1m])
 
         # ==================================================================
         # Availability SLI (5분 평균)
@@ -100,7 +100,7 @@ spec:
         # Why: 단기 가용성 추세 파악 (순간적인 장애 필터링)
         # Impact: 1분 평균보다 부드러운 그래프 (노이즈 감소)
         - record: sli:availability:5m
-          expr: avg_over_time(probe_success{job="blackbox-http", instance="http://blog.jiminhome.shop"}[5m])
+          expr: avg_over_time(probe_success{job="probe/monitoring/blog-http-probe", instance="http://blog.jiminhome.shop"}[5m])
 
         # ==================================================================
         # Availability SLI (1시간 평균)
@@ -111,7 +111,7 @@ spec:
         # Why: SLO Alert 조건 (1시간 평균 < 99% 시 Warning 알림)
         # Impact: 이 메트릭이 없으면 SLOAvailabilityViolation1h 알림이 작동하지 않음
         - record: sli:availability:1h
-          expr: avg_over_time(probe_success{job="blackbox-http", instance="http://blog.jiminhome.shop"}[1h])
+          expr: avg_over_time(probe_success{job="probe/monitoring/blog-http-probe", instance="http://blog.jiminhome.shop"}[1h])
 
         # ==================================================================
         # Availability SLI (30일 평균)
@@ -122,7 +122,7 @@ spec:
         # Why: SLO 달성률 계산 (월간 목표: 99% 가용성)
         # Impact: 이 메트릭이 없으면 SLOAvailabilityViolation30d 알림이 작동하지 않음
         - record: sli:availability:30d
-          expr: avg_over_time(probe_success{job="blackbox-http", instance="http://blog.jiminhome.shop"}[30d])
+          expr: avg_over_time(probe_success{job="probe/monitoring/blog-http-probe", instance="http://blog.jiminhome.shop"}[30d])
 
     # ==========================================================================
     # SLI: Latency (응답 시간)
@@ -156,7 +156,7 @@ spec:
           # Why: histogram_quantile로 Histogram 메트릭의 백분위수 계산
           # Impact: 값이 0.5 (500ms)를 초과하면 일반 사용자도 느림 체감
           # Options: p50 (중간값), p95 (상위 5%), p99 (상위 1%)
-          expr: histogram_quantile(0.50, rate(probe_duration_seconds_bucket{job="blackbox-http", instance="http://blog.jiminhome.shop"}[1m]))
+          expr: histogram_quantile(0.50, rate(probe_duration_seconds_bucket{job="probe/monitoring/blog-http-probe", instance="http://blog.jiminhome.shop"}[1m]))
 
         # ==================================================================
         # Latency p95 (95 백분위수, 1분)
@@ -167,7 +167,7 @@ spec:
         # Why: 대부분 사용자(95%)가 경험하는 최악의 응답 시간
         # Impact: p95 > 500ms면 사용자 경험 저하 (SLO 위반)
         - record: sli:latency_p95:1m
-          expr: histogram_quantile(0.95, rate(probe_duration_seconds_bucket{job="blackbox-http", instance="http://blog.jiminhome.shop"}[1m]))
+          expr: histogram_quantile(0.95, rate(probe_duration_seconds_bucket{job="probe/monitoring/blog-http-probe", instance="http://blog.jiminhome.shop"}[1m]))
 
         # ==================================================================
         # Latency p95 (5분)
@@ -178,7 +178,7 @@ spec:
         # Why: SLO Alert 조건 (p95 > 500ms 시 Warning 알림)
         # Impact: 이 메트릭이 없으면 SLOLatencyViolation 알림이 작동하지 않음
         - record: sli:latency_p95:5m
-          expr: histogram_quantile(0.95, rate(probe_duration_seconds_bucket{job="blackbox-http", instance="http://blog.jiminhome.shop"}[5m]))
+          expr: histogram_quantile(0.95, rate(probe_duration_seconds_bucket{job="probe/monitoring/blog-http-probe", instance="http://blog.jiminhome.shop"}[5m]))
 
         # ==================================================================
         # Latency p99 (99 백분위수, 1분)
@@ -189,7 +189,7 @@ spec:
         # Why: 최악의 응답 시간 모니터링 (극소수 사용자가 경험)
         # Impact: p99 > 1s면 일부 사용자가 매우 느린 응답 경험
         - record: sli:latency_p99:1m
-          expr: histogram_quantile(0.99, rate(probe_duration_seconds_bucket{job="blackbox-http", instance="http://blog.jiminhome.shop"}[1m]))
+          expr: histogram_quantile(0.99, rate(probe_duration_seconds_bucket{job="probe/monitoring/blog-http-probe", instance="http://blog.jiminhome.shop"}[1m]))
 
     # ==========================================================================
     # SLI: Error Rate (에러율)
