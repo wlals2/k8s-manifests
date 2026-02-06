@@ -90,9 +90,9 @@ kube-prometheus-stack:
         volumeClaimTemplate:
           spec:
             # StorageClass 지정 (선택 사항)
-            # 옵션: null (기본 SC), longhorn, nfs-client 등
-            # 권장: null (cluster 기본 SC 사용)
-            storageClassName: null
+            # 옵션: 필드 생략 (기본 SC 자동 사용), longhorn, nfs-client 등
+            # 권장: 필드 생략 (cluster 기본 SC 사용)
+            # 현재: longhorn (default) 자동 사용
 
             # 액세스 모드
             # ReadWriteOnce: 단일 Node만 마운트 (권장)
