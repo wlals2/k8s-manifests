@@ -1,0 +1,143 @@
+# ==============================================================================
+# Kube-Prometheus-Stack ArgoCD Application
+# ==============================================================================
+# 목적: CRD 기반 모니터링 스택 자동 배포
+# 포함: Prometheus Operator, Prometheus, Grafana, AlertManager
+# ==============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+  finalizers:
+    # 리소스 정리: Application 삭제 시 모든 배포된 리소스도 자동 삭제
+    # 주의: CRD도 삭제되므로 신중히 사용
+    - resources-finalizer.argocd.argoproj.io
+
+spec:
+  # ArgoCD Project (기본값: default)
+  # 옵션: default, production, monitoring 등
+  project: default
+
+  # Source: Git 저장소 정보
+  source:
+    repoURL: https://github.com/wlals2/k8s-manifests.git
+    targetRevision: main  # 브랜치 또는 Tag
+
+    # Path: Helm Chart 디렉터리
+    # 중요: Chart.yaml이 있는 디렉터리 경로
+    path: apps/kube-prometheus-stack
+
+    # Helm 설정
+    helm:
+      # values.yaml 파일 경로 (자동 인식됨)
+      # 기본값: <path>/values.yaml
+
+      # Helm dependency build (필수!)
+      # 이유: Chart.yaml의 dependencies를 다운로드
+      # 실행: helm dependency build
+      # 결과: charts/ 디렉터리에 kube-prometheus-stack-65.0.0.tgz 생성
+      # 주의: .gitignore에 charts/ 있어야 함 (Git에 커밋 안 함)
+      skipCrds: false  # CRD 설치 (ServiceMonitor, PrometheusRule 등)
+
+  # Destination: 배포할 클러스터 및 Namespace
+  destination:
+    server: https://kubernetes.default.svc  # 로컬 클러스터
+    namespace: monitoring  # 배포할 namespace
+
+  # Sync Policy: 동기화 정책
+  syncPolicy:
+    # 자동 동기화 활성화
+    automated:
+      prune: true       # Git에서 삭제된 리소스 자동 제거
+      selfHeal: true    # Drift 감지 시 자동 복구
+      allowEmpty: false # 빈 디렉터리 허용 안 함
+
+    # Sync Options
+    syncOptions:
+      - CreateNamespace=true  # namespace 자동 생성
+
+      # ServerSideApply 활성화
+      # 이유: Helm Chart는 많은 리소스 생성 → Conflict 방지
+      - ServerSideApply=true
+
+      # Replace 전략 (선택 사항)
+      # 이유: Immutable 필드 변경 시 기존 리소스 삭제 후 재생성
+      # 주의: StatefulSet, PVC 등은 데이터 손실 위험
+      # - Replace=true
+
+# ==============================================================================
+# 배포 순서 (Helm Chart)
+# ==============================================================================
+#
+# 1. ArgoCD가 apps/kube-prometheus-stack/ 감지
+# 2. helm dependency build 실행 (charts/ 디렉터리에 Chart 다운로드)
+# 3. helm template 실행 (values.yaml 적용하여 YAML 생성)
+# 4. kubectl apply 실행 (생성된 YAML 배포)
+# 5. Prometheus Operator 배포 완료
+# 6. Operator가 CRD 감시 시작 (ServiceMonitor, PrometheusRule)
+#
+# ==============================================================================
+# 배포 후 확인 사항
+# ==============================================================================
+#
+# 1. Application Sync 상태
+#    kubectl get application kube-prometheus-stack -n argocd
+#    상태: Synced, Healthy
+#
+# 2. Prometheus Operator Pod
+#    kubectl get pods -n monitoring -l app.kubernetes.io/name=prometheus-operator
+#    상태: Running
+#
+# 3. Prometheus Pod
+#    kubectl get pods -n monitoring -l app.kubernetes.io/name=prometheus
+#    상태: Running (1/1 또는 2/2)
+#
+# 4. Grafana Pod
+#    kubectl get pods -n monitoring -l app.kubernetes.io/name=grafana
+#    상태: Running
+#
+# 5. CRD 설치 확인
+#    kubectl get crd | grep monitoring.coreos.com
+#    출력: servicemonitors.monitoring.coreos.com
+#          prometheusrules.monitoring.coreos.com
+#          podmonitors.monitoring.coreos.com
+#          등등
+#
+# 6. ServiceMonitor 인식 확인
+#    kubectl get servicemonitor -n monitoring
+#    출력: mysql-exporter (생성한 ServiceMonitor)
+#
+# 7. PrometheusRule 인식 확인
+#    kubectl get prometheusrule -n monitoring
+#    출력: mysql-alerts (생성한 PrometheusRule)
+#
+# ==============================================================================
+# 트러블슈팅
+# ==============================================================================
+#
+# 문제 1: Application이 OutOfSync 상태
+# 원인: Helm dependency가 다운로드되지 않음
+# 해결:
+#    kubectl patch application kube-prometheus-stack -n argocd \
+#      --type merge -p '{"operation":{"sync":{"revision":"HEAD"}}}'
+#
+# 문제 2: Prometheus Operator Pod가 CrashLoopBackOff
+# 원인: CRD 설치 실패 또는 RBAC 권한 부족
+# 해결:
+#    kubectl logs -n monitoring -l app.kubernetes.io/name=prometheus-operator
+#    helm template 출력 확인: helm template apps/kube-prometheus-stack/
+#
+# 문제 3: ServiceMonitor가 Target에 안 보임
+# 원인: "prometheus: kube-prometheus" 라벨 누락
+# 해결:
+#    kubectl get servicemonitor mysql-exporter -n monitoring -o yaml | grep "prometheus: kube-prometheus"
+#    없으면: ServiceMonitor YAML에 라벨 추가
+#
+# 문제 4: PVC가 Pending 상태
+# 원인: StorageClass 없음
+# 해결:
+#    kubectl get storageclass
+#    없으면: values.yaml에서 persistence.enabled: false 설정
+#
+# ==============================================================================

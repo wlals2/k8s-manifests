@@ -1,0 +1,22 @@
+# ==============================================================================
+# Kube-Prometheus-Stack Helm Wrapper Chart
+# ==============================================================================
+# 목적: Upstream kube-prometheus-stack Chart를 Wrapper로 관리
+# 버전: 65.0.0 (2024년 안정 버전)
+# 포함 컴포넌트:
+#   - Prometheus Operator (CRD 자동 관리)
+#   - Prometheus (메트릭 수집)
+#   - Grafana (시각화)
+#   - AlertManager (알림)
+# ==============================================================================
+apiVersion: v2
+name: my-kube-prometheus-stack
+version: 1.0.0
+description: Wrapper chart for kube-prometheus-stack
+
+# Helm dependency 정의
+# 이유: Upstream Chart를 직접 수정하지 않고 values.yaml로 커스터마이징
+dependencies:
+  - name: kube-prometheus-stack
+    version: 65.0.0  # 버전 고정 (업그레이드 시 명시적으로 변경)
+    repository: https://prometheus-community.github.io/helm-charts

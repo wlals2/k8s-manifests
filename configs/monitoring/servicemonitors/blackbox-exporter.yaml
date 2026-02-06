@@ -1,0 +1,101 @@
+# ==============================================================================
+# Blackbox Exporter ServiceMonitor
+# ==============================================================================
+# 목적: 외부 서비스 프로빙(HTTP/TCP) 메트릭 수집을 CRD 방식으로 선언
+# 역할: blog.jiminhome.shop, MySQL TCP 등의 가용성 모니터링
+# ==============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: blackbox-exporter
+  namespace: monitoring
+  labels:
+    # CRITICAL: 이 라벨이 없으면 Prometheus Operator가 무시함!
+    # 이유: values.yaml의 serviceMonitorSelector.matchLabels와 일치해야 함
+    # 확인: apps/kube-prometheus-stack/values.yaml:60
+    prometheus: kube-prometheus
+
+    # 추가 라벨 (선택 사항)
+    app: blackbox-exporter
+    component: monitoring
+
+spec:
+  # 선택자: 어떤 Service를 모니터링할 것인가?
+  # 작동 원리:
+  #   1. monitoring namespace의 Service 중
+  #   2. app=blackbox-exporter 라벨을 가진 Service 자동 발견
+  #   3. 해당 Service의 Endpoints로 메트릭 수집
+  selector:
+    matchLabels:
+      app: blackbox-exporter
+
+  # Namespace 선택자
+  # 이유: ServiceMonitor는 monitoring namespace에 있고
+  #       실제 Service도 monitoring namespace에 있음
+  namespaceSelector:
+    matchNames:
+      - monitoring
+
+  # Endpoints 설정
+  endpoints:
+    # Port 이름 (Service의 port.name과 일치)
+    # 확인: kubectl get service blackbox-exporter -n monitoring -o yaml
+    - port: http
+
+      # 수집 간격 (Scrape Interval)
+      # 형식: 30s, 1m, 5m 등
+      # 권장: 30s (기본값)
+      # Trade-off:
+      #   - 짧을수록: 실시간성 ↑, 스토리지 ↑, CPU ↑
+      #   - 길수록: 실시간성 ↓, 스토리지 ↓, CPU ↓
+      interval: 30s
+
+      # 수집 타임아웃
+      # 이유: Exporter 응답이 느릴 때 무한 대기 방지
+      # 권장: 10s (interval보다 짧아야 함)
+      scrapeTimeout: 10s
+
+      # Path (선택 사항)
+      # 기본값: /metrics
+      path: /metrics
+
+# ==============================================================================
+# Blackbox Exporter 특징
+# ==============================================================================
+#
+# 역할:
+#   - 외부 서비스 가용성 모니터링 (HTTP, HTTPS, TCP, ICMP)
+#   - probe_success{} 메트릭 제공 (1 = 정상, 0 = 실패)
+#   - probe_duration_seconds{} 메트릭 제공 (응답 시간)
+#
+# 주요 메트릭:
+#   - probe_success{job="blackbox-http", instance="http://blog.jiminhome.shop"}
+#   - probe_duration_seconds{job="blackbox-http"}
+#   - probe_http_status_code{job="blackbox-http"}
+#
+# 사용 예시 (PrometheusRule):
+#   - alert: WebsiteDown
+#     expr: probe_success{job="blackbox-http"} == 0
+#     for: 1m
+#
+# ==============================================================================
+# 검증 방법
+# ==============================================================================
+#
+# 1. ServiceMonitor 생성 확인
+#    kubectl get servicemonitor blackbox-exporter -n monitoring
+#
+# 2. Prometheus가 Target으로 인식했는지 확인
+#    kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090
+#    브라우저: http://localhost:9090/targets
+#    → "serviceMonitor/monitoring/blackbox-exporter/0" 있어야 함
+#
+# 3. 메트릭 수집 확인
+#    kubectl exec -n monitoring prometheus-kube-prometheus-stack-prometheus-0 \
+#      -- wget -qO- http://blackbox-exporter.monitoring.svc.cluster.local:9115/metrics
+#
+# 4. PromQL 쿼리 테스트
+#    probe_success{job="blackbox-http"}  # 외부 서비스 가용성
+#    probe_duration_seconds{job="blackbox-http"}  # 응답 시간
+#
+# ==============================================================================

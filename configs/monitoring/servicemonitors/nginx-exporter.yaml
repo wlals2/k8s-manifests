@@ -1,0 +1,107 @@
+# ==============================================================================
+# NGINX Exporter ServiceMonitor
+# ==============================================================================
+# 목적: NGINX 웹 서버 메트릭 수집을 CRD 방식으로 선언
+# 역할: NGINX 연결 수, 요청 수, 응답 시간 등 모니터링
+# ==============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: nginx-exporter
+  namespace: monitoring
+  labels:
+    # CRITICAL: 이 라벨이 없으면 Prometheus Operator가 무시함!
+    # 이유: values.yaml의 serviceMonitorSelector.matchLabels와 일치해야 함
+    # 확인: apps/kube-prometheus-stack/values.yaml:60
+    prometheus: kube-prometheus
+
+    # 추가 라벨 (선택 사항)
+    app: nginx-exporter
+    component: web
+
+spec:
+  # 선택자: 어떤 Service를 모니터링할 것인가?
+  # 작동 원리:
+  #   1. monitoring namespace의 Service 중
+  #   2. app=nginx-exporter 라벨을 가진 Service 자동 발견
+  #   3. 해당 Service의 Endpoints로 메트릭 수집
+  selector:
+    matchLabels:
+      app: nginx-exporter
+
+  # Namespace 선택자
+  # 이유: ServiceMonitor는 monitoring namespace에 있고
+  #       실제 Service도 monitoring namespace에 있음
+  namespaceSelector:
+    matchNames:
+      - monitoring
+
+  # Endpoints 설정
+  endpoints:
+    # Port 이름 (Service의 port.name과 일치)
+    # 확인: kubectl get service nginx-exporter -n monitoring -o yaml
+    # NGINX Exporter는 보통 9113 포트를 사용
+    - port: metrics
+
+      # 수집 간격 (Scrape Interval)
+      # 형식: 30s, 1m, 5m 등
+      # 권장: 30s (기본값)
+      # Trade-off:
+      #   - 짧을수록: 실시간성 ↑, 스토리지 ↑, CPU ↑
+      #   - 길수록: 실시간성 ↓, 스토리지 ↓, CPU ↓
+      interval: 30s
+
+      # 수집 타임아웃
+      # 이유: Exporter 응답이 느릴 때 무한 대기 방지
+      # 권장: 10s (interval보다 짧아야 함)
+      scrapeTimeout: 10s
+
+      # Path (선택 사항)
+      # 기본값: /metrics
+      path: /metrics
+
+# ==============================================================================
+# NGINX Exporter 특징
+# ==============================================================================
+#
+# 역할:
+#   - NGINX 웹 서버 성능 메트릭 수집
+#   - stub_status 모듈 기반 (NGINX 설정 필요)
+#   - 연결 수, 요청 수, 응답 시간 등
+#
+# 주요 메트릭:
+#   - nginx_connections_active{} (현재 활성 연결 수)
+#   - nginx_connections_accepted{} (누적 수락된 연결 수)
+#   - nginx_connections_handled{} (누적 처리된 연결 수)
+#   - nginx_http_requests_total{} (누적 HTTP 요청 수)
+#
+# NGINX 설정 필요:
+#   server {
+#     location /stub_status {
+#       stub_status on;
+#       allow 127.0.0.1;  # Exporter만 접근 허용
+#       deny all;
+#     }
+#   }
+#
+# ==============================================================================
+# 검증 방법
+# ==============================================================================
+#
+# 1. ServiceMonitor 생성 확인
+#    kubectl get servicemonitor nginx-exporter -n monitoring
+#
+# 2. Prometheus가 Target으로 인식했는지 확인
+#    kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090
+#    브라우저: http://localhost:9090/targets
+#    → "serviceMonitor/monitoring/nginx-exporter/0" 있어야 함
+#
+# 3. 메트릭 수집 확인
+#    kubectl exec -n monitoring prometheus-kube-prometheus-stack-prometheus-0 \
+#      -- wget -qO- http://nginx-exporter.monitoring.svc.cluster.local:9113/metrics
+#
+# 4. PromQL 쿼리 테스트
+#    nginx_connections_active{}  # 현재 활성 연결 수
+#    rate(nginx_http_requests_total[5m])  # 초당 요청 수
+#
+# ==============================================================================

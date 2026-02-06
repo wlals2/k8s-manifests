@@ -24,6 +24,8 @@ metadata:
   namespace: monitoring
   labels:
     grafana_dashboard: "1"
+  labels:
+    grafana_dashboard: "1"
     tier: monitoring
 data:
   blog-hpa-monitoring.json: |

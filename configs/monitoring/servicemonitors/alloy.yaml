@@ -1,0 +1,115 @@
+# ==============================================================================
+# Grafana Alloy ServiceMonitor
+# ==============================================================================
+# 목적: Alloy (OpenTelemetry Collector) 메트릭 수집을 CRD 방식으로 선언
+# 역할: 노드 메트릭 수집 (Node Exporter 대체), 로그/트레이스 수집
+# 배포 방식: DaemonSet (모든 노드에서 실행)
+# ==============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: alloy
+  namespace: monitoring
+  labels:
+    # CRITICAL: 이 라벨이 없으면 Prometheus Operator가 무시함!
+    # 이유: values.yaml의 serviceMonitorSelector.matchLabels와 일치해야 함
+    # 확인: apps/kube-prometheus-stack/values.yaml:60
+    prometheus: kube-prometheus
+
+    # 추가 라벨 (선택 사항)
+    app: alloy
+    component: observability
+
+spec:
+  # 선택자: 어떤 Service를 모니터링할 것인가?
+  # 작동 원리:
+  #   1. monitoring namespace의 Service 중
+  #   2. app.kubernetes.io/name=alloy 라벨을 가진 Service 자동 발견
+  #   3. 해당 Service의 Endpoints로 메트릭 수집
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: alloy
+
+  # Namespace 선택자
+  # 이유: ServiceMonitor는 monitoring namespace에 있고
+  #       실제 Service도 monitoring namespace에 있음
+  namespaceSelector:
+    matchNames:
+      - monitoring
+
+  # Endpoints 설정
+  endpoints:
+    # Port 이름 (Service의 port.name과 일치)
+    # 확인: kubectl get service alloy -n monitoring -o yaml
+    # Alloy는 보통 12345 포트를 사용
+    - port: http-metrics
+
+      # 수집 간격 (Scrape Interval)
+      # 형식: 30s, 1m, 5m 등
+      # 권장: 30s (기본값)
+      # Trade-off:
+      #   - 짧을수록: 실시간성 ↑, 스토리지 ↑, CPU ↑
+      #   - 길수록: 실시간성 ↓, 스토리지 ↓, CPU ↓
+      interval: 30s
+
+      # 수집 타임아웃
+      # 이유: Exporter 응답이 느릴 때 무한 대기 방지
+      # 권장: 10s (interval보다 짧아야 함)
+      scrapeTimeout: 10s
+
+      # Path (선택 사항)
+      # 기본값: /metrics
+      path: /metrics
+
+      # Relabeling (선택 사항)
+      # 이유: DaemonSet이므로 instance 라벨을 node 이름으로 변경
+      # 예시: instance="alloy-abc123" → instance="node01"
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+          action: replace
+
+# ==============================================================================
+# Grafana Alloy 특징
+# ==============================================================================
+#
+# 역할:
+#   - OpenTelemetry Collector (메트릭, 로그, 트레이스 수집)
+#   - Node Exporter 기능 포함 (노드 메트릭)
+#   - DaemonSet으로 모든 노드에서 실행
+#
+# 주요 메트릭:
+#   - node_cpu_seconds_total{} (CPU 사용량)
+#   - node_memory_MemAvailable_bytes{} (메모리 가용량)
+#   - node_filesystem_avail_bytes{} (디스크 사용량)
+#   - node_network_receive_bytes_total{} (네트워크 수신)
+#
+# Node Exporter 대체 이유:
+#   - values.yaml에서 nodeExporter.enabled: false 설정
+#   - Alloy가 Node Exporter 기능 포함
+#   - 중복 메트릭 수집 방지
+#
+# ==============================================================================
+# 검증 방법
+# ==============================================================================
+#
+# 1. ServiceMonitor 생성 확인
+#    kubectl get servicemonitor alloy -n monitoring
+#
+# 2. Prometheus가 Target으로 인식했는지 확인
+#    kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090
+#    브라우저: http://localhost:9090/targets
+#    → "serviceMonitor/monitoring/alloy/0" 있어야 함
+#
+# 3. 메트릭 수집 확인
+#    kubectl exec -n monitoring prometheus-kube-prometheus-stack-prometheus-0 \
+#      -- wget -qO- http://alloy.monitoring.svc.cluster.local:12345/metrics
+#
+# 4. PromQL 쿼리 테스트
+#    node_cpu_seconds_total{}  # CPU 메트릭
+#    node_memory_MemAvailable_bytes{}  # 메모리 메트릭
+#
+# 5. DaemonSet 확인 (모든 노드에 Pod 실행 중인지)
+#    kubectl get pods -n monitoring -l app.kubernetes.io/name=alloy -o wide
+#
+# ==============================================================================
