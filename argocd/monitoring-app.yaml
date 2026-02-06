@@ -11,6 +11,13 @@ spec:
     repoURL: https://github.com/wlals2/k8s-manifests.git
     targetRevision: main
     path: configs/monitoring  # ✅ configs/ 디렉터리로 변경
+
+    # Directory 설정
+    # recurse: subdirectory까지 재귀적으로 읽기
+    # 이유: servicemonitors/, prometheusrules/ subdirectory 포함
+    directory:
+      recurse: true
+
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
