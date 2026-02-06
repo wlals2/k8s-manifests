@@ -1,0 +1,486 @@
+# ==============================================================================
+# SLO Alert Rules
+# ==============================================================================
+# 목적: SLO(Service Level Objective) 위반 시 알림 전송
+# 역할: SLI Recording Rules를 활용하여 SLO 달성 여부 모니터링
+# 의존성:
+#   - sli-recording-rules.yaml: sli:availability:*, sli:latency_*, sli:error_rate:* 메트릭 필요
+#   - Blackbox Exporter: probe_success 메트릭 필요 (서비스 완전 중단 감지)
+# 참고: https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/
+# ==============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  # 리소스 이름: slo-alerts
+  # What: PrometheusRule CRD 리소스 이름
+  # Why: Prometheus Operator가 이 이름으로 Alert Rules를 인식
+  # Impact: 변경 시 ArgoCD Application에서도 이름 변경 필요
+  name: slo-alerts
+
+  # Namespace: monitoring
+  # What: 이 PrometheusRule이 배포될 namespace
+  # Why: Prometheus가 monitoring namespace에서 실행 중
+  # Impact: 다른 namespace로 변경 시 Prometheus가 인식하지 못함
+  # Options: monitoring (권장), default (비권장)
+  namespace: monitoring
+
+  labels:
+    # CRITICAL: Prometheus가 이 Rules를 인식하려면 라벨 필수!
+    # What: Prometheus Operator의 ruleSelector와 매칭되는 라벨
+    # Why: Platform Conformity - Helm Chart 표준 라벨 사용
+    # Impact: 이 라벨이 없으면 Prometheus가 Rules를 로드하지 않음
+    # Options: prometheus: kube-prometheus (Helm Chart 기본값, 필수!)
+    prometheus: kube-prometheus
+
+    # 추가 라벨 (선택 사항, 분류용)
+    # What: Prometheus 관련 리소스임을 표시
+    # Why: kubectl get prometheusrule -l app=prometheus로 필터링 가능
+    # Impact: 선택 사항, 삭제해도 동작에 영향 없음
+    app: prometheus
+
+    # What: Alert Rules임을 표시
+    # Why: Recording Rules와 구분하기 위함
+    # Impact: 선택 사항, 삭제해도 동작에 영향 없음
+    component: alert-rules
+
+    # What: SLO 관련 Rules임을 표시
+    # Why: SLO/SLI 관련 리소스만 필터링 가능
+    # Impact: 선택 사항, 삭제해도 동작에 영향 없음
+    slo: "true"
+
+spec:
+  groups:
+    # ==========================================================================
+    # SLO: Availability (가용성)
+    # ==========================================================================
+    # 목표: 99% 가용성 (30일 기준)
+    # 허용 다운타임: 7.2시간/30일 (1% = 30일 * 24시간 * 0.01)
+
+    # Rule Group 이름: slo-availability
+    # What: Availability SLO 위반 시 알림을 발송하는 규칙 그룹
+    # Why: 블로그 사이트 가용성이 목표(99%)보다 낮을 때 즉시 대응하기 위함
+    # Impact: 이 그룹이 없으면 다운타임 발생 시 알림 없음 (장애 발견 지연)
+    - name: slo-availability
+
+      # 평가 주기: 1분
+      # What: Alert Rules를 평가하는 주기
+      # Why: 가용성은 중요하므로 빠른 주기로 확인 필요
+      # Impact: 값이 클수록 알림 지연, 작을수록 Prometheus 부하 증가
+      # Options: 30s (매우 빠름, 부하↑), 1m (권장, 균형), 5m (느림, 부하↓)
+      interval: 1m
+
+      rules:
+        # ==================================================================
+        # SLO 위반: 1시간 평균 가용성 < 99%
+        # ==================================================================
+
+        # Alert 이름: SLOAvailabilityViolation1h
+        # What: 1시간 평균 가용성이 99% 미만일 때 발생하는 알림
+        # Why: 단기 가용성 저하를 빠르게 감지하기 위함
+        # Impact: 이 알림이 없으면 1시간 이상 다운타임 발생 시에도 모름
+        - alert: SLOAvailabilityViolation1h
+
+          # PromQL 조건
+          # What: sli:availability:1h 메트릭이 0.99 미만
+          # Why: 1시간 평균 가용성이 99% 미만이면 SLO 위반
+          # Impact: 조건 충족 시 Pending → Firing 상태로 전환
+          # Options: 0.99 (99%), 0.95 (95%), 0.90 (90%)
+          expr: sli:availability:1h < 0.99
+
+          # 지속 시간: 5분
+          # What: 조건이 5분 동안 지속되어야 Firing
+          # Why: 순간적인 장애로 인한 오알람 방지
+          # Impact: 값이 클수록 알림 지연, 작을수록 오알람 증가
+          # Options: 0 (즉시), 5m (권장), 10m (느림)
+          for: 5m
+
+          labels:
+            # 심각도: warning
+            # What: 이 알림의 심각도 레벨
+            # Why: 1시간 평균이므로 즉시 조치보다는 주의 필요
+            # Impact: warning은 Slack/Discord 알림, critical은 긴급 알림
+            # Options: info, warning, critical, page
+            severity: warning
+
+            # SLO 타입: availability
+            # What: 이 알림이 어떤 SLO 관련인지 표시
+            # Why: Alert 분류 및 필터링 용도
+            # Impact: 선택 사항, 삭제해도 동작에 영향 없음
+            slo: availability
+
+            # 컴포넌트: blog-system
+            # What: 어떤 시스템의 알림인지 표시
+            # Why: 여러 시스템 운영 시 구분 용도
+            # Impact: 선택 사항
+            component: blog-system
+
+          annotations:
+            # 알림 제목
+            # What: AlertManager에서 표시될 알림 제목
+            # Why: 한눈에 문제를 파악하기 위함
+            # Impact: 짧고 명확해야 함 (50자 이내 권장)
+            summary: "가용성 SLO 위반 (1시간 평균)"
+
+            # 알림 상세 내용
+            # What: AlertManager에서 표시될 상세 설명 및 조치 방법
+            # Why: 문제 원인과 해결 방법을 즉시 알려주기 위함
+            # Impact: 조치 방법이 명확해야 빠른 대응 가능
+            description: |
+              블로그 사이트 가용성이 1시간 평균 99% 미만입니다.
+              현재 가용성: {{ $value | humanizePercentage }}
+              목표: 99%
+
+              조치:
+              1. kubectl get pods -n blog-system (Pod 상태 확인)
+              2. kubectl logs -n blog-system -l app=web --tail=100 (로그 확인)
+              3. Grafana Dashboard에서 상세 분석
+
+        # ==================================================================
+        # SLO 위반: 30일 평균 가용성 < 99%
+        # ==================================================================
+
+        # Alert 이름: SLOAvailabilityViolation30d
+        # What: 30일 평균 가용성이 99% 미만일 때 발생하는 알림
+        # Why: 월간 SLO 달성 여부 확인 (장기 추세)
+        # Impact: 이 알림이 발생하면 Error Budget 소진 (긴급 조치 필요)
+        - alert: SLOAvailabilityViolation30d
+          expr: sli:availability:30d < 0.99
+
+          # 지속 시간: 1시간
+          # Why: 30일 평균은 천천히 변하므로 긴 지속 시간 필요
+          # Impact: 오알람 방지 (순간적인 장애로 30일 평균이 떨어지지 않음)
+          for: 1h
+
+          labels:
+            # 심각도: critical
+            # Why: 월간 SLO 미달성은 심각한 문제 (Error Budget 소진)
+            # Impact: 긴급 알림 전송 (PagerDuty, 전화 등)
+            severity: critical
+            slo: availability
+            component: blog-system
+
+          annotations:
+            summary: "가용성 SLO 30일 목표 미달성"
+            description: |
+              블로그 사이트 30일 평균 가용성이 99% 미만입니다.
+              현재 가용성: {{ $value | humanizePercentage }}
+              목표: 99%
+
+              Error Budget 소진:
+              허용 다운타임: 7.2시간/30일
+              실제 다운타임: {{ mul (sub 1 $value) 30 24 | printf "%.2f" }}시간
+
+              긴급 조치 필요!
+
+    # ==========================================================================
+    # SLO: Latency (응답 시간)
+    # ==========================================================================
+    # 목표: p95 < 500ms
+
+    # Rule Group 이름: slo-latency
+    # What: Latency SLO 위반 시 알림을 발송하는 규칙 그룹
+    # Why: 응답 시간이 느려지면 사용자 경험 저하
+    # Impact: 이 그룹이 없으면 느린 응답을 감지하지 못함
+    - name: slo-latency
+
+      # 평가 주기: 1분
+      # Why: 응답 시간은 빠르게 변할 수 있으므로 짧은 주기 필요
+      interval: 1m
+
+      rules:
+        # ==================================================================
+        # SLO 위반: p95 응답 시간 > 500ms
+        # ==================================================================
+
+        # Alert 이름: SLOLatencyViolation
+        # What: p95 응답 시간이 500ms를 초과할 때 발생하는 알림
+        # Why: 대부분 사용자(95%)가 느린 응답을 경험하면 SLO 위반
+        # Impact: 이 알림이 없으면 느린 응답으로 인한 사용자 이탈 증가
+        - alert: SLOLatencyViolation
+
+          # PromQL 조건
+          # What: sli:latency_p95:5m 메트릭이 0.5 (500ms) 초과
+          # Why: p95 응답 시간이 500ms를 초과하면 사용자 경험 저하
+          # Impact: 조건 충족 시 Pending → Firing 상태로 전환
+          # Options: 0.5 (500ms, 권장), 0.3 (300ms, 엄격), 1.0 (1s, 느슨)
+          expr: sli:latency_p95:5m > 0.5
+
+          # 지속 시간: 5분
+          # Why: 순간적인 스파이크로 인한 오알람 방지
+          # Impact: 5분 동안 지속되면 실제 문제로 간주
+          for: 5m
+
+          labels:
+            # 심각도: warning
+            # Why: 응답 시간 저하는 주의 필요하지만 즉시 조치는 아님
+            severity: warning
+            slo: latency
+            component: blog-system
+
+          annotations:
+            summary: "응답 시간 SLO 위반 (p95 > 500ms)"
+            description: |
+              블로그 사이트 p95 응답 시간이 500ms를 초과했습니다.
+              현재 p95: {{ $value | printf "%.3f" }}s ({{ mul $value 1000 | printf "%.0f" }}ms)
+              목표: < 0.5s (500ms)
+
+              조치:
+              1. Grafana에서 Latency 추세 확인
+              2. kubectl top pods -n blog-system (리소스 사용량 확인)
+              3. HPA 작동 여부 확인 (kubectl get hpa -n blog-system)
+
+        # ==================================================================
+        # SLO 위반: p99 응답 시간 > 1s
+        # ==================================================================
+
+        # Alert 이름: SLOLatencyP99Violation
+        # What: p99 응답 시간이 1초를 초과할 때 발생하는 알림
+        # Why: 최악의 응답 시간이 너무 느리면 일부 사용자 경험 매우 나쁨
+        # Impact: p99가 높으면 극소수 사용자가 매우 느린 응답 경험
+        - alert: SLOLatencyP99Violation
+          expr: sli:latency_p99:1m > 1.0
+
+          # 지속 시간: 5분
+          # Why: p99는 변동이 크므로 5분 지속 확인
+          for: 5m
+
+          labels:
+            severity: warning
+            slo: latency
+            component: blog-system
+
+          annotations:
+            summary: "응답 시간 p99 > 1초"
+            description: |
+              블로그 사이트 p99 응답 시간이 1초를 초과했습니다.
+              현재 p99: {{ $value | printf "%.3f" }}s ({{ mul $value 1000 | printf "%.0f" }}ms)
+
+              일부 사용자가 매우 느린 응답을 경험하고 있습니다.
+
+    # ==========================================================================
+    # SLO: Error Rate (에러율)
+    # ==========================================================================
+    # 목표: 5xx 에러율 < 1%
+
+    # Rule Group 이름: slo-error-rate
+    # What: Error Rate SLO 위반 시 알림을 발송하는 규칙 그룹
+    # Why: 서버 에러 비율이 높으면 시스템 불안정
+    # Impact: 이 그룹이 없으면 에러 발생을 감지하지 못함
+    - name: slo-error-rate
+
+      # 평가 주기: 1분
+      # Why: 에러 발생 시 빠른 감지 필요
+      interval: 1m
+
+      rules:
+        # ==================================================================
+        # SLO 위반: 5xx 에러율 > 1%
+        # ==================================================================
+
+        # Alert 이름: SLOErrorRateViolation
+        # What: 5xx 에러율이 1%를 초과할 때 발생하는 알림
+        # Why: 서버 에러 비율이 높으면 사용자가 서비스 이용 불가
+        # Impact: 이 알림이 없으면 대량 에러 발생 시에도 모름
+        - alert: SLOErrorRateViolation
+
+          # PromQL 조건
+          # What: sli:error_rate:5m 메트릭이 0.01 (1%) 초과
+          # Why: 에러율이 1%를 초과하면 100명 중 1명 이상이 에러 경험
+          # Impact: 조건 충족 시 Pending → Firing 상태로 전환
+          # Options: 0.01 (1%, 권장), 0.05 (5%, 느슨), 0.001 (0.1%, 엄격)
+          expr: sli:error_rate:5m > 0.01
+
+          # 지속 시간: 5분
+          # Why: 순간적인 에러 스파이크로 인한 오알람 방지
+          # Impact: 5분 동안 지속되면 실제 문제로 간주
+          for: 5m
+
+          labels:
+            # 심각도: warning
+            # Why: 에러율 1%는 주의 필요하지만 즉시 조치는 아님
+            severity: warning
+            slo: error_rate
+            component: blog-system
+
+          annotations:
+            summary: "에러율 SLO 위반 (5xx > 1%)"
+            description: |
+              블로그 사이트 5xx 에러율이 1%를 초과했습니다.
+              현재 에러율: {{ $value | humanizePercentage }}
+              목표: < 1%
+
+              조치:
+              1. kubectl logs -n blog-system -l app=web --tail=100 | grep -i error
+              2. kubectl logs -n blog-system -l app=was --tail=100 | grep -i error
+              3. WAS ↔ MySQL 연결 확인
+
+        # ==================================================================
+        # Critical: 5xx 에러율 > 5%
+        # ==================================================================
+
+        # Alert 이름: SLOErrorRateCritical
+        # What: 5xx 에러율이 5%를 초과할 때 발생하는 알림
+        # Why: 대량의 서버 에러 발생 (심각한 문제)
+        # Impact: 긴급 조치 필요 (서비스 거의 불가능)
+        - alert: SLOErrorRateCritical
+
+          # PromQL 조건
+          # What: sli:error_rate:5m 메트릭이 0.05 (5%) 초과
+          # Why: 에러율이 5%를 초과하면 100명 중 5명 이상이 에러 경험
+          # Impact: 조건 충족 시 즉시 긴급 알림
+          expr: sli:error_rate:5m > 0.05
+
+          # 지속 시간: 2분
+          # Why: 심각한 상황이므로 짧은 지속 시간 (빠른 대응)
+          # Impact: 2분 동안 지속되면 즉시 조치
+          for: 2m
+
+          labels:
+            # 심각도: critical
+            # Why: 대량 에러는 긴급 조치 필요
+            severity: critical
+            slo: error_rate
+            component: blog-system
+
+          annotations:
+            summary: "심각한 에러율 (5xx > 5%)"
+            description: |
+              블로그 사이트 5xx 에러율이 5%를 초과했습니다!
+              현재 에러율: {{ $value | humanizePercentage }}
+
+              긴급 조치:
+              1. Pod 재시작: kubectl rollout restart deployment web -n blog-system
+              2. 로그 확인: kubectl logs -n blog-system -l app=web --tail=200
+              3. 즉시 Slack/Discord 알림
+
+    # ==========================================================================
+    # SLO: Service Down (서비스 완전 중단)
+    # ==========================================================================
+    # 가용성 0% (완전 중단)
+
+    # Rule Group 이름: slo-service-down
+    # What: 서비스 완전 중단 시 알림을 발송하는 규칙 그룹
+    # Why: 블로그 사이트가 완전히 접속 불가능할 때 즉시 대응
+    # Impact: 이 그룹이 없으면 서비스 중단을 감지하지 못함 (매우 위험)
+    - name: slo-service-down
+
+      # 평가 주기: 30초
+      # Why: 서비스 중단은 가장 심각하므로 매우 짧은 주기 필요
+      # Impact: 30초마다 확인 (빠른 감지)
+      interval: 30s
+
+      rules:
+        # ==================================================================
+        # Service 완전 중단
+        # ==================================================================
+
+        # Alert 이름: BlogServiceDown
+        # What: 블로그 사이트가 완전히 접속 불가능할 때 발생하는 알림
+        # Why: probe_success = 0 (Blackbox Exporter가 HTTP 응답 못 받음)
+        # Impact: 이 알림이 없으면 서비스 중단을 모름 (사용자 신고로만 파악)
+        - alert: BlogServiceDown
+
+          # PromQL 조건
+          # What: probe_success 메트릭이 0 (접속 실패)
+          # Why: Blackbox Exporter가 HTTP 요청에 실패하면 0 반환
+          # Impact: 조건 충족 시 즉시 긴급 알림
+          # Options: == 0 (완전 중단), < 0.5 (50% 이상 실패)
+          expr: probe_success{job="blackbox-http", instance="http://blog.jiminhome.shop"} == 0
+
+          # 지속 시간: 1분
+          # Why: 순간적인 네트워크 장애로 인한 오알람 방지
+          # Impact: 1분 동안 지속되면 실제 중단으로 간주
+          # Options: 0 (즉시), 1m (권장), 5m (느슨)
+          for: 1m
+
+          labels:
+            # 심각도: critical
+            # Why: 서비스 완전 중단은 가장 심각한 상황
+            severity: critical
+            slo: availability
+            component: blog-system
+
+            # Page 알림: "true"
+            # What: PagerDuty, 전화 등 긴급 알림 전송
+            # Why: 서비스 중단은 즉시 깨워서라도 대응 필요
+            # Impact: 이 라벨이 있으면 긴급 알림 채널로 전송
+            # Options: "true" (긴급 알림), "false" (일반 알림)
+            page: "true"
+
+          annotations:
+            summary: "블로그 사이트 완전 중단!"
+            description: |
+              블로그 사이트가 완전히 접속 불가능합니다.
+
+              긴급 조치:
+              1. kubectl get pods -n blog-system
+              2. kubectl get svc -n blog-system
+              3. Istio Gateway 확인: kubectl get gateway -n blog-system
+              4. AuthorizationPolicy 확인: kubectl get authorizationpolicy -n istio-system
+
+              예상 원인:
+              - Pod 전체 다운
+              - Service Endpoint 없음
+              - Istio Gateway 설정 오류
+              - AuthorizationPolicy 차단
+
+# ==============================================================================
+# 검증 방법 (Verification)
+# ==============================================================================
+#
+# 1. PrometheusRule 생성 확인
+#    kubectl get prometheusrule slo-alerts -n monitoring
+#    → NAME, AGE 표시되면 정상
+#
+# 2. Alert Rules 동작 확인
+#    kubectl exec -n monitoring prometheus-kube-prometheus-stack-prometheus-0 \
+#      -- wget -qO- http://localhost:9090/api/v1/rules | jq '.data.groups[] | select(.name | contains("slo"))'
+#    → slo-availability, slo-latency, slo-error-rate, slo-service-down 그룹 표시되면 정상
+#
+# 3. 현재 Firing 중인 Alert 확인
+#    kubectl exec -n monitoring prometheus-kube-prometheus-stack-prometheus-0 \
+#      -- wget -qO- http://localhost:9090/api/v1/alerts | jq '.data.alerts[] | select(.labels.slo)'
+#    → Firing 중인 알림이 있으면 state: "firing" 표시
+#
+# 4. Grafana Alerting 연동
+#    - Grafana UI > Alerting > Alert rules
+#    - Prometheus 규칙이 자동으로 표시됨
+#    - Firing 중인 알림은 빨간색으로 표시
+#
+# ==============================================================================
+# 주의사항 (Important Notes)
+# ==============================================================================
+#
+# 1. **for 절의 의미**:
+#    - for: 5m → Alert가 5분 동안 지속되어야 Firing
+#    - for 없음 → 즉시 Firing (Pending 상태 건너뜀)
+#    - Pending 상태: 조건 충족했지만 아직 Firing 전 (대기 중)
+#
+# 2. **severity 레벨**:
+#    - info: 참고용 정보 (알림 없음)
+#    - warning: 주의 필요 (단기 SLO 위반)
+#    - critical: 긴급 조치 필요 (장기 SLO 위반, 서비스 중단)
+#    - page: 즉시 알림 필요 (PagerDuty, 전화 등)
+#
+# 3. **SLI Recording Rules 필수**:
+#    - sli-recording-rules.yaml을 먼저 배포해야 함
+#    - sli:availability:1h, sli:latency_p95:5m 등의 메트릭 필요
+#    - Recording Rules 없으면 Alert 조건이 평가되지 않음 (No data)
+#
+# 4. **AlertManager 설정 필요**:
+#    - PrometheusRule만으로는 알림 전송 안 됨
+#    - AlertManager 설정에서 route와 receiver 정의 필요
+#    - Telegram, Slack, Discord 등 연동 필요
+#
+# 5. **라벨 불일치 시 Rules 무시**:
+#    - prometheus: kube-prometheus 라벨 필수!
+#    - 라벨 없으면 Prometheus가 이 Rules를 로드하지 않음
+#    - 확인: kubectl get prometheus -n monitoring -o yaml | grep -A 3 ruleSelector
+#
+# 6. **annotations의 템플릿 문법**:
+#    - {{ $value }}: Alert 조건의 현재 값
+#    - {{ $value | humanizePercentage }}: 0.99 → 99%
+#    - {{ $value | printf "%.3f" }}: 0.5234 → 0.523
+#    - {{ mul $value 1000 }}: 0.5 → 500 (ms 변환)
+#
+# ==============================================================================

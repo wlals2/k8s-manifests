@@ -1,0 +1,362 @@
+# ==============================================================================
+# SLI Recording Rules
+# ==============================================================================
+# 목적: SLI(Service Level Indicator) 메트릭을 미리 계산하여 쿼리 성능 향상
+# 역할: Availability, Latency, Error Rate 등 핵심 지표를 주기적으로 계산
+# 의존성:
+#   - Blackbox Exporter: probe_success, probe_duration_seconds 메트릭 필요
+#   - NGINX Exporter: nginx_http_requests_total 메트릭 필요
+# 참고: https://prometheus.io/docs/prometheus/latest/configuration/recording_rules/
+# ==============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  # 리소스 이름: sli-recording-rules
+  # What: PrometheusRule CRD 리소스 이름
+  # Why: Prometheus Operator가 이 이름으로 Rules를 인식
+  # Impact: 변경 시 ArgoCD Application에서도 이름 변경 필요
+  name: sli-recording-rules
+
+  # Namespace: monitoring
+  # What: 이 PrometheusRule이 배포될 namespace
+  # Why: Prometheus가 monitoring namespace에서 실행 중
+  # Impact: 다른 namespace로 변경 시 Prometheus가 인식하지 못함
+  # Options: monitoring (권장), default (비권장)
+  namespace: monitoring
+
+  labels:
+    # CRITICAL: Prometheus가 이 Rules를 인식하려면 라벨 필수!
+    # What: Prometheus Operator의 ruleSelector와 매칭되는 라벨
+    # Why: Platform Conformity - Helm Chart 표준 라벨 사용
+    # Impact: 이 라벨이 없으면 Prometheus가 Rules를 로드하지 않음
+    # Options: prometheus: kube-prometheus (Helm Chart 기본값, 필수!)
+    prometheus: kube-prometheus
+
+    # 추가 라벨 (선택 사항, 분류용)
+    # What: Prometheus 관련 리소스임을 표시
+    # Why: kubectl get prometheusrule -l app=prometheus로 필터링 가능
+    # Impact: 선택 사항, 삭제해도 동작에 영향 없음
+    app: prometheus
+
+    # What: Recording Rules임을 표시
+    # Why: Alert Rules와 구분하기 위함
+    # Impact: 선택 사항, 삭제해도 동작에 영향 없음
+    component: recording-rules
+
+    # What: SLO 관련 Rules임을 표시
+    # Why: SLO/SLI 관련 리소스만 필터링 가능
+    # Impact: 선택 사항, 삭제해도 동작에 영향 없음
+    slo: "true"
+
+spec:
+  groups:
+    # ==========================================================================
+    # SLI: Availability (가용성)
+    # ==========================================================================
+    # 메트릭: probe_success (Blackbox Exporter)
+    # 목표: 99% 가용성 (30일 기준)
+    # 허용 다운타임: 7.2시간/30일
+
+    # Rule Group 이름: sli-availability
+    # What: Availability SLI 메트릭을 계산하는 규칙 그룹
+    # Why: 블로그 사이트 가용성을 시간대별로 추적하기 위함
+    # Impact: 이 그룹이 없으면 SLO Alert (가용성 < 99%)가 작동하지 않음
+    - name: sli-availability
+
+      # 평가 주기: 30초
+      # What: Recording Rules를 실행하는 주기
+      # Why: 실시간 모니터링을 위해 짧은 주기 필요 (기본값 1분보다 빠름)
+      # Impact: 값이 클수록 메트릭 업데이트 지연, 작을수록 Prometheus 부하 증가
+      # Options: 15s (빠름, 부하↑), 30s (권장, 균형), 1m (느림, 부하↓)
+      interval: 30s
+
+      rules:
+        # ==================================================================
+        # Availability SLI (1분 평균)
+        # ==================================================================
+
+        # Recording Rule 이름: sli:availability:1m
+        # What: 1분 평균 가용성을 계산하여 저장
+        # Why: 실시간 가용성 모니터링 (Grafana Dashboard용)
+        # Impact: 이 메트릭이 없으면 실시간 가용성 추세를 볼 수 없음
+        - record: sli:availability:1m
+
+          # PromQL 쿼리
+          # What: probe_success의 1분 평균값
+          # Why: Blackbox Exporter가 HTTP 요청 성공 시 1, 실패 시 0 반환
+          # Impact: blog.jiminhome.shop에 접속 불가 시 0, 정상 시 1
+          # Options:
+          #   - 1m (실시간, 권장)
+          #   - 5m (단기 추세)
+          #   - 1h (장기 추세)
+          expr: avg_over_time(probe_success{job="blackbox-http", instance="http://blog.jiminhome.shop"}[1m])
+
+        # ==================================================================
+        # Availability SLI (5분 평균)
+        # ==================================================================
+
+        # Recording Rule 이름: sli:availability:5m
+        # What: 5분 평균 가용성을 계산하여 저장
+        # Why: 단기 가용성 추세 파악 (순간적인 장애 필터링)
+        # Impact: 1분 평균보다 부드러운 그래프 (노이즈 감소)
+        - record: sli:availability:5m
+          expr: avg_over_time(probe_success{job="blackbox-http", instance="http://blog.jiminhome.shop"}[5m])
+
+        # ==================================================================
+        # Availability SLI (1시간 평균)
+        # ==================================================================
+
+        # Recording Rule 이름: sli:availability:1h
+        # What: 1시간 평균 가용성을 계산하여 저장
+        # Why: SLO Alert 조건 (1시간 평균 < 99% 시 Warning 알림)
+        # Impact: 이 메트릭이 없으면 SLOAvailabilityViolation1h 알림이 작동하지 않음
+        - record: sli:availability:1h
+          expr: avg_over_time(probe_success{job="blackbox-http", instance="http://blog.jiminhome.shop"}[1h])
+
+        # ==================================================================
+        # Availability SLI (30일 평균)
+        # ==================================================================
+
+        # Recording Rule 이름: sli:availability:30d
+        # What: 30일 평균 가용성을 계산하여 저장
+        # Why: SLO 달성률 계산 (월간 목표: 99% 가용성)
+        # Impact: 이 메트릭이 없으면 SLOAvailabilityViolation30d 알림이 작동하지 않음
+        - record: sli:availability:30d
+          expr: avg_over_time(probe_success{job="blackbox-http", instance="http://blog.jiminhome.shop"}[30d])
+
+    # ==========================================================================
+    # SLI: Latency (응답 시간)
+    # ==========================================================================
+    # 메트릭: probe_duration_seconds (Blackbox Exporter)
+    # 목표: p95 < 500ms, p99 < 1s
+
+    # Rule Group 이름: sli-latency
+    # What: Latency (응답 시간) SLI 메트릭을 계산하는 규칙 그룹
+    # Why: 사용자 경험 품질을 측정하기 위함 (느린 응답 감지)
+    # Impact: 이 그룹이 없으면 SLO Alert (p95 > 500ms)가 작동하지 않음
+    - name: sli-latency
+
+      # 평가 주기: 30초
+      # Why: Latency는 빠르게 변할 수 있으므로 짧은 주기 필요
+      interval: 30s
+
+      rules:
+        # ==================================================================
+        # Latency p50 (중간값, 1분)
+        # ==================================================================
+
+        # Recording Rule 이름: sli:latency_p50:1m
+        # What: 1분 동안의 p50 응답 시간 (중간값)
+        # Why: 일반적인 사용자가 경험하는 응답 시간 (50% 사용자)
+        # Impact: p50이 높으면 일반 사용자 경험 저하
+        - record: sli:latency_p50:1m
+
+          # PromQL 쿼리
+          # What: probe_duration_seconds의 50번째 백분위수
+          # Why: histogram_quantile로 Histogram 메트릭의 백분위수 계산
+          # Impact: 값이 0.5 (500ms)를 초과하면 일반 사용자도 느림 체감
+          # Options: p50 (중간값), p95 (상위 5%), p99 (상위 1%)
+          expr: histogram_quantile(0.50, rate(probe_duration_seconds_bucket{job="blackbox-http", instance="http://blog.jiminhome.shop"}[1m]))
+
+        # ==================================================================
+        # Latency p95 (95 백분위수, 1분)
+        # ==================================================================
+
+        # Recording Rule 이름: sli:latency_p95:1m
+        # What: 1분 동안의 p95 응답 시간 (상위 5% 제외)
+        # Why: 대부분 사용자(95%)가 경험하는 최악의 응답 시간
+        # Impact: p95 > 500ms면 사용자 경험 저하 (SLO 위반)
+        - record: sli:latency_p95:1m
+          expr: histogram_quantile(0.95, rate(probe_duration_seconds_bucket{job="blackbox-http", instance="http://blog.jiminhome.shop"}[1m]))
+
+        # ==================================================================
+        # Latency p95 (5분)
+        # ==================================================================
+
+        # Recording Rule 이름: sli:latency_p95:5m
+        # What: 5분 동안의 p95 응답 시간
+        # Why: SLO Alert 조건 (p95 > 500ms 시 Warning 알림)
+        # Impact: 이 메트릭이 없으면 SLOLatencyViolation 알림이 작동하지 않음
+        - record: sli:latency_p95:5m
+          expr: histogram_quantile(0.95, rate(probe_duration_seconds_bucket{job="blackbox-http", instance="http://blog.jiminhome.shop"}[5m]))
+
+        # ==================================================================
+        # Latency p99 (99 백분위수, 1분)
+        # ==================================================================
+
+        # Recording Rule 이름: sli:latency_p99:1m
+        # What: 1분 동안의 p99 응답 시간 (상위 1% 제외)
+        # Why: 최악의 응답 시간 모니터링 (극소수 사용자가 경험)
+        # Impact: p99 > 1s면 일부 사용자가 매우 느린 응답 경험
+        - record: sli:latency_p99:1m
+          expr: histogram_quantile(0.99, rate(probe_duration_seconds_bucket{job="blackbox-http", instance="http://blog.jiminhome.shop"}[1m]))
+
+    # ==========================================================================
+    # SLI: Error Rate (에러율)
+    # ==========================================================================
+    # 메트릭: nginx_http_requests_total (NGINX Exporter)
+    # 목표: 5xx 에러율 < 1%
+
+    # Rule Group 이름: sli-error-rate
+    # What: Error Rate (에러율) SLI 메트릭을 계산하는 규칙 그룹
+    # Why: 서버 에러 비율을 추적하여 시스템 안정성 측정
+    # Impact: 이 그룹이 없으면 SLO Alert (에러율 > 1%)가 작동하지 않음
+    - name: sli-error-rate
+
+      # 평가 주기: 30초
+      # Why: 에러 발생 시 빠른 감지 필요
+      interval: 30s
+
+      rules:
+        # ==================================================================
+        # Total Request Rate (5분)
+        # ==================================================================
+
+        # Recording Rule 이름: sli:requests_total:5m
+        # What: 5분 동안의 전체 요청 수 (초당 요청 수)
+        # Why: 에러율 계산의 분모 (전체 요청 중 몇 %가 에러인가?)
+        # Impact: 이 값이 0이면 에러율 계산 불가능 (트래픽 없음)
+        - record: sli:requests_total:5m
+
+          # PromQL 쿼리
+          # What: nginx_http_requests_total의 5분 rate 합계
+          # Why: rate()는 Counter 메트릭의 초당 증가율 계산
+          # Impact: 값이 0이면 트래픽 없음, 높으면 부하 증가
+          # Options: instance 필터 변경 가능 (instance=~".*web.*" = web Pod만)
+          expr: sum(rate(nginx_http_requests_total{instance=~".*web.*"}[5m]))
+
+        # ==================================================================
+        # 5xx Error Rate (5분)
+        # ==================================================================
+
+        # Recording Rule 이름: sli:errors_5xx:5m
+        # What: 5분 동안의 5xx 에러 수 (초당 에러 수)
+        # Why: 에러율 계산의 분자 (서버 에러 발생 횟수)
+        # Impact: 이 값이 높으면 서버에 문제 발생 (DB 연결, OOM 등)
+        - record: sli:errors_5xx:5m
+
+          # PromQL 쿼리
+          # What: nginx_http_requests_total에서 status=5xx만 필터링
+          # Why: 5xx는 서버 에러 (500 Internal Server Error, 503 Service Unavailable 등)
+          # Impact: 값이 0이 아니면 서버 장애 발생 중
+          # Options: status=~"5.." (5xx 전체), status="500" (500만)
+          expr: sum(rate(nginx_http_requests_total{instance=~".*web.*", status=~"5.."}[5m]))
+
+        # ==================================================================
+        # Error Rate Ratio (5분)
+        # ==================================================================
+
+        # Recording Rule 이름: sli:error_rate:5m
+        # What: 5분 동안의 에러율 (5xx 에러 / 전체 요청)
+        # Why: SLO Alert 조건 (에러율 > 1% 시 Warning 알림)
+        # Impact: 이 메트릭이 없으면 SLOErrorRateViolation 알림이 작동하지 않음
+        - record: sli:error_rate:5m
+
+          # PromQL 쿼리
+          # What: 5xx 에러율 = (5xx 에러 수 / 전체 요청 수)
+          # Why: 비율로 표현해야 임계값(1%) 비교 가능
+          # Impact: 값이 0.01 (1%)을 초과하면 SLO 위반
+          # Options:
+          #   - or vector(0): 분모가 0일 때 0 반환 (에러 방지)
+          #   - 제거 시: 트래픽 없을 때 NaN 발생 (Alert 오작동)
+          expr: |
+            (
+              sum(rate(nginx_http_requests_total{instance=~".*web.*", status=~"5.."}[5m]))
+              /
+              sum(rate(nginx_http_requests_total{instance=~".*web.*"}[5m]))
+            )
+            or
+            vector(0)
+
+    # ==========================================================================
+    # SLI: Throughput (처리량)
+    # ==========================================================================
+    # 메트릭: nginx_http_requests_total (NGINX Exporter)
+    # 용도: 트래픽 추세 분석
+
+    # Rule Group 이름: sli-throughput
+    # What: Throughput (처리량) SLI 메트릭을 계산하는 규칙 그룹
+    # Why: 트래픽 추세를 파악하여 HPA/VPA 스케일링 결정 지원
+    # Impact: 이 그룹은 Alert 없이 Dashboard 전용 (선택 사항)
+    - name: sli-throughput
+
+      # 평가 주기: 30초
+      # Why: 트래픽 추세를 빠르게 파악하기 위함
+      interval: 30s
+
+      rules:
+        # ==================================================================
+        # Request Per Second (1분)
+        # ==================================================================
+
+        # Recording Rule 이름: sli:requests_per_second:1m
+        # What: 1분 동안의 초당 요청 수 (RPS)
+        # Why: 실시간 트래픽 모니터링 (Grafana Dashboard용)
+        # Impact: HPA 스케일링 결정에 참고 가능 (높으면 스케일 아웃)
+        - record: sli:requests_per_second:1m
+          expr: sum(rate(nginx_http_requests_total{instance=~".*web.*"}[1m]))
+
+        # ==================================================================
+        # Request Per Second (5분)
+        # ==================================================================
+
+        # Recording Rule 이름: sli:requests_per_second:5m
+        # What: 5분 동안의 초당 요청 수 (RPS)
+        # Why: 단기 트래픽 추세 파악 (노이즈 제거)
+        # Impact: 트래픽 급증 감지 (평소 대비 2배 이상 시 조사 필요)
+        - record: sli:requests_per_second:5m
+          expr: sum(rate(nginx_http_requests_total{instance=~".*web.*"}[5m]))
+
+# ==============================================================================
+# 검증 방법 (Verification)
+# ==============================================================================
+#
+# 1. PrometheusRule 생성 확인
+#    kubectl get prometheusrule sli-recording-rules -n monitoring
+#    → NAME, AGE 표시되면 정상
+#
+# 2. Prometheus가 Rules를 인식했는지 확인
+#    kubectl exec -n monitoring prometheus-kube-prometheus-stack-prometheus-0 \
+#      -- wget -qO- http://localhost:9090/api/v1/rules | jq '.data.groups[] | select(.name | contains("sli"))'
+#    → sli-availability, sli-latency, sli-error-rate, sli-throughput 그룹 표시되면 정상
+#
+# 3. Recording Rules 동작 확인 (메트릭 조회)
+#    kubectl exec -n monitoring prometheus-kube-prometheus-stack-prometheus-0 \
+#      -- wget -qO- 'http://localhost:9090/api/v1/query?query=sli:availability:1m'
+#    → result가 비어있지 않으면 정상 (값: 0 또는 1)
+#
+# 4. Grafana에서 확인
+#    - Query: sli:availability:30d * 100  (30일 가용성 %)
+#    - Query: sli:latency_p95:5m  (p95 응답 시간, 초 단위)
+#    - Query: sli:error_rate:5m * 100  (에러율 %)
+#    - Query: sli:requests_per_second:1m  (초당 요청 수)
+#
+# ==============================================================================
+# 주의사항 (Important Notes)
+# ==============================================================================
+#
+# 1. **instance 필터 확인 필수**:
+#    - Blackbox: instance="http://blog.jiminhome.shop" (정확한 URL)
+#    - NGINX: instance=~".*web.*" (Pod 이름 패턴, web-xxxx-xxxx 매칭)
+#    - 잘못된 instance 필터 시 메트릭 수집 실패 (값 없음)
+#
+# 2. **Recording Rules는 시간이 필요**:
+#    - PrometheusRule 생성 후 30초~1분 대기 (Prometheus 자동 reload)
+#    - 즉시 조회 시 메트릭 없음 (정상 동작)
+#
+# 3. **메트릭이 없으면 Recording Rules도 없음**:
+#    - probe_success가 0이면 sli:availability:1m = 0 (다운 상태)
+#    - nginx_http_requests_total이 없으면 sli:requests_per_second:1m = 0 (트래픽 없음)
+#    - Blackbox Exporter나 NGINX Exporter가 중단되면 모든 SLI 메트릭 사라짐
+#
+# 4. **interval 변경 시 영향**:
+#    - 값을 작게 (15s): Prometheus 부하 증가, CPU/Memory 사용량 상승
+#    - 값을 크게 (1m): 메트릭 업데이트 지연, 실시간성 감소
+#    - 권장: 30s (균형)
+#
+# 5. **라벨 불일치 시 Rules 무시**:
+#    - prometheus: kube-prometheus 라벨 필수!
+#    - 라벨 없으면 Prometheus가 이 Rules를 로드하지 않음
+#    - 확인: kubectl get prometheus -n monitoring -o yaml | grep -A 3 ruleSelector
+#
+# ==============================================================================
