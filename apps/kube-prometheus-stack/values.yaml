@@ -5,230 +5,234 @@
 # 변경 이유: ConfigMap은 runtime 수정으로 OutOfSync 지속 발생
 # 해결책: ServiceMonitor/PrometheusRule CRD 사용 → Always Synced
 # ==============================================================================
-
+# CRITICAL: Wrapper Chart에서는 dependency name을 prefix로 사용해야 함!
+# Chart.yaml의 dependencies.name: kube-prometheus-stack
 # ==============================================================================
-# Global Settings
-# ==============================================================================
-global:
-  # RBAC: Role-Based Access Control 활성화
-  # 이유: Prometheus Operator가 CRD를 관리하려면 RBAC 필요
-  # 영향: ServiceAccount, ClusterRole, ClusterRoleBinding 자동 생성
-  rbac:
-    create: true
 
-# ==============================================================================
-# Prometheus Operator
-# ==============================================================================
-# 역할: ServiceMonitor/PrometheusRule CRD를 감시하고 Prometheus 설정 자동 업데이트
-# 작동 원리:
-#   1. ServiceMonitor CRD 생성 → Operator가 감지
-#   2. Operator가 prometheus.yml에 scrape_configs 자동 추가
-#   3. Prometheus Pod 자동 reload (ConfigMap 수동 수정 불필요!)
-prometheusOperator:
-  enabled: true
+kube-prometheus-stack:
+  # ==============================================================================
+  # Global Settings
+  # ==============================================================================
+  global:
+    # RBAC: Role-Based Access Control 활성화
+    # 이유: Prometheus Operator가 CRD를 관리하려면 RBAC 필요
+    # 영향: ServiceAccount, ClusterRole, ClusterRoleBinding 자동 생성
+    rbac:
+      create: true
 
-  # Operator가 관리할 namespace
-  # 옵션:
-  #   - [] (empty): 모든 namespace (기본값)
-  #   - [monitoring, blog-system]: 특정 namespace만
-  # 권장: 모든 namespace (유연성)
-  namespaces: {}
-
-  # Admission Webhook 비활성화
-  # 이유: 홈랩 환경에서 불필요 (webhook 인증서 관리 복잡)
-  # 영향: CRD 생성 시 validation 없음 (YAML 오류 주의!)
-  admissionWebhooks:
-    enabled: false
-
-# ==============================================================================
-# Prometheus
-# ==============================================================================
-# 역할: 메트릭 수집 및 저장
-prometheus:
-  enabled: true
-
-  # Prometheus 설정
-  prometheusSpec:
-    # ServiceMonitor 선택 규칙 (CRITICAL!)
-    # 중요: ServiceMonitor에 "prometheus: kube-prometheus" 라벨 필수!
-    # 이유: 이 라벨이 없으면 Operator가 ServiceMonitor를 무시함
-    # 예시:
-    #   apiVersion: monitoring.coreos.com/v1
-    #   kind: ServiceMonitor
-    #   metadata:
-    #     labels:
-    #       prometheus: kube-prometheus  ← 필수!
-    serviceMonitorSelector:
-      matchLabels:
-        prometheus: kube-prometheus
-
-    # PrometheusRule 선택 규칙 (CRITICAL!)
-    # 중요: PrometheusRule에도 "prometheus: kube-prometheus" 라벨 필수!
-    ruleSelector:
-      matchLabels:
-        prometheus: kube-prometheus
-
-    # 메트릭 보관 기간
-    # 형식: Nd (N일), Nh (N시간)
-    # 권장: 7d (1주일) - 홈랩 환경
-    # 변경 시: 디스크 공간 고려 (7d → 30d면 4배 증가)
-    retention: 7d
-
-    # 메트릭 쿼리 시간 제한
-    # 이유: 복잡한 PromQL 쿼리로 인한 OOM 방지
-    # 권장: 10m (10분)
-    retentionSize: ""
-
-    # Storage 설정 (PVC)
-    # 이유: Pod 재시작 시 메트릭 보존
-    # 주의: StorageClass가 없으면 Pending 상태
-    storageSpec:
-      volumeClaimTemplate:
-        spec:
-          # StorageClass 지정 (선택 사항)
-          # 옵션: null (기본 SC), longhorn, nfs-client 등
-          # 권장: null (cluster 기본 SC 사용)
-          storageClassName: null
-
-          # 액세스 모드
-          # ReadWriteOnce: 단일 Node만 마운트 (권장)
-          # ReadWriteMany: 여러 Node 마운트 (NFS 필요)
-          accessModes:
-            - ReadWriteOnce
-
-          # 스토리지 용량
-          # 계산: 약 1GB/day (기본 scrape_interval: 30s)
-          # 7d retention → 7GB + 여유분 = 20GB 권장
-          resources:
-            requests:
-              storage: 20Gi
-
-    # 리소스 제한
-    # 이유: OOM Killer 방지, 다른 Pod 영향 최소화
-    # 권장: 홈랩 환경 기준
-    resources:
-      requests:
-        cpu: 500m      # 최소 0.5 core
-        memory: 2Gi    # 최소 2GB RAM
-      limits:
-        cpu: 2000m     # 최대 2 cores
-        memory: 4Gi    # 최대 4GB RAM
-
-# ==============================================================================
-# Grafana
-# ==============================================================================
-# 역할: 메트릭 시각화 대시보드
-grafana:
-  enabled: true
-
-  # Admin 비밀번호 (변경 권장!)
-  # 주의: 평문 저장 (SealedSecret으로 관리 권장)
-  # TODO: grafana-admin-sealedsecret.yaml로 교체
-  adminPassword: admin
-
-  # Sidecar 설정 (자동 Dashboard 로드)
+  # ==============================================================================
+  # Prometheus Operator
+  # ==============================================================================
+  # 역할: ServiceMonitor/PrometheusRule CRD를 감시하고 Prometheus 설정 자동 업데이트
   # 작동 원리:
-  #   1. ConfigMap에 "grafana_dashboard: \"1\"" 라벨 추가
-  #   2. Sidecar가 자동 감지하여 Grafana에 로드
-  #   3. ConfigMap 수정 → 자동 reload (수동 import 불필요!)
-  sidecar:
-    dashboards:
-      enabled: true
+  #   1. ServiceMonitor CRD 생성 → Operator가 감지
+  #   2. Operator가 prometheus.yml에 scrape_configs 자동 추가
+  #   3. Prometheus Pod 자동 reload (ConfigMap 수동 수정 불필요!)
+  prometheusOperator:
+    enabled: true
 
-      # Dashboard 자동 로드 라벨
-      # 중요: ConfigMap에 이 라벨 필수!
+    # Operator가 관리할 namespace
+    # 옵션:
+    #   - [] (empty): 모든 namespace (기본값)
+    #   - [monitoring, blog-system]: 특정 namespace만
+    # 권장: 모든 namespace (유연성)
+    namespaces: {}
+
+    # Admission Webhook 비활성화
+    # 이유: 홈랩 환경에서 불필요 (webhook 인증서 관리 복잡)
+    # 영향: CRD 생성 시 validation 없음 (YAML 오류 주의!)
+    admissionWebhooks:
+      enabled: false
+
+  # ==============================================================================
+  # Prometheus
+  # ==============================================================================
+  # 역할: 메트릭 수집 및 저장
+  prometheus:
+    enabled: true
+
+    # Prometheus 설정
+    prometheusSpec:
+      # ServiceMonitor 선택 규칙 (CRITICAL!)
+      # 중요: ServiceMonitor에 "prometheus: kube-prometheus" 라벨 필수!
+      # 이유: 이 라벨이 없으면 Operator가 ServiceMonitor를 무시함
       # 예시:
-      #   apiVersion: v1
-      #   kind: ConfigMap
+      #   apiVersion: monitoring.coreos.com/v1
+      #   kind: ServiceMonitor
       #   metadata:
       #     labels:
-      #       grafana_dashboard: "1"  ← 필수!
-      label: grafana_dashboard
+      #       prometheus: kube-prometheus  ← 필수!
+      serviceMonitorSelector:
+        matchLabels:
+          prometheus: kube-prometheus
 
-      # 라벨 값 (기본: "1")
-      # 옵션: "1", "true", "enabled" 등 (문자열 필수!)
-      labelValue: "1"
+      # PrometheusRule 선택 규칙 (CRITICAL!)
+      # 중요: PrometheusRule에도 "prometheus: kube-prometheus" 라벨 필수!
+      ruleSelector:
+        matchLabels:
+          prometheus: kube-prometheus
 
-      # 검색할 namespace
-      # 옵션:
-      #   - null: 모든 namespace (기본값)
-      #   - monitoring: monitoring namespace만
-      # 권장: null (유연성)
-      searchNamespace: null
+      # 메트릭 보관 기간
+      # 형식: Nd (N일), Nh (N시간)
+      # 권장: 7d (1주일) - 홈랩 환경
+      # 변경 시: 디스크 공간 고려 (7d → 30d면 4배 증가)
+      retention: 7d
 
-    # Datasource 자동 로드 (선택 사항)
-    # 이유: Prometheus는 이미 자동 등록됨
-    datasources:
-      enabled: true
+      # 메트릭 쿼리 시간 제한
+      # 이유: 복잡한 PromQL 쿼리로 인한 OOM 방지
+      # 권장: 10m (10분)
+      retentionSize: ""
 
-  # Persistent Storage (선택 사항)
-  # 이유: Dashboard 설정 보존 (Sidecar 사용 시 불필요)
-  # 권장: 비활성화 (ConfigMap으로 관리)
-  persistence:
+      # Storage 설정 (PVC)
+      # 이유: Pod 재시작 시 메트릭 보존
+      # 주의: StorageClass가 없으면 Pending 상태
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            # StorageClass 지정 (선택 사항)
+            # 옵션: null (기본 SC), longhorn, nfs-client 등
+            # 권장: null (cluster 기본 SC 사용)
+            storageClassName: null
+
+            # 액세스 모드
+            # ReadWriteOnce: 단일 Node만 마운트 (권장)
+            # ReadWriteMany: 여러 Node 마운트 (NFS 필요)
+            accessModes:
+              - ReadWriteOnce
+
+            # 스토리지 용량
+            # 계산: 약 1GB/day (기본 scrape_interval: 30s)
+            # 7d retention → 7GB + 여유분 = 20GB 권장
+            resources:
+              requests:
+                storage: 20Gi
+
+      # 리소스 제한
+      # 이유: OOM Killer 방지, 다른 Pod 영향 최소화
+      # 권장: 홈랩 환경 기준
+      resources:
+        requests:
+          cpu: 500m      # 최소 0.5 core
+          memory: 2Gi    # 최소 2GB RAM
+        limits:
+          cpu: 2000m     # 최대 2 cores
+          memory: 4Gi    # 최대 4GB RAM
+
+  # ==============================================================================
+  # Grafana
+  # ==============================================================================
+  # 역할: 메트릭 시각화 대시보드
+  grafana:
+    enabled: true
+
+    # Admin 비밀번호 (변경 권장!)
+    # 주의: 평문 저장 (SealedSecret으로 관리 권장)
+    # TODO: grafana-admin-sealedsecret.yaml로 교체
+    adminPassword: admin
+
+    # Sidecar 설정 (자동 Dashboard 로드)
+    # 작동 원리:
+    #   1. ConfigMap에 "grafana_dashboard: \"1\"" 라벨 추가
+    #   2. Sidecar가 자동 감지하여 Grafana에 로드
+    #   3. ConfigMap 수정 → 자동 reload (수동 import 불필요!)
+    sidecar:
+      dashboards:
+        enabled: true
+
+        # Dashboard 자동 로드 라벨
+        # 중요: ConfigMap에 이 라벨 필수!
+        # 예시:
+        #   apiVersion: v1
+        #   kind: ConfigMap
+        #   metadata:
+        #     labels:
+        #       grafana_dashboard: "1"  ← 필수!
+        label: grafana_dashboard
+
+        # 라벨 값 (기본: "1")
+        # 옵션: "1", "true", "enabled" 등 (문자열 필수!)
+        labelValue: "1"
+
+        # 검색할 namespace
+        # 옵션:
+        #   - null: 모든 namespace (기본값)
+        #   - monitoring: monitoring namespace만
+        # 권장: null (유연성)
+        searchNamespace: null
+
+      # Datasource 자동 로드 (선택 사항)
+      # 이유: Prometheus는 이미 자동 등록됨
+      datasources:
+        enabled: true
+
+    # Persistent Storage (선택 사항)
+    # 이유: Dashboard 설정 보존 (Sidecar 사용 시 불필요)
+    # 권장: 비활성화 (ConfigMap으로 관리)
+    persistence:
+      enabled: false
+
+  # ==============================================================================
+  # AlertManager
+  # ==============================================================================
+  # 역할: Alert 알림 전송 (Telegram, Slack, Email 등)
+  alertmanager:
+    enabled: true
+
+    # AlertManager 설정
+    alertmanagerSpec:
+      # Storage 설정 (선택 사항)
+      # 이유: Alert 이력 보존 (Silences, Inhibit Rules)
+      # 권장: 홈랩 환경에서는 비활성화 (휘발성 데이터)
+      storage: {}
+
+      # 리소스 제한
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+
+  # ==============================================================================
+  # Exporters (Node Exporter, Kube-State-Metrics)
+  # ==============================================================================
+
+  # Node Exporter 비활성화
+  # 이유: Grafana Alloy로 이미 Node 메트릭 수집 중
+  # 영향: 중복 메트릭 수집 방지
+  nodeExporter:
     enabled: false
 
-# ==============================================================================
-# AlertManager
-# ==============================================================================
-# 역할: Alert 알림 전송 (Telegram, Slack, Email 등)
-alertmanager:
-  enabled: true
+  # Kube-State-Metrics 활성화
+  # 역할: Kubernetes 리소스 상태 메트릭 (Deployment, Pod, Node 등)
+  # 필수: Kubernetes 클러스터 모니터링에 필수
+  kubeStateMetrics:
+    enabled: true
 
-  # AlertManager 설정
-  alertmanagerSpec:
-    # Storage 설정 (선택 사항)
-    # 이유: Alert 이력 보존 (Silences, Inhibit Rules)
-    # 권장: 홈랩 환경에서는 비활성화 (휘발성 데이터)
-    storage: {}
+  # ==============================================================================
+  # Default Rules (Alert Rules)
+  # ==============================================================================
+  # 이유: Upstream 기본 Alert Rules 포함 (Node, Pod, etcd 등)
+  # 옵션:
+  #   - true: 기본 Rules 사용 (권장 - 학습용)
+  #   - false: 커스텀 PrometheusRule만 사용
+  # 권장: true (나중에 false로 변경 가능)
+  defaultRules:
+    create: true
 
-    # 리소스 제한
-    resources:
-      requests:
-        cpu: 100m
-        memory: 128Mi
-      limits:
-        cpu: 200m
-        memory: 256Mi
-
-# ==============================================================================
-# Exporters (Node Exporter, Kube-State-Metrics)
-# ==============================================================================
-
-# Node Exporter 비활성화
-# 이유: Grafana Alloy로 이미 Node 메트릭 수집 중
-# 영향: 중복 메트릭 수집 방지
-nodeExporter:
-  enabled: false
-
-# Kube-State-Metrics 활성화
-# 역할: Kubernetes 리소스 상태 메트릭 (Deployment, Pod, Node 등)
-# 필수: Kubernetes 클러스터 모니터링에 필수
-kubeStateMetrics:
-  enabled: true
-
-# ==============================================================================
-# Default Rules (Alert Rules)
-# ==============================================================================
-# 이유: Upstream 기본 Alert Rules 포함 (Node, Pod, etcd 등)
-# 옵션:
-#   - true: 기본 Rules 사용 (권장 - 학습용)
-#   - false: 커스텀 PrometheusRule만 사용
-# 권장: true (나중에 false로 변경 가능)
-defaultRules:
-  create: true
-
-  # 기본 Rules 라벨
-  # 이유: Prometheus가 Rules를 인식하려면 라벨 필요
-  rules:
-    alertmanager: true
-    etcd: true
-    general: true
-    k8s: true
-    kubeApiserver: true
-    kubePrometheusNodeRecording: true
-    kubernetesSystem: true
-    node: true
-    prometheus: true
+    # 기본 Rules 라벨
+    # 이유: Prometheus가 Rules를 인식하려면 라벨 필요
+    rules:
+      alertmanager: true
+      etcd: true
+      general: true
+      k8s: true
+      kubeApiserver: true
+      kubePrometheusNodeRecording: true
+      kubernetesSystem: true
+      node: true
+      prometheus: true
 
 # ==============================================================================
 # 주의사항 및 다음 단계
