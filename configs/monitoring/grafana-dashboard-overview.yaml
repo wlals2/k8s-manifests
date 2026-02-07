@@ -21,6 +21,81 @@ data:
         {
           "collapsed": false,
           "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "id": 200,
+          "panels": [],
+          "title": "🎯 SLI/SLO 목표",
+          "type": "row"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "unit": "percentunit",
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "yellow", "value": 0.95 }, { "color": "green", "value": 0.99 } ] }
+            }
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+          "id": 201,
+          "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+          "targets": [{ "expr": "avg(avg_over_time(probe_success[24h]))", "refId": "A" }],
+          "title": "가용성 (목표: 99%)",
+          "type": "stat"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "unit": "ms",
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 300 }, { "color": "red", "value": 500 } ] }
+            }
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+          "id": 202,
+          "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+          "targets": [{ "expr": "histogram_quantile(0.95, sum(rate(istio_request_duration_milliseconds_bucket{destination_service_namespace=\"blog-system\"}[5m])) by (le))", "refId": "A" }],
+          "title": "응답 시간 P95 (목표: <500ms)",
+          "type": "stat"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "unit": "percentunit",
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 0.005 }, { "color": "red", "value": 0.01 } ] }
+            }
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+          "id": 203,
+          "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+          "targets": [{ "expr": "sum(rate(istio_requests_total{destination_service_namespace=\"blog-system\",response_code=~\"5..\"}[5m])) / sum(rate(istio_requests_total{destination_service_namespace=\"blog-system\"}[5m]))", "refId": "A" }],
+          "title": "에러율 (목표: <1%)",
+          "type": "stat"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "mappings": [
+                { "options": { "0": { "color": "red", "index": 1, "text": "❌ 미달성" } }, "type": "value" },
+                { "options": { "1": { "color": "green", "index": 0, "text": "✅ 달성" } }, "type": "value" }
+              ],
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] }
+            }
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+          "id": 204,
+          "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+          "targets": [{ "expr": "(avg(avg_over_time(probe_success[24h])) >= 0.99) and (histogram_quantile(0.95, sum(rate(istio_request_duration_milliseconds_bucket{destination_service_namespace=\"blog-system\"}[5m])) by (le)) < 500) and ((sum(rate(istio_requests_total{destination_service_namespace=\"blog-system\",response_code=~\"5..\"}[5m])) / sum(rate(istio_requests_total{destination_service_namespace=\"blog-system\"}[5m]))) < 0.01)", "refId": "A" }],
+          "title": "SLO 달성 상태",
+          "type": "stat"
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
           "id": 100,
           "panels": [],
           "title": "🚦 전체 상태 (Global Status)",
@@ -38,7 +113,7 @@ data:
               "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] }
             }
           },
-          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 6 },
           "id": 1,
           "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
           "pluginVersion": "10.0.0",
@@ -58,7 +133,7 @@ data:
               "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] }
             }
           },
-          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 6 },
           "id": 2,
           "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [{ "expr": "clamp_max(sum(kube_pod_status_ready{namespace=\"blog-system\",pod=~\"web.*\",condition=\"true\"}),1)", "legendFormat": "WEB", "refId": "A" }],
@@ -77,7 +152,7 @@ data:
               "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] }
             }
           },
-          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 6 },
           "id": 3,
           "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [{ "expr": "up{job=\"mysql-exporter\"}", "legendFormat": "MySQL", "refId": "A" }],
@@ -93,7 +168,7 @@ data:
               "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 50 }, { "color": "red", "value": 100 } ] }
             }
           },
-          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 6 },
           "id": 4,
           "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [{ "expr": "sum(rate(istio_requests_total{destination_service_namespace=\"blog-system\"}[5m]))", "legendFormat": "RPS", "refId": "A" }],
@@ -109,7 +184,7 @@ data:
               "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 10 } ] }
             }
           },
-          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 6 },
           "id": 5,
           "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [{ "expr": "sum(increase(istio_requests_total{destination_service_namespace=\"blog-system\",response_code=~\"5..\"}[1h]))", "legendFormat": "5xx", "refId": "A" }],
@@ -125,7 +200,7 @@ data:
               "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 10 }, { "color": "red", "value": 50 } ] }
             }
           },
-          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 6 },
           "id": 6,
           "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [{ "expr": "sum(increase(istio_requests_total{destination_service_namespace=\"blog-system\",response_code=~\"4..\"}[1h]))", "legendFormat": "4xx", "refId": "A" }],
@@ -134,7 +209,7 @@ data:
         },
         {
           "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 10 },
           "id": 101,
           "panels": [],
           "title": "1️⃣ Gateway 계층 (Istio - RED Metrics)",
@@ -149,7 +224,7 @@ data:
               "unit": "reqps"
             }
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 11 },
           "id": 10,
           "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
           "targets": [
@@ -169,7 +244,7 @@ data:
               "max": 1
             }
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 11 },
           "id": 11,
           "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
           "targets": [
@@ -189,7 +264,7 @@ data:
               "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 500 }, { "color": "red", "value": 1000 } ] }
             }
           },
-          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 14 },
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 19 },
           "id": 12,
           "options": { "legend": { "calcs": ["mean", "p95", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
           "targets": [
@@ -202,7 +277,7 @@ data:
         },
         {
           "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
           "id": 102,
           "panels": [],
           "title": "2️⃣ Application 계층 (WAS - Spring Boot)",
@@ -217,7 +292,7 @@ data:
               "unit": "percent"
             }
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
           "id": 20,
           "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
           "targets": [
@@ -235,7 +310,7 @@ data:
               "unit": "bytes"
             }
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 23 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
           "id": 21,
           "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
           "targets": [
@@ -252,7 +327,7 @@ data:
               "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 3 }, { "color": "red", "value": 5 } ] }
             }
           },
-          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 31 },
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 41 },
           "id": 22,
           "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [{ "expr": "sum(kube_pod_container_status_restarts_total{namespace=\"blog-system\",pod=~\"was.*\"})", "legendFormat": "Restarts", "refId": "A" }],
@@ -268,7 +343,7 @@ data:
               "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 3 }, { "color": "red", "value": 5 } ] }
             }
           },
-          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 31 },
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 41 },
           "id": 23,
           "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [{ "expr": "sum(kube_pod_container_status_restarts_total{namespace=\"blog-system\",pod=~\"web.*\"})", "legendFormat": "Restarts", "refId": "A" }],
@@ -284,7 +359,7 @@ data:
               "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] }
             }
           },
-          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 31 },
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 41 },
           "id": 24,
           "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [{ "expr": "count(kube_pod_info{namespace=\"blog-system\",pod=~\"was.*\"})", "legendFormat": "WAS Pods", "refId": "A" }],
@@ -300,7 +375,7 @@ data:
               "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] }
             }
           },
-          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 31 },
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 41 },
           "id": 25,
           "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [{ "expr": "count(kube_pod_info{namespace=\"blog-system\",pod=~\"web.*\"})", "legendFormat": "WEB Pods", "refId": "A" }],
@@ -309,7 +384,7 @@ data:
         },
         {
           "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 35 },
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 40 },
           "id": 103,
           "panels": [],
           "title": "3️⃣ Database 계층 (MySQL)",
@@ -324,7 +399,7 @@ data:
               "unit": "short"
             }
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 41 },
           "id": 30,
           "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
           "targets": [
@@ -343,7 +418,7 @@ data:
               "unit": "ops"
             }
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 41 },
           "id": 31,
           "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
           "targets": [
@@ -355,7 +430,7 @@ data:
         },
         {
           "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 44 },
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 49 },
           "id": 104,
           "panels": [],
           "title": "4️⃣ Infrastructure 계층 (Kubernetes)",
@@ -372,7 +447,7 @@ data:
               "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 70 }, { "color": "red", "value": 85 } ] }
             }
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 45 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 50 },
           "id": 40,
           "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
           "targets": [
@@ -392,7 +467,7 @@ data:
               "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 70 }, { "color": "red", "value": 85 } ] }
             }
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 45 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 50 },
           "id": 41,
           "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
           "targets": [
@@ -410,7 +485,7 @@ data:
               "unit": "short"
             }
           },
-          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 53 },
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 58 },
           "id": 42,
           "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
           "targets": [
