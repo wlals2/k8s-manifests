@@ -1,0 +1,404 @@
+# ==============================================================================
+# Grafana Dashboard: SLI/SLO Monitoring
+# ==============================================================================
+# 목적: SLI (Service Level Indicator) 및 SLO (Service Level Objective) 모니터링
+# 역할: Recording Rules로 미리 계산된 SLI 메트릭을 시각화하여 서비스 품질 추적
+# 의존성:
+#   - sli-recording-rules.yaml: sli:availability:*, sli:latency:* 메트릭 필요
+#   - slo-alerts.yaml: SLO 위반 시 알림 발송
+# 참고: https://grafana.com/docs/grafana/latest/dashboards/
+# ==============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  # ConfigMap 이름: grafana-dashboard-slo
+  # What: Grafana Dashboard를 저장하는 ConfigMap
+  # Why: Grafana provisioning 방식으로 자동 로드
+  # Impact: 변경 시 Grafana Pod 재시작 필요
+  name: grafana-dashboard-slo
+
+  # Namespace: monitoring
+  # What: Grafana와 같은 namespace에 배포
+  # Why: Grafana가 같은 namespace의 ConfigMap만 읽음
+  namespace: monitoring
+
+  labels:
+    # CRITICAL: Grafana가 이 Dashboard를 인식하려면 라벨 필수!
+    # What: grafana_dashboard 라벨
+    # Why: Grafana provisioning이 이 라벨을 가진 ConfigMap만 Dashboard로 로드
+    # Impact: 이 라벨이 없으면 Dashboard가 Grafana에 나타나지 않음
+    grafana_dashboard: "1"
+
+data:
+  # Dashboard JSON
+  # What: Grafana Dashboard 정의 (JSON 형식)
+  # Why: Grafana가 이 JSON을 파싱하여 Dashboard 생성
+  slo-dashboard.json: |
+    {
+      "dashboard": {
+        "title": "📊 SLI/SLO Monitoring",
+        "tags": ["slo", "sli", "blog-system"],
+        "timezone": "browser",
+        "schemaVersion": 16,
+        "version": 1,
+        "refresh": "30s",
+
+        "panels": [
+          {
+            "id": 1,
+            "type": "stat",
+            "title": "🎯 30일 가용성 (SLO: 99%)",
+            "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+            "targets": [
+              {
+                "expr": "sli:availability:30d * 100",
+                "legendFormat": "Availability",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percent",
+                "decimals": 3,
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "value": 0, "color": "red" },
+                    { "value": 99, "color": "green" }
+                  ]
+                },
+                "mappings": []
+              }
+            },
+            "options": {
+              "reduceOptions": {
+                "values": false,
+                "calcs": ["lastNotNull"]
+              },
+              "orientation": "auto",
+              "textMode": "value_and_name",
+              "colorMode": "value",
+              "graphMode": "area"
+            }
+          },
+
+          {
+            "id": 2,
+            "type": "stat",
+            "title": "⚡ 5분 평균 응답 시간 (SLO: < 500ms)",
+            "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+            "targets": [
+              {
+                "expr": "sli:latency:5m * 1000",
+                "legendFormat": "Latency",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "ms",
+                "decimals": 0,
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "value": 0, "color": "green" },
+                    { "value": 500, "color": "red" }
+                  ]
+                },
+                "mappings": []
+              }
+            },
+            "options": {
+              "reduceOptions": {
+                "values": false,
+                "calcs": ["lastNotNull"]
+              },
+              "orientation": "auto",
+              "textMode": "value_and_name",
+              "colorMode": "value",
+              "graphMode": "area"
+            }
+          },
+
+          {
+            "id": 3,
+            "type": "stat",
+            "title": "📅 Error Budget (30일)",
+            "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+            "targets": [
+              {
+                "expr": "(1 - sli:availability:30d) * 30 * 24",
+                "legendFormat": "Downtime (hours)",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "h",
+                "decimals": 2,
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "value": 0, "color": "green" },
+                    { "value": 7.2, "color": "red" }
+                  ]
+                },
+                "mappings": []
+              }
+            },
+            "options": {
+              "reduceOptions": {
+                "values": false,
+                "calcs": ["lastNotNull"]
+              },
+              "orientation": "auto",
+              "textMode": "value_and_name",
+              "colorMode": "value"
+            },
+            "description": "허용 다운타임: 7.2시간/30일 (1% = 30일 * 24시간 * 0.01)"
+          },
+
+          {
+            "id": 4,
+            "type": "stat",
+            "title": "✅ SLO 달성 상태",
+            "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+            "targets": [
+              {
+                "expr": "(sli:availability:30d >= 0.99) and (sli:latency:5m < 0.5)",
+                "legendFormat": "SLO Status",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "none",
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "value": 0, "color": "red" },
+                    { "value": 1, "color": "green" }
+                  ]
+                },
+                "mappings": [
+                  { "type": "value", "value": "1", "text": "✅ 달성" },
+                  { "type": "value", "value": "0", "text": "❌ 위반" }
+                ]
+              }
+            },
+            "options": {
+              "reduceOptions": {
+                "values": false,
+                "calcs": ["lastNotNull"]
+              },
+              "orientation": "auto",
+              "textMode": "value",
+              "colorMode": "background"
+            }
+          },
+
+          {
+            "id": 5,
+            "type": "graph",
+            "title": "📈 Availability Trend",
+            "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+            "targets": [
+              {
+                "expr": "sli:availability:1m * 100",
+                "legendFormat": "1분 평균",
+                "refId": "A"
+              },
+              {
+                "expr": "sli:availability:5m * 100",
+                "legendFormat": "5분 평균",
+                "refId": "B"
+              },
+              {
+                "expr": "sli:availability:1h * 100",
+                "legendFormat": "1시간 평균",
+                "refId": "C"
+              }
+            ],
+            "yaxes": [
+              {
+                "format": "percent",
+                "min": 95,
+                "max": 100,
+                "decimals": 2
+              },
+              {
+                "format": "short"
+              }
+            ],
+            "xaxis": {
+              "mode": "time"
+            },
+            "lines": true,
+            "fill": 1,
+            "linewidth": 2,
+            "points": false,
+            "bars": false,
+            "stack": false,
+            "percentage": false,
+            "legend": {
+              "show": true,
+              "values": true,
+              "current": true,
+              "avg": true
+            },
+            "thresholds": [
+              {
+                "value": 99,
+                "colorMode": "critical",
+                "op": "lt",
+                "fill": true,
+                "line": true
+              }
+            ]
+          },
+
+          {
+            "id": 6,
+            "type": "graph",
+            "title": "⚡ Latency Trend",
+            "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+            "targets": [
+              {
+                "expr": "sli:latency:1m * 1000",
+                "legendFormat": "1분 평균",
+                "refId": "A"
+              },
+              {
+                "expr": "sli:latency:5m * 1000",
+                "legendFormat": "5분 평균",
+                "refId": "B"
+              }
+            ],
+            "yaxes": [
+              {
+                "format": "ms",
+                "min": 0,
+                "decimals": 0
+              },
+              {
+                "format": "short"
+              }
+            ],
+            "xaxis": {
+              "mode": "time"
+            },
+            "lines": true,
+            "fill": 1,
+            "linewidth": 2,
+            "points": false,
+            "bars": false,
+            "stack": false,
+            "percentage": false,
+            "legend": {
+              "show": true,
+              "values": true,
+              "current": true,
+              "avg": true,
+              "max": true
+            },
+            "thresholds": [
+              {
+                "value": 500,
+                "colorMode": "critical",
+                "op": "gt",
+                "fill": true,
+                "line": true
+              }
+            ]
+          },
+
+          {
+            "id": 7,
+            "type": "table",
+            "title": "📊 SLI Summary",
+            "gridPos": { "x": 0, "y": 12, "w": 12, "h": 6 },
+            "targets": [
+              {
+                "expr": "sli:availability:1m * 100",
+                "format": "table",
+                "instant": true,
+                "legendFormat": "",
+                "refId": "A"
+              },
+              {
+                "expr": "sli:availability:5m * 100",
+                "format": "table",
+                "instant": true,
+                "refId": "B"
+              },
+              {
+                "expr": "sli:availability:1h * 100",
+                "format": "table",
+                "instant": true,
+                "refId": "C"
+              },
+              {
+                "expr": "sli:availability:30d * 100",
+                "format": "table",
+                "instant": true,
+                "refId": "D"
+              }
+            ],
+            "styles": [
+              {
+                "pattern": "Time",
+                "type": "hidden"
+              },
+              {
+                "pattern": "Value",
+                "type": "number",
+                "unit": "percent",
+                "decimals": 3,
+                "thresholds": ["99"],
+                "colorMode": "cell",
+                "colors": ["red", "green"]
+              }
+            ],
+            "transform": "timeseries_aggregations"
+          },
+
+          {
+            "id": 8,
+            "type": "table",
+            "title": "⚡ Latency Summary",
+            "gridPos": { "x": 12, "y": 12, "w": 12, "h": 6 },
+            "targets": [
+              {
+                "expr": "sli:latency:1m * 1000",
+                "format": "table",
+                "instant": true,
+                "legendFormat": "",
+                "refId": "A"
+              },
+              {
+                "expr": "sli:latency:5m * 1000",
+                "format": "table",
+                "instant": true,
+                "refId": "B"
+              }
+            ],
+            "styles": [
+              {
+                "pattern": "Time",
+                "type": "hidden"
+              },
+              {
+                "pattern": "Value",
+                "type": "number",
+                "unit": "ms",
+                "decimals": 0,
+                "thresholds": ["500"],
+                "colorMode": "cell",
+                "colors": ["green", "red"]
+              }
+            ],
+            "transform": "timeseries_aggregations"
+          }
+        ]
+      }
+    }
