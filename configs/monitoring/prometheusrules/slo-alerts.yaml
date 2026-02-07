@@ -189,21 +189,24 @@ spec:
 
       rules:
         # ==================================================================
-        # SLO 위반: p95 응답 시간 > 500ms
+        # SLO 위반: 평균 응답 시간 > 500ms
         # ==================================================================
 
         # Alert 이름: SLOLatencyViolation
-        # What: p95 응답 시간이 500ms를 초과할 때 발생하는 알림
-        # Why: 대부분 사용자(95%)가 느린 응답을 경험하면 SLO 위반
+        # What: 평균 응답 시간이 500ms를 초과할 때 발생하는 알림
+        # Why: Blackbox Exporter는 Gauge 메트릭 사용 (Histogram 아님)
         # Impact: 이 알림이 없으면 느린 응답으로 인한 사용자 이탈 증가
+        #
+        # 참고: Synthetic Check (30초 1번 측정)이므로 평균 사용
+        #       추후 NGINX Exporter 추가 시 p95/p99로 변경 예정
         - alert: SLOLatencyViolation
 
           # PromQL 조건
-          # What: sli:latency_p95:5m 메트릭이 0.5 (500ms) 초과
-          # Why: p95 응답 시간이 500ms를 초과하면 사용자 경험 저하
+          # What: sli:latency:5m 메트릭이 0.5 (500ms) 초과
+          # Why: 평균 응답 시간이 500ms를 초과하면 사용자 경험 저하
           # Impact: 조건 충족 시 Pending → Firing 상태로 전환
           # Options: 0.5 (500ms, 권장), 0.3 (300ms, 엄격), 1.0 (1s, 느슨)
-          expr: sli:latency_p95:5m > 0.5
+          expr: sli:latency:5m > 0.5
 
           # 지속 시간: 5분
           # Why: 순간적인 스파이크로 인한 오알람 방지
@@ -218,10 +221,10 @@ spec:
             component: blog-system
 
           annotations:
-            summary: "응답 시간 SLO 위반 (p95 > 500ms)"
+            summary: "응답 시간 SLO 위반 (평균 > 500ms)"
             description: |
-              블로그 사이트 p95 응답 시간이 500ms를 초과했습니다.
-              현재 p95: {{ $value | printf "%.3f" }}s ({{ mul $value 1000 | printf "%.0f" }}ms)
+              블로그 사이트 평균 응답 시간이 500ms를 초과했습니다.
+              현재 평균: {{ $value | printf "%.3f" }}s ({{ mul $value 1000 | printf "%.0f" }}ms)
               목표: < 0.5s (500ms)
 
               조치:
@@ -229,33 +232,8 @@ spec:
               2. kubectl top pods -n blog-system (리소스 사용량 확인)
               3. HPA 작동 여부 확인 (kubectl get hpa -n blog-system)
 
-        # ==================================================================
-        # SLO 위반: p99 응답 시간 > 1s
-        # ==================================================================
-
-        # Alert 이름: SLOLatencyP99Violation
-        # What: p99 응답 시간이 1초를 초과할 때 발생하는 알림
-        # Why: 최악의 응답 시간이 너무 느리면 일부 사용자 경험 매우 나쁨
-        # Impact: p99가 높으면 극소수 사용자가 매우 느린 응답 경험
-        - alert: SLOLatencyP99Violation
-          expr: sli:latency_p99:1m > 1.0
-
-          # 지속 시간: 5분
-          # Why: p99는 변동이 크므로 5분 지속 확인
-          for: 5m
-
-          labels:
-            severity: warning
-            slo: latency
-            component: blog-system
-
-          annotations:
-            summary: "응답 시간 p99 > 1초"
-            description: |
-              블로그 사이트 p99 응답 시간이 1초를 초과했습니다.
-              현재 p99: {{ $value | printf "%.3f" }}s ({{ mul $value 1000 | printf "%.0f" }}ms)
-
-              일부 사용자가 매우 느린 응답을 경험하고 있습니다.
+              참고: Blackbox Exporter 사용 중 (Synthetic Check, 30초 1번 측정)
+                    추후 NGINX Exporter 추가 시 p95/p99 percentile로 변경 예정
 
     # ==========================================================================
     # SLO: Error Rate (에러율)

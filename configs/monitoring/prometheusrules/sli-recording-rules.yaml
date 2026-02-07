@@ -127,13 +127,18 @@ spec:
     # ==========================================================================
     # SLI: Latency (응답 시간)
     # ==========================================================================
-    # 메트릭: probe_duration_seconds (Blackbox Exporter)
-    # 목표: p95 < 500ms, p99 < 1s
+    # 메트릭: probe_duration_seconds (Blackbox Exporter, Gauge)
+    # 목표: < 500ms
+    #
+    # 참고: Blackbox Exporter는 Summary 형식 메트릭을 생성하므로
+    #       histogram_quantile() 사용 불가. Gauge 값을 직접 사용.
+    #       이유: 30초 1번 측정하는 "Synthetic Check"이므로
+    #            단일 측정값 자체가 전체 상황을 대표함 (평균의 함정 없음).
 
     # Rule Group 이름: sli-latency
     # What: Latency (응답 시간) SLI 메트릭을 계산하는 규칙 그룹
     # Why: 사용자 경험 품질을 측정하기 위함 (느린 응답 감지)
-    # Impact: 이 그룹이 없으면 SLO Alert (p95 > 500ms)가 작동하지 않음
+    # Impact: 이 그룹이 없으면 SLO Alert (latency > 500ms)가 작동하지 않음
     - name: sli-latency
 
       # 평가 주기: 30초
@@ -142,170 +147,46 @@ spec:
 
       rules:
         # ==================================================================
-        # Latency p50 (중간값, 1분)
+        # Latency (1분 평균)
         # ==================================================================
 
-        # Recording Rule 이름: sli:latency_p50:1m
-        # What: 1분 동안의 p50 응답 시간 (중간값)
-        # Why: 일반적인 사용자가 경험하는 응답 시간 (50% 사용자)
-        # Impact: p50이 높으면 일반 사용자 경험 저하
-        - record: sli:latency_p50:1m
+        # Recording Rule 이름: sli:latency:1m
+        # What: 1분 평균 응답 시간 (초 단위)
+        # Why: Blackbox Exporter의 Gauge 값 (실시간 모니터링)
+        # Impact: 값이 0.5 (500ms)를 초과하면 사용자 경험 저하
+        # Options: avg_over_time() 사용 (1분 평균), max_over_time() (1분 최대값)
+        - record: sli:latency:1m
 
           # PromQL 쿼리
-          # What: probe_duration_seconds의 50번째 백분위수
-          # Why: histogram_quantile로 Histogram 메트릭의 백분위수 계산
-          # Impact: 값이 0.5 (500ms)를 초과하면 일반 사용자도 느림 체감
-          # Options: p50 (중간값), p95 (상위 5%), p99 (상위 1%)
-          expr: histogram_quantile(0.50, rate(probe_duration_seconds_bucket{job="probe/monitoring/blog-http-probe", instance="http://blog.jiminhome.shop"}[1m]))
+          # What: probe_duration_seconds의 1분 평균값
+          # Why: Gauge 메트릭을 시간 범위 평균으로 부드럽게 처리
+          # Impact: 순간적인 튀는 값 방지 (노이즈 제거)
+          expr: avg_over_time(probe_duration_seconds{job="probe/monitoring/blog-http-probe", instance="http://blog.jiminhome.shop"}[1m])
 
         # ==================================================================
-        # Latency p95 (95 백분위수, 1분)
+        # Latency (5분 평균)
         # ==================================================================
 
-        # Recording Rule 이름: sli:latency_p95:1m
-        # What: 1분 동안의 p95 응답 시간 (상위 5% 제외)
-        # Why: 대부분 사용자(95%)가 경험하는 최악의 응답 시간
-        # Impact: p95 > 500ms면 사용자 경험 저하 (SLO 위반)
-        - record: sli:latency_p95:1m
-          expr: histogram_quantile(0.95, rate(probe_duration_seconds_bucket{job="probe/monitoring/blog-http-probe", instance="http://blog.jiminhome.shop"}[1m]))
-
-        # ==================================================================
-        # Latency p95 (5분)
-        # ==================================================================
-
-        # Recording Rule 이름: sli:latency_p95:5m
-        # What: 5분 동안의 p95 응답 시간
-        # Why: SLO Alert 조건 (p95 > 500ms 시 Warning 알림)
+        # Recording Rule 이름: sli:latency:5m
+        # What: 5분 평균 응답 시간 (초 단위)
+        # Why: SLO Alert 조건 (latency > 500ms 시 Warning 알림)
         # Impact: 이 메트릭이 없으면 SLOLatencyViolation 알림이 작동하지 않음
-        - record: sli:latency_p95:5m
-          expr: histogram_quantile(0.95, rate(probe_duration_seconds_bucket{job="probe/monitoring/blog-http-probe", instance="http://blog.jiminhome.shop"}[5m]))
-
-        # ==================================================================
-        # Latency p99 (99 백분위수, 1분)
-        # ==================================================================
-
-        # Recording Rule 이름: sli:latency_p99:1m
-        # What: 1분 동안의 p99 응답 시간 (상위 1% 제외)
-        # Why: 최악의 응답 시간 모니터링 (극소수 사용자가 경험)
-        # Impact: p99 > 1s면 일부 사용자가 매우 느린 응답 경험
-        - record: sli:latency_p99:1m
-          expr: histogram_quantile(0.99, rate(probe_duration_seconds_bucket{job="probe/monitoring/blog-http-probe", instance="http://blog.jiminhome.shop"}[1m]))
+        - record: sli:latency:5m
+          expr: avg_over_time(probe_duration_seconds{job="probe/monitoring/blog-http-probe", instance="http://blog.jiminhome.shop"}[5m])
 
     # ==========================================================================
-    # SLI: Error Rate (에러율)
+    # SLI: Error Rate & Throughput (향후 추가 예정)
     # ==========================================================================
-    # 메트릭: nginx_http_requests_total (NGINX Exporter)
-    # 목표: 5xx 에러율 < 1%
-
-    # Rule Group 이름: sli-error-rate
-    # What: Error Rate (에러율) SLI 메트릭을 계산하는 규칙 그룹
-    # Why: 서버 에러 비율을 추적하여 시스템 안정성 측정
-    # Impact: 이 그룹이 없으면 SLO Alert (에러율 > 1%)가 작동하지 않음
-    - name: sli-error-rate
-
-      # 평가 주기: 30초
-      # Why: 에러 발생 시 빠른 감지 필요
-      interval: 30s
-
-      rules:
-        # ==================================================================
-        # Total Request Rate (5분)
-        # ==================================================================
-
-        # Recording Rule 이름: sli:requests_total:5m
-        # What: 5분 동안의 전체 요청 수 (초당 요청 수)
-        # Why: 에러율 계산의 분모 (전체 요청 중 몇 %가 에러인가?)
-        # Impact: 이 값이 0이면 에러율 계산 불가능 (트래픽 없음)
-        - record: sli:requests_total:5m
-
-          # PromQL 쿼리
-          # What: nginx_http_requests_total의 5분 rate 합계
-          # Why: rate()는 Counter 메트릭의 초당 증가율 계산
-          # Impact: 값이 0이면 트래픽 없음, 높으면 부하 증가
-          # Options: instance 필터 변경 가능 (instance=~".*web.*" = web Pod만)
-          expr: sum(rate(nginx_http_requests_total{instance=~".*web.*"}[5m]))
-
-        # ==================================================================
-        # 5xx Error Rate (5분)
-        # ==================================================================
-
-        # Recording Rule 이름: sli:errors_5xx:5m
-        # What: 5분 동안의 5xx 에러 수 (초당 에러 수)
-        # Why: 에러율 계산의 분자 (서버 에러 발생 횟수)
-        # Impact: 이 값이 높으면 서버에 문제 발생 (DB 연결, OOM 등)
-        - record: sli:errors_5xx:5m
-
-          # PromQL 쿼리
-          # What: nginx_http_requests_total에서 status=5xx만 필터링
-          # Why: 5xx는 서버 에러 (500 Internal Server Error, 503 Service Unavailable 등)
-          # Impact: 값이 0이 아니면 서버 장애 발생 중
-          # Options: status=~"5.." (5xx 전체), status="500" (500만)
-          expr: sum(rate(nginx_http_requests_total{instance=~".*web.*", status=~"5.."}[5m]))
-
-        # ==================================================================
-        # Error Rate Ratio (5분)
-        # ==================================================================
-
-        # Recording Rule 이름: sli:error_rate:5m
-        # What: 5분 동안의 에러율 (5xx 에러 / 전체 요청)
-        # Why: SLO Alert 조건 (에러율 > 1% 시 Warning 알림)
-        # Impact: 이 메트릭이 없으면 SLOErrorRateViolation 알림이 작동하지 않음
-        - record: sli:error_rate:5m
-
-          # PromQL 쿼리
-          # What: 5xx 에러율 = (5xx 에러 수 / 전체 요청 수)
-          # Why: 비율로 표현해야 임계값(1%) 비교 가능
-          # Impact: 값이 0.01 (1%)을 초과하면 SLO 위반
-          # Options:
-          #   - or vector(0): 분모가 0일 때 0 반환 (에러 방지)
-          #   - 제거 시: 트래픽 없을 때 NaN 발생 (Alert 오작동)
-          expr: |
-            (
-              sum(rate(nginx_http_requests_total{instance=~".*web.*", status=~"5.."}[5m]))
-              /
-              sum(rate(nginx_http_requests_total{instance=~".*web.*"}[5m]))
-            )
-            or
-            vector(0)
-
-    # ==========================================================================
-    # SLI: Throughput (처리량)
-    # ==========================================================================
-    # 메트릭: nginx_http_requests_total (NGINX Exporter)
-    # 용도: 트래픽 추세 분석
-
-    # Rule Group 이름: sli-throughput
-    # What: Throughput (처리량) SLI 메트릭을 계산하는 규칙 그룹
-    # Why: 트래픽 추세를 파악하여 HPA/VPA 스케일링 결정 지원
-    # Impact: 이 그룹은 Alert 없이 Dashboard 전용 (선택 사항)
-    - name: sli-throughput
-
-      # 평가 주기: 30초
-      # Why: 트래픽 추세를 빠르게 파악하기 위함
-      interval: 30s
-
-      rules:
-        # ==================================================================
-        # Request Per Second (1분)
-        # ==================================================================
-
-        # Recording Rule 이름: sli:requests_per_second:1m
-        # What: 1분 동안의 초당 요청 수 (RPS)
-        # Why: 실시간 트래픽 모니터링 (Grafana Dashboard용)
-        # Impact: HPA 스케일링 결정에 참고 가능 (높으면 스케일 아웃)
-        - record: sli:requests_per_second:1m
-          expr: sum(rate(nginx_http_requests_total{instance=~".*web.*"}[1m]))
-
-        # ==================================================================
-        # Request Per Second (5분)
-        # ==================================================================
-
-        # Recording Rule 이름: sli:requests_per_second:5m
-        # What: 5분 동안의 초당 요청 수 (RPS)
-        # Why: 단기 트래픽 추세 파악 (노이즈 제거)
-        # Impact: 트래픽 급증 감지 (평소 대비 2배 이상 시 조사 필요)
-        - record: sli:requests_per_second:5m
-          expr: sum(rate(nginx_http_requests_total{instance=~".*web.*"}[5m]))
+    # 상태: NGINX Exporter 미설치로 인해 비활성화
+    # 필요 메트릭: nginx_http_requests_total (NGINX Exporter)
+    #
+    # 추후 작업:
+    #   1. NGINX Exporter sidecar 추가 (web Rollout)
+    #   2. ServiceMonitor 생성
+    #   3. Recording Rules 활성화 (Histogram 사용)
+    #
+    # 참고: 고빈도 트래픽에서는 반드시 Histogram을 사용하여
+    #       p95, p99 percentile을 계산해야 "평균의 함정"을 피할 수 있음.
 
 # ==============================================================================
 # 검증 방법 (Verification)
