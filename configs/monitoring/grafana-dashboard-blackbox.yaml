@@ -4,11 +4,13 @@
 # 목적: 외부 서비스 가용성 및 응답 시간 모니터링
 #
 # 포함된 패널:
-# 1. 서비스 가용성 상태 (UP/DOWN)
-# 2. HTTP 응답 시간 (WEB, WAS)
-# 3. SSL 인증서 만료일
-# 4. TCP 연결 상태 (MySQL)
-# 5. Probe 히스토리
+# 1. SLI/SLO 요약 (가용성, 응답 시간, Error Budget, 달성 상태)
+# 2. SLI Trend (Availability, Latency)
+# 3. 서비스 가용성 상태 (UP/DOWN)
+# 4. HTTP 응답 시간 (WEB, WAS)
+# 5. SSL 인증서 만료일
+# 6. TCP 연결 상태 (MySQL)
+# 7. Probe 히스토리
 # ==============================================================================
 
 apiVersion: v1
@@ -33,6 +35,130 @@ data:
         {
           "collapsed": false,
           "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "id": 200,
+          "panels": [],
+          "title": "📊 SLI/SLO 요약",
+          "type": "row"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "unit": "percentunit",
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "yellow", "value": 0.95 }, { "color": "green", "value": 0.99 } ] }
+            }
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+          "id": 201,
+          "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+          "targets": [{ "expr": "sli:availability:30d", "refId": "A" }],
+          "title": "30일 가용성 (목표: 99%)",
+          "type": "stat"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "unit": "ms",
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 300 }, { "color": "red", "value": 500 } ] }
+            }
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+          "id": 202,
+          "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+          "targets": [{ "expr": "sli:latency:5m * 1000", "refId": "A" }],
+          "title": "5분 평균 응답 시간 (목표: <500ms)",
+          "type": "stat"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "unit": "h",
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "yellow", "value": 3.6 }, { "color": "green", "value": 7.2 } ] }
+            }
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+          "id": 203,
+          "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+          "targets": [{ "expr": "(1 - sli:availability:30d) * 30 * 24", "refId": "A" }],
+          "title": "Error Budget 남은 시간 (30일)",
+          "type": "stat"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "mappings": [
+                { "options": { "0": { "color": "red", "index": 1, "text": "❌ 미달성" } }, "type": "value" },
+                { "options": { "1": { "color": "green", "index": 0, "text": "✅ 달성" } }, "type": "value" }
+              ],
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] }
+            }
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+          "id": 204,
+          "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+          "targets": [{ "expr": "(sli:availability:30d >= 0.99) and (sli:latency:5m < 0.5)", "refId": "A" }],
+          "title": "SLO 달성 상태",
+          "type": "stat"
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+          "id": 210,
+          "panels": [],
+          "title": "📈 SLI Trend",
+          "type": "row"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "barAlignment": 0, "drawStyle": "line", "fillOpacity": 20, "gradientMode": "none", "hideFrom": { "legend": false, "tooltip": false, "viz": false }, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5, "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": false, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "line" } },
+              "unit": "percentunit",
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 0.99 } ] }
+            }
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+          "id": 211,
+          "options": { "legend": { "calcs": ["mean", "min", "last"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [
+            { "expr": "sli:availability:1m", "legendFormat": "1분 평균", "refId": "A" },
+            { "expr": "sli:availability:5m", "legendFormat": "5분 평균", "refId": "B" },
+            { "expr": "sli:availability:1h", "legendFormat": "1시간 평균", "refId": "C" }
+          ],
+          "title": "Availability Trend",
+          "type": "timeseries"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "barAlignment": 0, "drawStyle": "line", "fillOpacity": 20, "gradientMode": "none", "hideFrom": { "legend": false, "tooltip": false, "viz": false }, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5, "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": false, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "line" } },
+              "unit": "ms",
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 300 }, { "color": "red", "value": 500 } ] }
+            }
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+          "id": 212,
+          "options": { "legend": { "calcs": ["mean", "max", "last"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [
+            { "expr": "sli:latency:1m * 1000", "legendFormat": "1분 평균", "refId": "A" },
+            { "expr": "sli:latency:5m * 1000", "legendFormat": "5분 평균", "refId": "B" }
+          ],
+          "title": "Latency Trend (목표: <500ms)",
+          "type": "timeseries"
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
           "id": 100,
           "panels": [],
           "title": "서비스 가용성 상태",
@@ -50,7 +176,7 @@ data:
               "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] }
             }
           },
-          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 15 },
           "id": 1,
           "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [{ "expr": "probe_success{job=\"blackbox-http\",instance=~\".*web-service.*\"}", "legendFormat": "WEB", "refId": "A" }],
@@ -69,7 +195,7 @@ data:
               "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] }
             }
           },
-          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 15 },
           "id": 2,
           "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [{ "expr": "probe_success{job=\"blackbox-http\",instance=~\".*was-service.*\"}", "legendFormat": "WAS", "refId": "A" }],
@@ -88,7 +214,7 @@ data:
               "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] }
             }
           },
-          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 15 },
           "id": 3,
           "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [{ "expr": "probe_success{job=\"blackbox-tcp\",instance=~\".*mysql.*\"}", "legendFormat": "MySQL", "refId": "A" }],
@@ -104,7 +230,7 @@ data:
               "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "yellow", "value": 0.9 }, { "color": "green", "value": 0.99 } ] }
             }
           },
-          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 15 },
           "id": 4,
           "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [{ "expr": "avg(avg_over_time(probe_success[24h]))", "legendFormat": "Availability", "refId": "A" }],
@@ -113,7 +239,7 @@ data:
         },
         {
           "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 19 },
           "id": 101,
           "panels": [],
           "title": "HTTP 응답 시간",
@@ -129,7 +255,7 @@ data:
               "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 0.5 }, { "color": "red", "value": 1 } ] }
             }
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
           "id": 10,
           "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
           "targets": [
@@ -151,7 +277,7 @@ data:
               "unit": "s"
             }
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
           "id": 11,
           "options": { "legend": { "calcs": ["mean", "max", "last"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
           "targets": [
@@ -162,7 +288,7 @@ data:
         },
         {
           "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 },
           "id": 102,
           "panels": [],
           "title": "HTTP 상태 코드",
@@ -185,7 +311,7 @@ data:
               "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 400 }, { "color": "red", "value": 500 } ] }
             }
           },
-          "gridPos": { "h": 4, "w": 8, "x": 0, "y": 15 },
+          "gridPos": { "h": 4, "w": 8, "x": 0, "y": 29 },
           "id": 20,
           "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [{ "expr": "probe_http_status_code{job=\"blackbox-http\",instance=~\".*web-service.*\"}", "legendFormat": "WEB", "refId": "A" }],
@@ -209,7 +335,7 @@ data:
               "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 400 }, { "color": "red", "value": 500 } ] }
             }
           },
-          "gridPos": { "h": 4, "w": 8, "x": 8, "y": 15 },
+          "gridPos": { "h": 4, "w": 8, "x": 8, "y": 29 },
           "id": 21,
           "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [{ "expr": "probe_http_status_code{job=\"blackbox-http\",instance=~\".*was-service.*\"}", "legendFormat": "WAS", "refId": "A" }],
@@ -225,7 +351,7 @@ data:
               "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] }
             }
           },
-          "gridPos": { "h": 4, "w": 8, "x": 16, "y": 15 },
+          "gridPos": { "h": 4, "w": 8, "x": 16, "y": 29 },
           "id": 22,
           "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [{ "expr": "probe_http_version{job=\"blackbox-http\"}", "legendFormat": "{{instance}}", "refId": "A" }],
@@ -234,7 +360,7 @@ data:
         },
         {
           "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 19 },
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 33 },
           "id": 103,
           "panels": [],
           "title": "Probe 히스토리",
@@ -259,7 +385,7 @@ data:
               { "matcher": { "id": "byRegexp", "options": ".*mysql.*" }, "properties": [ { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } } ] }
             ]
           },
-          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 34 },
           "id": 30,
           "options": { "legend": { "calcs": ["mean"], "displayMode": "table", "placement": "right", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
           "targets": [
@@ -270,7 +396,7 @@ data:
         },
         {
           "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 },
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 42 },
           "id": 104,
           "panels": [],
           "title": "TCP 연결 상세",
@@ -285,7 +411,7 @@ data:
               "unit": "s"
             }
           },
-          "gridPos": { "h": 6, "w": 12, "x": 0, "y": 29 },
+          "gridPos": { "h": 6, "w": 12, "x": 0, "y": 43 },
           "id": 40,
           "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
           "targets": [
@@ -307,7 +433,7 @@ data:
               { "matcher": { "id": "byName", "options": "Duration" }, "properties": [ { "id": "unit", "value": "s" } ] }
             ]
           },
-          "gridPos": { "h": 6, "w": 12, "x": 12, "y": 29 },
+          "gridPos": { "h": 6, "w": 12, "x": 12, "y": 43 },
           "id": 41,
           "options": { "showHeader": true, "cellHeight": "sm" },
           "targets": [
