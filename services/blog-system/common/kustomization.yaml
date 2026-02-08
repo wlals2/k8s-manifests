@@ -3,7 +3,6 @@ kind: Kustomization
 
 # Common 리소스: 애플리케이션 전체에 적용되는 설정
 resources:
-  - blog-ingress.yaml              # Istio VirtualService (라우팅)
   - blog-routes.yaml               # HTTP 라우트 설정
   - cilium-netpol.yaml            # Cilium NetworkPolicy (L3/L4)
   - hpa.yaml                      # HorizontalPodAutoscaler
