@@ -1,0 +1,60 @@
+# ==============================================================================
+# PodMonitor - Istio Proxy Metrics
+# ==============================================================================
+# 목적: Istio Sidecar Proxy (Envoy)가 노출하는 메트릭을 Prometheus가 수집
+#
+# 배경:
+# - Istio Proxy는 15090 포트 (http-envoy-prom)에서 메트릭 노출
+# - Service에 메트릭 포트가 없으므로 PodMonitor 사용 (ServiceMonitor 불가)
+# - Prometheus는 podMonitorSelector로 이 리소스를 발견
+#
+# 수집 메트릭:
+# - istio_requests_total: 요청 수 (RED Method - Rate)
+# - istio_request_duration_milliseconds_bucket: 응답 시간 (RED Method - Duration)
+# - istio_tcp_*: TCP 연결 메트릭
+#
+# 의존성:
+# - Prometheus Operator (kube-prometheus-stack)
+# - Istio가 Pod에 sidecar 주입 완료
+# ==============================================================================
+
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: istio-proxies
+  namespace: monitoring
+  labels:
+    # Why: Prometheus podMonitorSelector에 맞춰 이 리소스를 발견
+    release: kube-prometheus-stack
+    component: istio
+spec:
+  # Why: istio-prometheus-ignore label이 없는 모든 Pod 선택 (Istio 기본 설정)
+  selector:
+    matchExpressions:
+    - key: istio-prometheus-ignore
+      operator: DoesNotExist
+
+  podMetricsEndpoints:
+  # Why: Istio Proxy가 노출하는 포트 이름 (Pod의 containerPort.name)
+  - port: http-envoy-prom
+    # Why: Istio Proxy 메트릭 엔드포인트 (Envoy 표준)
+    path: /stats/prometheus
+    # Why: 15초마다 수집 (기본값 30s보다 빠름, 실시간 모니터링)
+    interval: 15s
+    # Why: 10초 안에 응답 없으면 타임아웃
+    scrapeTimeout: 10s
+
+    # Why: Prometheus label 정리 (가독성 향상)
+    relabelings:
+    # Why: Pod IP를 instance label로 설정 (Pod 식별)
+    - sourceLabels: [__address__]
+      action: keep
+      regex: (.+):15090
+
+    # Why: job name을 istio-mesh로 설정 (Grafana 대시보드 표준)
+    - targetLabel: job
+      replacement: istio-mesh
+
+  # Why: 모든 namespace의 Istio Proxy 수집 (blog-system, monitoring 등)
+  namespaceSelector:
+    any: true
