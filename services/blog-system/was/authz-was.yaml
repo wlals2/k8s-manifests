@@ -33,8 +33,17 @@ spec:
   action: ALLOW
 
   rules:
-  # Rule 1: 특정 port와 path로만 접근 허용 (from 조건 없음: mTLS DISABLE 모드)
+  # Rule 1: 애플리케이션 트래픽 (8080 포트)
   - to:
     - operation:
         ports: ["8080"]  # WAS 포트만 허용
         paths: ["/api/*", "/actuator/*", "/auth", "/auth/*"]  # API, 모니터링, OAuth 경로만
+
+  # Rule 2: Prometheus 메트릭 수집 (15090 포트, monitoring namespace만)
+  # Why: Istio Proxy 메트릭을 Prometheus가 스크랩하도록 허용
+  - from:
+    - source:
+        namespaces: ["monitoring"]  # monitoring namespace에서만 접근 허용
+    to:
+    - operation:
+        ports: ["15090"]  # Istio Proxy 메트릭 포트
