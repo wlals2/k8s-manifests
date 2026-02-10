@@ -142,6 +142,9 @@ kube-prometheus-stack:
   grafana:
     enabled: true
 
+    # Why: kube-prometheus-stack 기본 대시보드 비활성화 (우리가 만든 대시보드만 사용)
+    defaultDashboardsEnabled: false
+
     # Admin 비밀번호 (변경 권장!)
     # 주의: 평문 저장 (SealedSecret으로 관리 권장)
     # TODO: grafana-admin-sealedsecret.yaml로 교체

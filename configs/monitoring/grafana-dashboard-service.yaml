@@ -131,7 +131,7 @@ data:
             {
               "datasource": { "type": "prometheus", "uid": "prometheus" },
               "editorMode": "code",
-              "expr": "sum(rate(istio_requests_total{destination_service_namespace=\"blog-system\",reporter=\"destination\",response_code=~\"5..\"}[5m])) / sum(rate(istio_requests_total{destination_service_namespace=\"blog-system\",reporter=\"destination\"}[5m])) * 100",
+              "expr": "(sum(rate(istio_requests_total{destination_service_namespace=\"blog-system\",reporter=\"destination\",response_code=~\"5..\"}[5m])) or vector(0)) / sum(rate(istio_requests_total{destination_service_namespace=\"blog-system\",reporter=\"destination\"}[5m])) * 100",
               "legendFormat": "Error Rate",
               "range": true,
               "refId": "A"
