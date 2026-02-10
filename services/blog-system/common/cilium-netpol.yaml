@@ -80,6 +80,18 @@ spec:
       - port: "3306"
         protocol: TCP
 
+  # Rule 5: blackbox-exporter → mysql:3306 허용 (TCP 가용성 체크)
+  # Why: Blackbox Exporter의 TCP probe로 MySQL 포트 열림 여부 체크
+  # Why: MySQL 프로토콜 파싱 없이 TCP 연결만 테스트 (보안 강화)
+  - fromEndpoints:
+    - matchLabels:
+        app: blackbox-exporter
+        io.kubernetes.pod.namespace: monitoring
+    toPorts:
+    - ports:
+      - port: "3306"
+        protocol: TCP
+
   # Egress (나가는 트래픽) - DNS만 허용
   egress:
   # Rule 1: DNS 쿼리 허용
