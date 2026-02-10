@@ -39,11 +39,9 @@ spec:
         ports: ["8080"]  # WAS 포트만 허용
         paths: ["/api/*", "/actuator/*", "/auth", "/auth/*"]  # API, 모니터링, OAuth 경로만
 
-  # Rule 2: Prometheus 메트릭 수집 (15090 포트, monitoring namespace만)
+  # Rule 2: Prometheus 메트릭 수집 (15090 포트, 클러스터 내부 전체 허용)
   # Why: Istio Proxy 메트릭을 Prometheus가 스크랩하도록 허용
-  - from:
-    - source:
-        namespaces: ["monitoring"]  # monitoring namespace에서만 접근 허용
-    to:
+  # Why: 메트릭 전용 포트로 민감 정보 없음, from 조건 불필요
+  - to:
     - operation:
         ports: ["15090"]  # Istio Proxy 메트릭 포트
