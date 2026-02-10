@@ -34,12 +34,24 @@ spec:
 
   rules:
   # Rule 1: 애플리케이션 트래픽 (8080 포트)
+  # Why: blog-system namespace 내부 트래픽만 허용
   - to:
     - operation:
         ports: ["8080"]  # WAS 포트만 허용
         paths: ["/api/*", "/actuator/*", "/auth", "/auth/*"]  # API, 모니터링, OAuth 경로만
 
-  # Rule 2: Prometheus 메트릭 수집 (15090 포트, 클러스터 내부 전체 허용)
+  # Rule 2: Blackbox Exporter Health Check (monitoring namespace → was:8080/actuator/health)
+  # Why: 외부 가용성 모니터링용
+  # Why: Health check 엔드포인트만 허용 (보안 강화)
+  - from:
+    - source:
+        namespaces: ["monitoring"]
+    to:
+    - operation:
+        ports: ["8080"]
+        paths: ["/actuator/health"]
+
+  # Rule 3: Prometheus 메트릭 수집 (15090 포트, 클러스터 내부 전체 허용)
   # Why: Istio Proxy 메트릭을 Prometheus가 스크랩하도록 허용
   # Why: 메트릭 전용 포트로 민감 정보 없음, from 조건 불필요
   - to:

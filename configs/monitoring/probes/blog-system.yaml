@@ -85,7 +85,8 @@ spec:
   targets:
     staticConfig:
       static:
-      - http://was-service.blog-system.svc.cluster.local:8080
+      # Why: AuthorizationPolicy가 /actuator/health만 허용
+      - http://was-service.blog-system.svc.cluster.local:8080/actuator/health
 
 ---
 # ==============================================================================
