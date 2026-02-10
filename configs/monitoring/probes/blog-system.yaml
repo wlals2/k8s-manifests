@@ -1,0 +1,125 @@
+# ==============================================================================
+# Probe Resources - blog-system Services
+# ==============================================================================
+# Why: Blackbox Exporter를 통한 서비스 가용성 모니터링
+#
+# 메트릭:
+# - probe_success: 프로브 성공 여부 (1=UP, 0=DOWN)
+# - probe_http_duration_seconds: HTTP 응답 시간
+# - probe_http_status_code: HTTP 상태 코드
+# - probe_duration_seconds: 전체 프로브 시간
+#
+# 대시보드: grafana-dashboard-blackbox.yaml
+# ==============================================================================
+
+---
+# ==============================================================================
+# WEB Service HTTP Probe
+# ==============================================================================
+# Target: web-service 내부 DNS (클러스터 내부 접근)
+# Module: http_2xx (HTTP/HTTPS 200/301/302 체크)
+# ==============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: web-http-probe
+  namespace: monitoring
+  labels:
+    app: blog-system
+    component: web
+    monitor-type: http
+    # Why: Prometheus probeSelector 매칭용 (Platform Conformity)
+    prometheus: kube-prometheus
+spec:
+  # Why: Prometheus가 이 Probe를 사용할 때 job label 값
+  # 대시보드 쿼리: probe_success{job="blackbox-http"}
+  jobName: blackbox-http
+
+  # Probe 간격 및 타임아웃
+  interval: 30s
+  scrapeTimeout: 10s
+
+  # Blackbox Exporter 설정
+  prober:
+    url: blackbox-exporter.monitoring.svc.cluster.local:9115
+    path: /probe
+
+  # Blackbox Exporter module (blackbox.yml에 정의된 module)
+  module: http_2xx
+
+  # Probe 타겟
+  targets:
+    staticConfig:
+      static:
+      - http://web-service.blog-system.svc.cluster.local:80
+
+---
+# ==============================================================================
+# WAS Service HTTP Probe
+# ==============================================================================
+# Target: was-service 내부 DNS
+# Module: http_2xx
+# ==============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: was-http-probe
+  namespace: monitoring
+  labels:
+    app: blog-system
+    component: was
+    monitor-type: http
+    prometheus: kube-prometheus
+spec:
+  jobName: blackbox-http
+
+  interval: 30s
+  scrapeTimeout: 10s
+
+  prober:
+    url: blackbox-exporter.monitoring.svc.cluster.local:9115
+    path: /probe
+
+  module: http_2xx
+
+  targets:
+    staticConfig:
+      static:
+      - http://was-service.blog-system.svc.cluster.local:8080
+
+---
+# ==============================================================================
+# MySQL Service TCP Probe
+# ==============================================================================
+# Target: mysql-service 내부 DNS
+# Module: tcp_connect (TCP 포트 열림 확인)
+# ==============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: mysql-tcp-probe
+  namespace: monitoring
+  labels:
+    app: blog-system
+    component: mysql
+    monitor-type: tcp
+    prometheus: kube-prometheus
+spec:
+  # Why: TCP probe는 별도 job으로 분리
+  # 대시보드 쿼리: probe_success{job="blackbox-tcp"}
+  jobName: blackbox-tcp
+
+  interval: 30s
+  scrapeTimeout: 10s
+
+  prober:
+    url: blackbox-exporter.monitoring.svc.cluster.local:9115
+    path: /probe
+
+  # Why: TCP 포트만 체크 (MySQL 프로토콜 파싱 불필요)
+  module: tcp_connect
+
+  targets:
+    staticConfig:
+      static:
+      - mysql-service.blog-system.svc.cluster.local:3306
