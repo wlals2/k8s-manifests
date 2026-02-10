@@ -140,12 +140,13 @@ spec:
       - port: "8080"
         protocol: TCP
 
-  # Rule 3: Istio sidecar 통신 허용
-  - fromEndpoints:
-    - {}  # 모든 endpoint (istio-proxy sidecar)
+  # Rule 3: Istio sidecar 메트릭/헬스체크 (클러스터 전체 허용)
+  # Why: Prometheus가 monitoring namespace에서 15090 포트 스크랩
+  - fromEntities:
+    - cluster  # 클러스터 내부 모든 namespace 허용
     toPorts:
     - ports:
-      - port: "15090"  # Istio Envoy admin
+      - port: "15090"  # Istio Proxy 메트릭
         protocol: TCP
       - port: "15021"  # Istio health check
         protocol: TCP
@@ -251,12 +252,13 @@ spec:
         http:
         - {}  # 모든 HTTP 요청 허용
 
-  # Rule 2: Istio sidecar 통신 허용
-  - fromEndpoints:
-    - {}
+  # Rule 2: Istio sidecar 메트릭/헬스체크 (클러스터 전체 허용)
+  # Why: Prometheus가 monitoring namespace에서 15090 포트 스크랩
+  - fromEntities:
+    - cluster  # 클러스터 내부 모든 namespace 허용
     toPorts:
     - ports:
-      - port: "15090"  # Istio Envoy admin
+      - port: "15090"  # Istio Proxy 메트릭
         protocol: TCP
       - port: "15021"  # Istio health check
         protocol: TCP
