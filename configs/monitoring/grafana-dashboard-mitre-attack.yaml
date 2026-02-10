@@ -1,0 +1,220 @@
+# Grafana Dashboard: MITRE ATT&CK Heatmap
+# Why: Falco + Wazuh 탐지 결과를 MITRE ATT&CK Framework로 시각화
+#
+# 목적:
+#   - Kill Chain 단계별 공격 빈도 시각화
+#   - Tactics별 Heatmap (빨강: 높은 빈도, 초록: 낮은 빈도)
+#   - 최근 24시간 공격 Timeline
+#
+# 의존성:
+#   - Wazuh API: Datasource 설정 필요
+#   - Grafana: provisioning 방식으로 자동 로드
+#
+# 참고:
+#   - MITRE ATT&CK: https://attack.mitre.org/
+#   - Wazuh API: https://documentation.wazuh.com/current/user-manual/api/reference.html
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-mitre-attack
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  mitre-attack.json: |
+    {
+      "dashboard": {
+        "title": "MITRE ATT&CK Heatmap (Falco + Wazuh)",
+        "tags": ["security", "mitre", "falco", "wazuh"],
+        "timezone": "Asia/Seoul",
+        "refresh": "30s",
+        "time": {
+          "from": "now-24h",
+          "to": "now"
+        },
+        "panels": [
+          {
+            "id": 1,
+            "title": "MITRE ATT&CK Tactics (24h)",
+            "type": "heatmap",
+            "gridPos": {"x": 0, "y": 0, "w": 24, "h": 8},
+            "targets": [
+              {
+                "expr": "sum by (mitre_tactic) (rate(wazuh_alerts_total{mitre_tactic!=\"\"}[24h]))",
+                "legendFormat": "{{mitre_tactic}}"
+              }
+            ],
+            "options": {
+              "calculate": false,
+              "cellGap": 2,
+              "cellRadius": 0,
+              "color": {
+                "mode": "scheme",
+                "scheme": "Spectral",
+                "steps": 128
+              },
+              "exemplars": {
+                "color": "rgba(255,0,255,0.7)"
+              },
+              "filterValues": {
+                "le": 1e-9
+              },
+              "showValue": "auto"
+            },
+            "description": "MITRE ATT&CK Tactics별 공격 빈도 (빨강: 높음, 초록: 낮음)"
+          },
+          {
+            "id": 2,
+            "title": "Top 10 MITRE Techniques",
+            "type": "bargauge",
+            "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+            "targets": [
+              {
+                "expr": "topk(10, sum by (mitre_id, mitre_tactic) (wazuh_alerts_total))",
+                "legendFormat": "{{mitre_id}} - {{mitre_tactic}}"
+              }
+            ],
+            "options": {
+              "orientation": "horizontal",
+              "displayMode": "gradient",
+              "showUnfilled": true
+            },
+            "description": "가장 많이 탐지된 MITRE Technique Top 10"
+          },
+          {
+            "id": 3,
+            "title": "Attack Timeline (24h)",
+            "type": "timeseries",
+            "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+            "targets": [
+              {
+                "expr": "sum by (mitre_tactic) (rate(wazuh_alerts_total[5m]))",
+                "legendFormat": "{{mitre_tactic}}"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "custom": {
+                  "lineWidth": 2,
+                  "fillOpacity": 10,
+                  "stacking": {"mode": "normal"}
+                },
+                "color": {"mode": "palette-classic"}
+              }
+            },
+            "description": "시간대별 공격 패턴 (Stacked Area Chart)"
+          },
+          {
+            "id": 4,
+            "title": "Severity Distribution",
+            "type": "piechart",
+            "gridPos": {"x": 0, "y": 16, "w": 8, "h": 8},
+            "targets": [
+              {
+                "expr": "sum by (severity) (wazuh_alerts_total)",
+                "legendFormat": "{{severity}}"
+              }
+            ],
+            "options": {
+              "legend": {
+                "displayMode": "table",
+                "placement": "right",
+                "values": ["value", "percent"]
+              },
+              "pieType": "donut"
+            },
+            "description": "알람 심각도 분포 (Low/Medium/High/Critical)"
+          },
+          {
+            "id": 5,
+            "title": "Top Attacked Namespaces",
+            "type": "table",
+            "gridPos": {"x": 8, "y": 16, "w": 16, "h": 8},
+            "targets": [
+              {
+                "expr": "topk(10, sum by (namespace, mitre_tactic) (wazuh_alerts_total))",
+                "format": "table",
+                "instant": true
+              }
+            ],
+            "transformations": [
+              {
+                "id": "organize",
+                "options": {
+                  "excludeByName": {"Time": true},
+                  "indexByName": {
+                    "namespace": 0,
+                    "mitre_tactic": 1,
+                    "Value": 2
+                  },
+                  "renameByName": {
+                    "namespace": "Namespace",
+                    "mitre_tactic": "MITRE Tactic",
+                    "Value": "Count"
+                  }
+                }
+              }
+            ],
+            "description": "가장 많이 공격받은 Namespace Top 10"
+          },
+          {
+            "id": 6,
+            "title": "ISO 27001 Compliance Score",
+            "type": "gauge",
+            "gridPos": {"x": 0, "y": 24, "w": 12, "h": 8},
+            "targets": [
+              {
+                "expr": "(wazuh_sca_passed / (wazuh_sca_passed + wazuh_sca_failed)) * 100"
+              }
+            ],
+            "options": {
+              "showThresholdLabels": false,
+              "showThresholdMarkers": true
+            },
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percent",
+                "min": 0,
+                "max": 100,
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {"value": 0, "color": "red"},
+                    {"value": 70, "color": "yellow"},
+                    {"value": 90, "color": "green"}
+                  ]
+                }
+              }
+            },
+            "description": "ISO 27001 Compliance 점수 (SCA Policy 기반)"
+          },
+          {
+            "id": 7,
+            "title": "Failed Compliance Checks",
+            "type": "table",
+            "gridPos": {"x": 12, "y": 24, "w": 12, "h": 8},
+            "targets": [
+              {
+                "expr": "wazuh_sca_checks{result=\"failed\"}",
+                "format": "table",
+                "instant": true
+              }
+            ],
+            "transformations": [
+              {
+                "id": "organize",
+                "options": {
+                  "renameByName": {
+                    "check_id": "Check ID",
+                    "check_title": "Title",
+                    "rationale": "Rationale"
+                  }
+                }
+              }
+            ],
+            "description": "ISO 27001 요구사항 미준수 항목"
+          }
+        ]
+      }
+    }

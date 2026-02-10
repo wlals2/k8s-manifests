@@ -1,0 +1,122 @@
+# Wazuh Helm Chart Values
+# Why: Falco + Falco-talon + Wazuh 통합 아키텍처의 SIEM Layer
+#
+# 목적:
+#   - Falco 알람을 MITRE ATT&CK으로 분류
+#   - 로그 30일 보관 (상관 분석용)
+#   - ISO 27001 Compliance SCA Policy 적용
+#
+# 의존성:
+#   - Falco: 실시간 탐지 (이미 배포됨)
+#   - Fluentd: Falco 로그 수집 (Phase 2에서 배포)
+#
+# 참고:
+#   - Wazuh 문서: https://documentation.wazuh.com/current/deployment-options/deploying-with-kubernetes/index.html
+#   - ISO 27001 SCA: https://documentation.wazuh.com/current/user-manual/capabilities/sec-config-assessment/index.html
+
+# Wazuh Manager (분석 엔진)
+wazuh:
+  manager:
+    enabled: true
+    replicas: 1
+
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+
+    # Why: Falco 로그를 받기 위한 Syslog Listener
+    ports:
+      syslog:
+        enabled: true
+        port: 514
+        protocol: UDP
+
+    # Why: MITRE ATT&CK 분류를 위한 커스텀 룰 경로
+    customRules:
+      enabled: true
+      path: /var/ossec/etc/rules/falco_rules.xml
+
+    # Why: ISO 27001 Compliance 검증
+    sca:
+      enabled: true
+      policies:
+        - cis_kubernetes_27001.yml
+
+# Wazuh Indexer (OpenSearch 기반)
+indexer:
+  enabled: true
+  replicas: 1
+
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+
+  persistence:
+    enabled: true
+    storageClass: "longhorn"  # Why: 홈랩 스토리지 클래스
+    size: 15Gi  # Why: 홈랩 노드 용량 제약 (k8s-worker3: 38.6GB)
+
+  # Why: 홈랩 환경 최적화 (10일 보관 + 압축으로 47일 효과)
+  indexManagement:
+    rolloverAge: 10d  # 30d → 10d (Timeline 분석 가능)
+    deleteAge: 10d
+
+  # Why: OpenSearch 압축 활성화 (저장 공간 30-40% 절감)
+  indexTemplate:
+    settings:
+      number_of_shards: 1        # 5 → 1 (홈랩 단일 노드)
+      number_of_replicas: 0      # 1 → 0 (Longhorn이 replica 관리)
+      codec: "best_compression"  # 압축 최대화
+      refresh_interval: "30s"    # 실시간성 낮춤 (성능 향상)
+
+# Wazuh Dashboard (Kibana 기반)
+dashboard:
+  enabled: true
+  replicas: 1
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+  # Why: 외부 접근용 VirtualService 연동
+  ingress:
+    enabled: false  # VirtualService로 대체
+
+  # Why: MITRE ATT&CK 플러그인 활성화
+  plugins:
+    mitre:
+      enabled: true
+
+# 보안 설정
+security:
+  # Why: 홈랩 내부 네트워크만 허용
+  authorizationPolicy:
+    enabled: true
+    allowedIPs:
+      - 192.168.1.0/24
+
+  # Why: Istio Service Mesh 외부 배치 (Prometheus와 동일 전략)
+  istio:
+    sidecar:
+      inject: false
+
+# 모니터링 통합
+monitoring:
+  serviceMonitor:
+    enabled: true
+    namespace: monitoring
+    labels:
+      prometheus: kube-prometheus  # Why: Prometheus가 인식하도록
+    interval: 30s

@@ -1,0 +1,162 @@
+# Fluentd DaemonSet: Falco 로그 → Wazuh Manager 전송
+# Why: Falco의 실시간 알람을 Wazuh SIEM으로 전달하여 MITRE ATT&CK 분류 및 로그 보관
+#
+# 목적:
+#   - Falco 로그 수집 (stdout)
+#   - Wazuh Manager Syslog 포트(514)로 전송
+#   - JSON 파싱 및 메타데이터 추가
+#
+# 의존성:
+#   - Falco: DaemonSet으로 이미 배포됨
+#   - Wazuh Manager: Service DNS (wazuh-manager.security.svc.cluster.local)
+#
+# 참고:
+#   - Fluentd 문서: https://docs.fluentd.org/
+#   - Falco Output: https://falco.org/docs/outputs/
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluentd-falco-config
+  namespace: security
+data:
+  fluent.conf: |
+    # Source: Falco 로그 수집
+    <source>
+      @type tail
+      path /var/log/falco/*.log
+      pos_file /var/log/fluentd-falco.pos
+      tag falco.*
+      <parse>
+        @type json
+        time_key time
+        time_format %Y-%m-%dT%H:%M:%S.%NZ
+      </parse>
+    </source>
+
+    # Filter 1: Severity 필터링 (Critical/High/Warning만 저장)
+    # Why: 디스크 용량 절약 (약 70% 감소), 노이즈 제거
+    <filter falco.**>
+      @type grep
+      <regexp>
+        key priority
+        pattern /(Warning|Error|Critical|Alert|Emergency)/
+      </regexp>
+    </filter>
+
+    # Filter 2: 메타데이터 추가 (MITRE ATT&CK 분류용)
+    <filter falco.**>
+      @type record_transformer
+      <record>
+        source "falco"
+        cluster "homelab-k8s"
+        environment "production"
+      </record>
+    </filter>
+
+    # Match: Wazuh Manager로 전송 (Syslog UDP)
+    <match falco.**>
+      @type syslog
+      host wazuh-manager.security.svc.cluster.local
+      port 514
+      protocol udp
+
+      # Why: Wazuh가 인식할 수 있는 Syslog 형식
+      <format>
+        @type json
+      </format>
+
+      <buffer>
+        @type file
+        path /var/log/fluentd-buffers/falco.buffer
+        flush_mode interval
+        flush_interval 5s  # Why: 실시간 분석을 위해 5초마다 전송
+        retry_type exponential_backoff
+        retry_wait 10s
+        retry_max_interval 300s
+      </buffer>
+    </match>
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluentd-falco
+  namespace: security
+  labels:
+    app: fluentd-falco
+spec:
+  selector:
+    matchLabels:
+      app: fluentd-falco
+  template:
+    metadata:
+      labels:
+        app: fluentd-falco
+    spec:
+      serviceAccountName: fluentd
+      containers:
+      - name: fluentd
+        image: fluent/fluentd:v1.16-1
+        resources:
+          requests:
+            cpu: 100m
+            memory: 200Mi
+          limits:
+            cpu: 200m
+            memory: 400Mi
+
+        volumeMounts:
+        - name: config
+          mountPath: /fluentd/etc
+        - name: varlog
+          mountPath: /var/log
+          readOnly: true  # Why: 로그 읽기만 가능
+
+      volumes:
+      - name: config
+        configMap:
+          name: fluentd-falco-config
+      - name: varlog
+        hostPath:
+          path: /var/log
+          type: Directory
+
+      tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fluentd
+  namespace: security
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: fluentd
+rules:
+- apiGroups: [""]
+  resources:
+    - pods
+    - namespaces
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: fluentd
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: fluentd
+subjects:
+- kind: ServiceAccount
+  name: fluentd
+  namespace: security

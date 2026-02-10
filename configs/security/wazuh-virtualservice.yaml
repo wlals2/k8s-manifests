@@ -1,0 +1,53 @@
+# VirtualService: Wazuh Dashboard 외부 접근
+# Why: Windows 워크스테이션에서 https://wazuh.jiminhome.shop로 접근 가능
+#
+# 목적:
+#   - Istio Gateway를 통한 외부 접근
+#   - HTTPS 리다이렉트
+#
+# 의존성:
+#   - Istio Gateway: default-gateway.istio-system
+#   - Wazuh Dashboard Service: wazuh-dashboard.security.svc.cluster.local
+#   - MetalLB LoadBalancer: 192.168.1.200
+#
+# 참고:
+#   - Istio VirtualService: https://istio.io/latest/docs/reference/config/networking/virtual-service/
+
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: wazuh-dashboard
+  namespace: security
+spec:
+  hosts:
+    - wazuh.jiminhome.shop
+  gateways:
+    - istio-system/default-gateway
+  http:
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: wazuh-dashboard.security.svc.cluster.local
+            port:
+              number: 443
+
+---
+# AuthorizationPolicy: IP 제한 (192.168.1.0/24만 허용)
+# Why: 홈랩 내부 네트워크만 접근 가능 (보안 강화)
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: wazuh-dashboard-ip-allow
+  namespace: security
+spec:
+  selector:
+    matchLabels:
+      app: wazuh-dashboard
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            ipBlocks:
+              - 192.168.1.0/24

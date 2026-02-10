@@ -1,0 +1,43 @@
+# ArgoCD Application: Wazuh SIEM
+# Why: Falco + Falco-talon + Wazuh 통합 아키텍처의 SIEM Layer
+#
+# 목적:
+#   - Wazuh Manager, Indexer, Dashboard 배포
+#   - Helm Chart 기반 배포 (자동 업데이트)
+#
+# 의존성:
+#   - Namespace: security (사전 생성 필요)
+#   - StorageClass: longhorn (Indexer PVC용)
+#
+# 참고:
+#   - Helm Repo: https://wazuh.github.io/wazuh-kubernetes
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: wazuh
+  namespace: argocd
+spec:
+  project: default
+
+  source:
+    repoURL: https://wazuh.github.io/wazuh-kubernetes
+    chart: wazuh
+    targetRevision: 4.7.0  # Why: 안정 버전
+    helm:
+      valueFiles:
+        - values.yaml
+      values: |
+        # values.yaml 내용을 여기에 삽입
+        # (또는 Git에서 wazuh-values.yaml을 참조)
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: security
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

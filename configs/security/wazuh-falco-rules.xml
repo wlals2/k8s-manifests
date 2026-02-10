@@ -1,0 +1,112 @@
+<!-- Wazuh Integration Rule: Falco → MITRE ATT&CK -->
+<!-- Why: Falco 알람을 MITRE ATT&CK으로 분류하여 Kill Chain 시각화 -->
+<!--
+목적:
+  - Falco 로그를 파싱하여 Wazuh 알람으로 변환
+  - MITRE ATT&CK Technique ID 매핑
+  - Severity Level 조정 (Warning/Critical)
+
+의존성:
+  - Fluentd: Falco 로그 전송 (Syslog UDP)
+  - Wazuh Manager: Rule 로드
+
+참고:
+  - Wazuh Rule Syntax: https://documentation.wazuh.com/current/user-manual/ruleset/ruleset-xml-syntax/index.html
+  - MITRE ATT&CK: https://attack.mitre.org/
+-->
+
+<group name="falco,kubernetes,">
+
+  <!-- Rule 100001: Falco 로그 감지 (Base Rule) -->
+  <rule id="100001" level="0">
+    <decoded_as>json</decoded_as>
+    <field name="source">falco</field>
+    <description>Falco event detected</description>
+  </rule>
+
+  <!-- Rule 100010: Outbound Connection (MITRE T1071 - Command and Control) -->
+  <rule id="100010" level="8">
+    <if_sid>100001</if_sid>
+    <field name="rule">Outbound or Inbound Traffic not to Authorized Server</field>
+    <description>Falco: Unexpected outbound connection detected</description>
+    <mitre>
+      <id>T1071</id>  <!-- Application Layer Protocol -->
+      <tactic>Command and Control</tactic>
+    </mitre>
+    <group>attack.command_and_control,</group>
+  </rule>
+
+  <!-- Rule 100020: Sensitive File Access (MITRE T1552 - Credential Access) -->
+  <rule id="100020" level="10">
+    <if_sid>100001</if_sid>
+    <field name="rule">Read sensitive file</field>
+    <field name="output_fields.fd.name">\.+\/(passwd|shadow|id_rsa|\.aws\/credentials)</field>
+    <description>Falco: Sensitive file access detected (Credential Theft)</description>
+    <mitre>
+      <id>T1552.001</id>  <!-- Unsecured Credentials: Credentials In Files -->
+      <tactic>Credential Access</tactic>
+    </mitre>
+    <group>attack.credential_access,</group>
+  </rule>
+
+  <!-- Rule 100030: Privilege Escalation (MITRE T1068 - Exploitation for Privilege Escalation) -->
+  <rule id="100030" level="12">
+    <if_sid>100001</if_sid>
+    <field name="rule">Privilege Escalation</field>
+    <description>Falco: Privilege escalation attempt detected</description>
+    <mitre>
+      <id>T1068</id>  <!-- Exploitation for Privilege Escalation -->
+      <tactic>Privilege Escalation</tactic>
+    </mitre>
+    <group>attack.privilege_escalation,</group>
+  </rule>
+
+  <!-- Rule 100040: Reverse Shell (MITRE T1059 - Command and Scripting Interpreter) -->
+  <rule id="100040" level="15">
+    <if_sid>100001</if_sid>
+    <field name="rule">Shell spawned</field>
+    <field name="output_fields.proc.cmdline">\.+\/(bash|sh|nc|netcat)</field>
+    <description>Falco: Reverse shell detected (Critical)</description>
+    <mitre>
+      <id>T1059.004</id>  <!-- Unix Shell -->
+      <tactic>Execution</tactic>
+    </mitre>
+    <group>attack.execution,pci_dss_10.6.1,</group>
+  </rule>
+
+  <!-- Rule 100050: Container Escape (MITRE T1611 - Escape to Host) -->
+  <rule id="100050" level="15">
+    <if_sid>100001</if_sid>
+    <field name="rule">Container Escape</field>
+    <description>Falco: Container escape attempt detected (Critical)</description>
+    <mitre>
+      <id>T1611</id>  <!-- Escape to Host -->
+      <tactic>Privilege Escalation</tactic>
+    </mitre>
+    <group>attack.privilege_escalation,</group>
+  </rule>
+
+  <!-- Rule 100060: ConfigMap/Secret Access (MITRE T1552 - Credential Access) -->
+  <rule id="100060" level="10">
+    <if_sid>100001</if_sid>
+    <field name="rule">Read ConfigMap or Secret</field>
+    <description>Falco: Kubernetes Secret access detected</description>
+    <mitre>
+      <id>T1552.007</id>  <!-- Container API -->
+      <tactic>Credential Access</tactic>
+    </mitre>
+    <group>attack.credential_access,kubernetes,</group>
+  </rule>
+
+  <!-- Rule 100070: Frequency Analysis (5분 내 3번 이상 발생) -->
+  <rule id="100070" level="12" frequency="3" timeframe="300">
+    <if_matched_sid>100010</if_matched_sid>
+    <description>Falco: Multiple outbound connections detected (Possible C2 Communication)</description>
+    <mitre>
+      <id>T1071</id>
+      <tactic>Command and Control</tactic>
+    </mitre>
+    <group>attack.command_and_control,correlation,</group>
+  </rule>
+
+</group>
