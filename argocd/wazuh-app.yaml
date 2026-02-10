@@ -1,0 +1,117 @@
+# ==============================================================================
+# Wazuh SIEM ArgoCD Application
+# ==============================================================================
+# 목적: Falco + Falco-talon + Wazuh 통합 아키텍처 (SIEM Layer)
+# 포함: Wazuh Manager, Indexer, Dashboard
+# 패턴: Helm Overlay (apps/security/wazuh/Chart.yaml + values.yaml)
+# ==============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: wazuh
+  namespace: argocd
+  finalizers:
+    # Why: Application 삭제 시 모든 리소스 자동 삭제
+    - resources-finalizer.argocd.argoproj.io
+
+spec:
+  # ArgoCD Project
+  project: default
+
+  # Source: Git 저장소 정보
+  source:
+    repoURL: https://github.com/wlals2/k8s-manifests.git
+    targetRevision: main  # 브랜치
+
+    # Path: Helm Chart 디렉터리 (Chart.yaml + values.yaml)
+    path: apps/security/wazuh
+
+    # Helm 설정
+    helm:
+      # Why: values.yaml 자동 인식 (apps/security/wazuh/values.yaml)
+      # Why: Chart.yaml의 dependency (wazuh 4.7.0) 자동 다운로드
+
+      # CRD 설치 (필요 시)
+      skipCrds: false
+
+  # Destination: 배포할 클러스터 및 Namespace
+  destination:
+    server: https://kubernetes.default.svc  # 로컬 클러스터
+    namespace: security  # 배포할 namespace
+
+  # Sync Policy: 동기화 정책
+  syncPolicy:
+    # 자동 동기화 활성화
+    automated:
+      prune: true       # Git에서 삭제된 리소스 자동 제거
+      selfHeal: true    # Drift 감지 시 자동 복구
+      allowEmpty: false # 빈 디렉터리 허용 안 함
+
+    # Sync Options
+    syncOptions:
+      - CreateNamespace=true  # security namespace 자동 생성
+
+      # ServerSideApply 활성화
+      # Why: Helm Chart는 많은 리소스 생성 → Conflict 방지
+      - ServerSideApply=true
+
+# ==============================================================================
+# 배포 순서 (Helm Overlay)
+# ==============================================================================
+#
+# 1. ArgoCD가 apps/security/wazuh/ 감지
+# 2. helm dependency build 실행 (Wazuh Chart 4.7.0 다운로드)
+# 3. helm template 실행 (values.yaml 적용하여 YAML 생성)
+# 4. kubectl apply 실행 (생성된 YAML 배포)
+# 5. Wazuh Manager, Indexer, Dashboard 배포 완료
+#
+# ==============================================================================
+# 배포 후 확인 사항
+# ==============================================================================
+#
+# 1. Application Sync 상태
+#    kubectl get application wazuh -n argocd
+#    상태: Synced, Healthy
+#
+# 2. Wazuh Manager Pod
+#    kubectl get pods -n security -l app=wazuh-manager
+#    상태: Running
+#
+# 3. Wazuh Indexer Pod
+#    kubectl get pods -n security -l app=wazuh-indexer
+#    상태: Running
+#
+# 4. Wazuh Dashboard Pod
+#    kubectl get pods -n security -l app=wazuh-dashboard
+#    상태: Running
+#
+# 5. PVC 확인
+#    kubectl get pvc -n security
+#    출력: wazuh-indexer-data-wazuh-indexer-0   Bound   15Gi
+#
+# 6. 외부 접근 확인
+#    https://wazuh.jiminhome.shop
+#
+# ==============================================================================
+# 트러블슈팅
+# ==============================================================================
+#
+# 문제 1: Application이 OutOfSync 상태
+# 원인: Helm dependency가 다운로드되지 않음
+# 해결:
+#    kubectl patch application wazuh -n argocd \
+#      --type merge -p '{"operation":{"sync":{"revision":"HEAD"}}}'
+#
+# 문제 2: Wazuh Indexer Pod가 Pending 상태
+# 원인: PVC가 Bound되지 않음 (Longhorn 용량 부족)
+# 해결:
+#    kubectl describe pvc -n security
+#    kubectl get nodes -o custom-columns=NAME:.metadata.name,DISK:.status.capacity.ephemeral-storage
+#
+# 문제 3: Wazuh Manager가 Falco 로그를 받지 못함
+# 원인: Fluentd DaemonSet 미배포 또는 Syslog 포트 미개방
+# 해결:
+#    kubectl get pods -n security -l app=fluentd-falco
+#    kubectl logs -n security -l app=fluentd-falco
+#
+# ==============================================================================
