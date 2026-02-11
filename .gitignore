@@ -38,3 +38,6 @@ Thumbs.db
 # 임시 파일
 /tmp/
 *.tmp
+
+# Wazuh 공식 secrets는 Git 관리 허용 (기본 credential, production에서 변경 필요)
+!apps/security/wazuh/secrets/
