@@ -33,6 +33,13 @@ spec:
     server: https://kubernetes.default.svc  # 로컬 클러스터
     namespace: security  # 배포할 namespace
 
+  # Why: Helm Chart의 checksum/config annotation은 동적 생성되므로 무시
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /spec/template/metadata/annotations/checksum~1config
+
   # Sync Policy: 동기화 정책
   syncPolicy:
     # 자동 동기화 활성화
