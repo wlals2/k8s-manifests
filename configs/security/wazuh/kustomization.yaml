@@ -17,9 +17,9 @@ kind: Kustomization
 # Why: security namespace에 배포
 namespace: security
 
-# Why: Wazuh 공식 Kustomize 참조 (GitHub 저장소)
+# Why: Wazuh 공식 Kustomize 참조 (wazuh/ 디렉터리)
 resources:
-  - https://github.com/wazuh/wazuh-kubernetes//wazuh?ref=v4.7.0
+  - github.com/wazuh/wazuh-kubernetes/wazuh?ref=v4.7.0
 
 # Why: 우리 환경에 맞게 Indexer 설정 수정
 patchesStrategicMerge:
