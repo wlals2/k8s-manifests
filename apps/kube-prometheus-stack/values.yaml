@@ -230,12 +230,6 @@ kube-prometheus-stack:
   kubeStateMetrics:
     enabled: true
 
-    # ServiceMonitor에 prometheus: kube-prometheus label 추가
-    # Why: Prometheus의 serviceMonitorSelector와 매칭 필요
-    serviceMonitor:
-      additionalLabels:
-        prometheus: kube-prometheus
-
   # ==============================================================================
   # Default Rules (Alert Rules)
   # ==============================================================================
@@ -289,3 +283,14 @@ kube-prometheus-stack:
 #   kubectl exec -n monitoring prometheus-kube-prometheus-stack-prometheus-0 \
 #     -- cat /etc/prometheus/config_out/prometheus.env.yaml
 # ==============================================================================
+
+# ==============================================================================
+# Subchart: kube-state-metrics
+# ==============================================================================
+# Why: ServiceMonitor에 prometheus: kube-prometheus label 추가
+# 이유: Prometheus의 serviceMonitorSelector가 이 label을 요구
+kube-state-metrics:
+  prometheus:
+    monitor:
+      additionalLabels:
+        prometheus: kube-prometheus
