@@ -63,6 +63,19 @@ wazuh:
           memory: "2Gi"
           cpu: "1000m"
 
+      # Why: Falco 이벤트 수신을 위한 Syslog 입력 추가
+      # Note: extraConf는 기본 ossec.conf에 병합됨 (기존 Agent 연결 유지)
+      # Note: 515 포트 사용 (1514는 Agent 전용, 514는 root 권한 필요)
+      extraConf: |
+        <ossec_config>
+          <remote>
+            <connection>syslog</connection>
+            <port>515</port>
+            <protocol>tcp</protocol>
+            <allowed-ips>10.0.0.0/8</allowed-ips>
+          </remote>
+        </ossec_config>
+
     worker:
       # Why: Single-node이므로 Worker 0개
       replicas: 0
