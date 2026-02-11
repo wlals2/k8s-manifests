@@ -285,12 +285,14 @@ kube-prometheus-stack:
 # ==============================================================================
 
 # ==============================================================================
-# Subchart: kube-state-metrics
+# Dependency Chart: kube-prometheus-stack
 # ==============================================================================
-# Why: ServiceMonitor에 prometheus: kube-prometheus label 추가
-# 이유: Prometheus의 serviceMonitorSelector가 이 label을 요구
-kube-state-metrics:
-  prometheus:
-    monitor:
-      additionalLabels:
-        prometheus: kube-prometheus
+kube-prometheus-stack:
+  # Subchart: kube-state-metrics
+  # Why: ServiceMonitor에 prometheus label 추가
+  kube-state-metrics:
+    prometheus:
+      monitor:
+        enabled: true
+        additionalLabels:
+          prometheus: kube-prometheus
