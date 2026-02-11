@@ -1,0 +1,20 @@
+# Copyright (C) 2019, Wazuh Inc.
+#
+# This program is a free software; you can redistribute it
+# and/or modify it under the terms of the GNU General Public
+# License (version 2) as published by the FSF - Free Software
+# Foundation.
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Why: security namespace 사용 (홈랩 표준)
+namespace: security
+
+resources:
+- ../  # 상위 wazuh 디렉터리의 kustomization.yml 참조
+
+patches:
+- path: storage-class.yaml
+- path: indexer-resources.yaml
+- path: wazuh-resources.yaml
