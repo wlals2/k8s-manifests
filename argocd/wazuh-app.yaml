@@ -37,8 +37,8 @@ spec:
   ignoreDifferences:
     - group: apps
       kind: StatefulSet
-      jsonPointers:
-        - /spec/template/metadata/annotations/checksum~1config
+      jqPathExpressions:
+        - .spec.template.metadata.annotations["checksum/config"]
 
   # Sync Policy: 동기화 정책
   syncPolicy:
