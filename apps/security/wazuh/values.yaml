@@ -42,11 +42,8 @@ dashboard:
       cpu: "500m"
 
 # Why: Wazuh Manager (로그 수집 + 분석 엔진)
-manager:
+wazuh:
   master:
-    # Why: Single-node 방식
-    replicas: 1
-
     # Why: k8s-worker3 용량 제약
     storageClass: "longhorn"
     storageSize: 15Gi
@@ -63,3 +60,7 @@ manager:
   worker:
     # Why: Single-node이므로 Worker 0개
     replicas: 0
+
+    # Why: Worker 비활성화 시에도 storageSize 설정 필요
+    storageClass: "longhorn"
+    storageSize: 15Gi
