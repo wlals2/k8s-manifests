@@ -29,15 +29,10 @@ Thumbs.db
 # Helm dependency (ArgoCD가 자동 다운로드)
 **/charts/
 **/Chart.lock
-# SealedSecret은 Git 관리 허용 (암호화되어 안전)
-!*-sealedsecret.yaml
 
-# SealedSecret은 Git 관리 허용 (암호화되어 안전)
+# SealedSecret은 Git 관리 허용 (공개키 암호화되어 안전)
 !*-sealedsecret.yaml
 
 # 임시 파일
 /tmp/
 *.tmp
-
-# Wazuh 공식 secrets는 Git 관리 허용 (기본 credential, production에서 변경 필요)
-!apps/security/wazuh/secrets/
