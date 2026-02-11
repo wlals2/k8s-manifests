@@ -230,6 +230,15 @@ kube-prometheus-stack:
   kubeStateMetrics:
     enabled: true
 
+  # Subchart: kube-state-metrics
+  # Why: ServiceMonitor에 prometheus label 추가
+  kube-state-metrics:
+    prometheus:
+      monitor:
+        enabled: true
+        additionalLabels:
+          prometheus: kube-prometheus
+
   # ==============================================================================
   # Default Rules (Alert Rules)
   # ==============================================================================
@@ -284,15 +293,3 @@ kube-prometheus-stack:
 #     -- cat /etc/prometheus/config_out/prometheus.env.yaml
 # ==============================================================================
 
-# ==============================================================================
-# Dependency Chart: kube-prometheus-stack
-# ==============================================================================
-kube-prometheus-stack:
-  # Subchart: kube-state-metrics
-  # Why: ServiceMonitor에 prometheus label 추가
-  kube-state-metrics:
-    prometheus:
-      monitor:
-        enabled: true
-        additionalLabels:
-          prometheus: kube-prometheus
