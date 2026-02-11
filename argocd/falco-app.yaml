@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: https://github.com/wlals2/k8s-manifests.git
     targetRevision: main
-    path: falco  # 같은 repo, 다른 path
+    path: apps/falco  # 같은 repo, 다른 path
   destination:
     server: https://kubernetes.default.svc
     namespace: falco
