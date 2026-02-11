@@ -10,30 +10,46 @@
 # ==============================================================================
 
 # Why: Wazuh Indexer (Elasticsearch 기반) 설정
-wazuh:
-  indexer:
-    # Why: Single-node 방식 (HA 불필요, 홈랩 환경)
-    replicas: 1
+indexer:
+  # Why: Single-node 방식 (HA 불필요, 홈랩 환경)
+  replicas: 1
 
-    # Why: k8s-worker3 용량 제약 (38.6GB < 50GB)
-    persistence:
-      enabled: true
-      storageClass: "longhorn"  # Why: Longhorn StorageClass 사용
-      size: 15Gi  # Why: 50Gi → 15Gi 축소
+  # Why: k8s-worker3 용량 제약 (38.6GB < 50GB)
+  storageClass: "longhorn"
+  storageSize: 15Gi
 
-    # Why: 홈랩 환경이므로 리소스 최소화
-    resources:
-      requests:
-        memory: "2Gi"
-        cpu: "500m"
-      limits:
-        memory: "4Gi"
-        cpu: "2000m"
+  # Why: 홈랩 환경이므로 리소스 최소화
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
 
-  # Why: Wazuh Manager (로그 수집 + 분석 엔진)
-  manager:
+# Why: Wazuh Dashboard (Kibana 기반 웹 UI)
+dashboard:
+  # Why: Single-node 방식
+  replicas: 1
+
+  # Why: 홈랩 환경이므로 리소스 최소화
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+# Why: Wazuh Manager (로그 수집 + 분석 엔진)
+manager:
+  master:
     # Why: Single-node 방식
     replicas: 1
+
+    # Why: k8s-worker3 용량 제약
+    storageClass: "longhorn"
+    storageSize: 15Gi
 
     # Why: 홈랩 환경이므로 리소스 최소화
     resources:
@@ -44,16 +60,6 @@ wazuh:
         memory: "2Gi"
         cpu: "1000m"
 
-  # Why: Wazuh Dashboard (Kibana 기반 웹 UI)
-  dashboard:
-    # Why: Single-node 방식
-    replicas: 1
-
-    # Why: 홈랩 환경이므로 리소스 최소화
-    resources:
-      requests:
-        memory: "512Mi"
-        cpu: "250m"
-      limits:
-        memory: "1Gi"
-        cpu: "500m"
+  worker:
+    # Why: Single-node이므로 Worker 0개
+    replicas: 0
