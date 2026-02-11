@@ -23,10 +23,10 @@ spec:
     repoURL: https://github.com/wlals2/k8s-manifests.git
     targetRevision: main  # 브랜치
 
-    # Path: Kustomize 디렉터리 (예외: Wazuh는 Helm Chart가 없음)
-    path: configs/security/wazuh
+    # Path: Helm Wrapper 디렉터리
+    path: apps/security/wazuh
 
-    # Why: Kustomize 자동 감지 (kustomization.yaml 존재 시)
+    # Why: Helm Chart 자동 감지 (Chart.yaml 존재 시)
 
   # Destination: 배포할 클러스터 및 Namespace
   destination:
