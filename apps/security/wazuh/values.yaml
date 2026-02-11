@@ -74,6 +74,12 @@ wazuh:
           <allowed-ips>10.0.0.0/8</allowed-ips>
         </remote>
 
+      # Why: Falco Syslog 연동을 위해 Service에 포트 515 노출
+      # Note: Kubernetes Service에 포트가 없으면 클러스터 내부에서도 접근 불가
+      service:
+        ports:
+          syslog: 515
+
     worker:
       # Why: Single-node이므로 Worker 0개
       replicas: 0
