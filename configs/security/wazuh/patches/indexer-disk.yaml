@@ -1,0 +1,27 @@
+# ==============================================================================
+# Wazuh Indexer Disk Patch
+# ==============================================================================
+# Why: k8s-worker3 노드 용량 제약 (38.6GB) 때문에 50Gi → 15Gi로 축소
+#
+# 원본: wazuh-kubernetes upstream (50Gi)
+# 수정: 15Gi (우리 환경)
+#
+# 동작 원리:
+# - StatefulSet의 volumeClaimTemplates에서 storage 크기 변경
+# - Longhorn이 15Gi PVC 생성
+# - k8s-worker3에 replica 배치 가능
+# ==============================================================================
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: wazuh-indexer
+spec:
+  volumeClaimTemplates:
+  - metadata:
+      name: wazuh-indexer
+    spec:
+      resources:
+        requests:
+          # Why: k8s-worker3 용량 제약 (50Gi 불가능)
+          storage: 15Gi

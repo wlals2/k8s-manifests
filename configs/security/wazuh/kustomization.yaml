@@ -1,0 +1,26 @@
+# ==============================================================================
+# Wazuh SIEM Kustomize Configuration
+# ==============================================================================
+# Why: Wazuh 공식 Single-node 배포를 우리 환경에 맞게 커스터마이징
+#
+# Upstream: https://github.com/wazuh/wazuh-kubernetes (v4.7.0)
+# 배포 방식: Single-node (Manager + Indexer + Dashboard 각 1개)
+#
+# 커스터마이징 항목:
+# - Indexer Disk: 50Gi → 15Gi (k8s-worker3 용량 제약)
+# - 로그 보관: 30d → 10d (홈랩 환경)
+# ==============================================================================
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Why: security namespace에 배포
+namespace: security
+
+# Why: Wazuh 공식 Single-node YAML 참조
+resources:
+  - https://raw.githubusercontent.com/wazuh/wazuh-kubernetes/v4.7.0/single-node/wazuh-single-node.yaml
+
+# Why: 우리 환경에 맞게 Indexer 설정 수정
+patchesStrategicMerge:
+  - patches/indexer-disk.yaml
