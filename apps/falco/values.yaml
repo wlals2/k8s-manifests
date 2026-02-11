@@ -64,7 +64,6 @@ falco:
   log_level: info
   priority: info
 falcosidekick:
-  # Why: Wazuh SIEM 연동 (Syslog 프로토콜)
   config:
     loki:
       hostport: http://loki-stack.monitoring.svc.cluster.local:3100
@@ -72,12 +71,13 @@ falcosidekick:
     talon:
       address: http://falco-talon.falco.svc.cluster.local:2803
       minimumpriority: warning
-  syslog:
-    host: wazuh-manager-worker.security.svc.cluster.local
-    port: "1514"
-    protocol: tcp
-    format: json
-    minimumpriority: info
+    # Why: Wazuh SIEM 연동 (Syslog 프로토콜)
+    syslog:
+      host: wazuh-manager-worker.security.svc.cluster.local
+      port: "1514"
+      protocol: tcp
+      format: json
+      minimumpriority: info
   enabled: true
   resources:
     limits:
