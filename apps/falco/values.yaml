@@ -73,8 +73,9 @@ falcosidekick:
       minimumpriority: warning
     # Why: Wazuh SIEM 연동 (Syslog 프로토콜)
     # Note: 515 포트 사용 (Wazuh Syslog 전용 포트, 1514는 Agent 전용)
+    # Note: StatefulSet Headless Service DNS 사용 (wazuh-manager-master Service 없음)
     syslog:
-      host: wazuh-manager-master.security.svc.cluster.local
+      host: wazuh-manager-master-0.wazuh-manager-cluster.security.svc.cluster.local
       port: "515"
       protocol: tcp
       format: json
