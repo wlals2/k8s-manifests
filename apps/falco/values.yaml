@@ -71,6 +71,13 @@ falcosidekick:
     talon:
       address: http://falco-talon.falco.svc.cluster.local:2803
       minimumpriority: warning
+    # Why: Wazuh SIEM 연동 (Syslog 프로토콜)
+    syslog:
+      host: wazuh-manager-worker.security.svc.cluster.local
+      port: "1514"
+      protocol: tcp
+      format: json
+      minimumpriority: info
   enabled: true
   resources:
     limits:
