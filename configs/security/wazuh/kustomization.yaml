@@ -17,9 +17,9 @@ kind: Kustomization
 # Why: security namespace에 배포
 namespace: security
 
-# Why: Wazuh 공식 Single-node YAML 참조
+# Why: Wazuh 공식 Kustomize 참조 (GitHub 저장소)
 resources:
-  - https://raw.githubusercontent.com/wazuh/wazuh-kubernetes/v4.7.0/single-node/wazuh-single-node.yaml
+  - https://github.com/wazuh/wazuh-kubernetes//wazuh?ref=v4.7.0
 
 # Why: 우리 환경에 맞게 Indexer 설정 수정
 patchesStrategicMerge:
