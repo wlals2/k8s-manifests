@@ -230,6 +230,12 @@ kube-prometheus-stack:
   kubeStateMetrics:
     enabled: true
 
+    # ServiceMonitor에 prometheus: kube-prometheus label 추가
+    # Why: Prometheus의 serviceMonitorSelector와 매칭 필요
+    serviceMonitor:
+      additionalLabels:
+        prometheus: kube-prometheus
+
   # ==============================================================================
   # Default Rules (Alert Rules)
   # ==============================================================================
