@@ -1,0 +1,82 @@
+# ==============================================================================
+# Grafana Contact Point - Discord
+# ==============================================================================
+# Why: Discord로 Alert 알람 전송
+#
+# 기능:
+# - Firing 알람: 🔥 [FIRING]
+# - Resolved 알람: ✅ [RESOLVED]
+# - Source/Silence URL 단축
+#
+# Secret 참조:
+# - discord-webhook: Discord Webhook URL
+# ==============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-contact-point-discord
+  namespace: monitoring
+  labels:
+    grafana_contact_point: "1"
+data:
+  discord.yaml: |
+    apiVersion: 1
+    contactPoints:
+      - orgId: 1
+        name: discord-homelab
+        receivers:
+          - uid: discord-webhook-uid
+            type: discord
+            settings:
+              url: ${DISCORD_WEBHOOK_URL}
+              title: |
+                {{ if eq .Status "firing" }}🔥 [FIRING]{{ else }}✅ [RESOLVED]{{ end }} {{ .CommonLabels.alertname }}
+              message: |
+                **Alert Details**
+
+                {{ if .CommonLabels.namespace }}• Namespace: `{{ .CommonLabels.namespace }}`{{ end }}
+                {{ if .CommonLabels.pod }}• Pod: `{{ .CommonLabels.pod }}`{{ end }}
+                {{ if .CommonLabels.container }}• Container: `{{ .CommonLabels.container }}`{{ end }}
+                {{ if .CommonLabels.severity }}• Severity: **{{ .CommonLabels.severity }}**{{ end }}
+
+                {{ if eq .Status "firing" }}
+                **Issue Description**
+                {{ if index .CommonAnnotations "summary" }}{{ index .CommonAnnotations "summary" }}{{ end }}
+                {{ if index .CommonAnnotations "description" }}
+                {{ index .CommonAnnotations "description" }}
+                {{ end }}
+
+                📊 [View in Grafana]({{ .ExternalURL }}/alerting/list)
+                {{ else }}
+                ✅ **Issue has been resolved!**
+                {{ end }}
+            disableResolveMessage: false
+
+---
+# Notification Policy - Discord 라우팅
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-notification-policy-discord
+  namespace: monitoring
+  labels:
+    grafana_notification_policy: "1"
+data:
+  policy.yaml: |
+    apiVersion: 1
+    policies:
+      - orgId: 1
+        receiver: discord-homelab
+        group_by: ['alertname', 'namespace', 'pod']
+        group_wait: 10s
+        group_interval: 5m
+        repeat_interval: 4h
+        matchers:
+          - severity = critical
+          - severity = warning
+        routes:
+          - receiver: discord-homelab
+            matchers:
+              - namespace = blog-system
+            group_by: ['alertname', 'pod']
+            continue: false

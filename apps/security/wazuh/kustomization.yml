@@ -8,8 +8,8 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Adds wazuh namespace to all resources.
-namespace: wazuh
+# Why: security namespace 사용 (홈랩 표준)
+namespace: security
 
 secretGenerator:
   - name: indexer-certs
