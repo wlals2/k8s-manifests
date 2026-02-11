@@ -5,10 +5,15 @@
 # License (version 2) as published by the FSF - Free Software
 # Foundation.
 
-# Wazuh StorageClass
+# Why: Longhorn StorageClass 사용 (기존 클러스터 표준)
 
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: wazuh-storage
-# provisioner: k8s.io/minikube-hostpath
+provisioner: driver.longhorn.io
+parameters:
+  numberOfReplicas: "2"
+  staleReplicaTimeout: "2880"
+reclaimPolicy: Retain
+allowVolumeExpansion: true
