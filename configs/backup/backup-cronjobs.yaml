@@ -284,8 +284,10 @@ spec:
               # --routines: Stored Procedures 포함
               # --triggers: Triggers 포함
               # --events: Events 포함
+              # Why: MySQL 8.0 caching_sha2_password → MariaDB client 호환성 문제 해결
               mysqldump -h mysql-service.blog-system.svc.cluster.local \
                 -u root -p${MYSQL_ROOT_PASSWORD} \
+                --default-auth=mysql_native_password \
                 --all-databases \
                 --single-transaction \
                 --quick \
