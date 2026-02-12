@@ -41,6 +41,10 @@ configMapGenerator:
   - name: dashboard-conf
     files:
       - indexer_stack/wazuh-dashboard/dashboard_conf/opensearch_dashboards.yml
+  # Why: Wazuh Agent DaemonSet 설정 (Falco 로그 tail)
+  - name: wazuh-agent-conf
+    files:
+      - wazuh_agents/wazuh-agent-conf/ossec.conf
 
 resources:
   - base/wazuh-ns.yaml
@@ -65,3 +69,6 @@ resources:
 
   - indexer_stack/wazuh-dashboard/dashboard-svc.yaml
   - indexer_stack/wazuh-dashboard/dashboard-deploy.yaml
+
+  # Why: Wazuh Agent DaemonSet (Cloud Native Pull pattern for Falco integration)
+  - wazuh_agents/wazuh-agent-daemonset.yaml
