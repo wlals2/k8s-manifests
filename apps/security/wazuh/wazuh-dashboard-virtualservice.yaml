@@ -6,7 +6,7 @@
 #   Windows (192.168.1.195) → MetalLB (192.168.1.200)
 #   → Istio Gateway (blog-system/blog-gateway)
 #   → VirtualService (wazuh.jiminhome.shop)
-#   → Wazuh Dashboard Service (dashboard.security:443)
+#   → Wazuh Dashboard Service (dashboard.security:80)
 #
 # Why VirtualService:
 #   - TLS 암호화
@@ -41,9 +41,9 @@ spec:
             prefix: /
       route:
         - destination:
-            # Why: Wazuh Dashboard Service DNS (HTTPS 포트 443)
+            # Why: Wazuh Dashboard Service DNS (HTTP 포트 80)
             host: dashboard.security.svc.cluster.local
             port:
-              number: 443
+              number: 80
       # Why: Dashboard 로딩 시간 여유
       timeout: 30s
