@@ -1,0 +1,82 @@
+# ==============================================================================
+# Pushgateway ServiceMonitor
+# ==============================================================================
+# Why: Cronjob 메트릭 수집을 위한 Pushgateway 모니터링
+#      배치 작업(etcd-backup, mysql-backup)이 메트릭을 push하는 중간 저장소
+# ==============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pushgateway
+  namespace: monitoring
+  labels:
+    # Why: Prometheus Operator가 이 ServiceMonitor를 발견하기 위함
+    #      apps/kube-prometheus-stack/values.yaml의 serviceMonitorSelector와 일치
+    prometheus: kube-prometheus
+
+    app: pushgateway
+    component: monitoring
+
+spec:
+  # Why: app=pushgateway 라벨을 가진 Service 자동 발견
+  selector:
+    matchLabels:
+      app: pushgateway
+
+  # Why: Pushgateway Service가 monitoring namespace에 있음
+  namespaceSelector:
+    matchNames:
+      - monitoring
+
+  endpoints:
+    # Why: Pushgateway Service의 port 이름이 "http"
+    - port: http
+
+      # Why: Cronjob 메트릭은 자주 변하지 않으므로 30s 수집 간격 적절
+      interval: 30s
+
+      # Why: Pushgateway는 응답이 빠르므로 10s timeout 충분
+      scrapeTimeout: 10s
+
+      # Why: Pushgateway 메트릭 엔드포인트
+      path: /metrics
+
+# ==============================================================================
+# Pushgateway 특징
+# ==============================================================================
+#
+# 역할:
+#   - 단기 실행 작업(cronjob, batch job)의 메트릭 중간 저장소
+#   - Prometheus가 직접 scrape할 수 없는 작업의 메트릭 수집
+#   - 작업 완료 후에도 메트릭이 남아있어 Prometheus가 수집 가능
+#
+# 주요 메트릭 (예시):
+#   - backup_success{job="etcd-backup-to-s3"} = 1 (성공) / 0 (실패)
+#   - backup_duration_seconds{job="etcd-backup-to-s3"}
+#   - backup_size_bytes{job="mysql-backup-to-s3"}
+#
+# 동작 원리:
+#   1. Cronjob이 메트릭을 Pushgateway로 POST 요청
+#   2. Pushgateway가 메트릭을 메모리에 저장
+#   3. Prometheus가 주기적으로 Pushgateway를 scrape
+#   4. 메트릭이 Prometheus TSDB에 저장됨
+#
+# ==============================================================================
+# 검증 방법
+# ==============================================================================
+#
+# 1. ServiceMonitor 생성 확인
+#    kubectl get servicemonitor pushgateway -n monitoring
+#
+# 2. Prometheus Target 확인
+#    http://prom.jiminhome.shop/targets
+#    → "serviceMonitor/monitoring/pushgateway/0" 있어야 함
+#
+# 3. Pushgateway 메트릭 확인
+#    curl http://pushgateway.monitoring.svc.cluster.local:9091/metrics
+#
+# 4. PromQL 쿼리 테스트
+#    backup_success{job=~".*backup.*"}  # 모든 백업 작업 성공 여부
+#    backup_duration_seconds{job="etcd-backup-to-s3"}  # 백업 소요 시간
+#
+# ==============================================================================
