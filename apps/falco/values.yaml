@@ -130,6 +130,7 @@ falco:
   falcosidekick:
     enabled: true
     config:
+      debug: true  # Why: Syslog 전송 디버깅
       loki:
         hostport: http://loki-stack.monitoring.svc.cluster.local:3100
         minimumpriority: warning
