@@ -60,11 +60,22 @@ spec:
       - port: "3306"
         protocol: TCP
 
-  # Rule 3: mysql-backup → mysql:3306 허용 (CronJob 백업)
+  # Rule 3: mysql-backup → mysql:3306 허용 (CronJob 백업 - blog-system)
   - fromEndpoints:
     - matchLabels:
         app: mysql-backup
         io.kubernetes.pod.namespace: blog-system
+    toPorts:
+    - ports:
+      - port: "3306"
+        protocol: TCP
+
+  # Rule 3-2: mysql-backup → mysql:3306 허용 (CronJob 백업 - backup-system)
+  # Why: backup-system namespace의 Cronjob도 MySQL 백업 가능하도록 허용
+  - fromEndpoints:
+    - matchLabels:
+        app: mysql-backup
+        io.kubernetes.pod.namespace: backup-system
     toPorts:
     - ports:
       - port: "3306"
