@@ -137,24 +137,12 @@ spec:
                 echo "   Duration: ${DURATION}s"
 
                 # Why: Prometheus 수집을 위한 메트릭 push (성공)
-                cat <<EOF | curl --data-binary @- http://pushgateway.monitoring.svc.cluster.local:9091/metrics/job/etcd-backup-to-s3
-# TYPE backup_success gauge
-backup_success 1
-# TYPE backup_duration_seconds gauge
-backup_duration_seconds $DURATION
-# TYPE backup_size_bytes gauge
-backup_size_bytes $FILE_SIZE
-EOF
+                printf "# TYPE backup_success gauge\nbackup_success 1\n# TYPE backup_duration_seconds gauge\nbackup_duration_seconds %s\n# TYPE backup_size_bytes gauge\nbackup_size_bytes %s\n" "$DURATION" "$FILE_SIZE" | curl --data-binary @- http://pushgateway.monitoring.svc.cluster.local:9091/metrics/job/etcd-backup-to-s3
               else
                 echo "S3 upload failed!"
 
                 # Why: 실패해도 메트릭 push (backup_success=0)
-                cat <<EOF | curl --data-binary @- http://pushgateway.monitoring.svc.cluster.local:9091/metrics/job/etcd-backup-to-s3
-# TYPE backup_success gauge
-backup_success 0
-# TYPE backup_duration_seconds gauge
-backup_duration_seconds $DURATION
-EOF
+                printf "# TYPE backup_success gauge\nbackup_success 0\n# TYPE backup_duration_seconds gauge\nbackup_duration_seconds %s\n" "$DURATION" | curl --data-binary @- http://pushgateway.monitoring.svc.cluster.local:9091/metrics/job/etcd-backup-to-s3
                 exit 1  # 실패 시 Job 재시도
               fi
 
@@ -321,24 +309,12 @@ spec:
                 echo "   Duration: ${DURATION}s"
 
                 # Why: Prometheus 수집을 위한 메트릭 push (성공)
-                cat <<EOF | curl --data-binary @- http://pushgateway.monitoring.svc.cluster.local:9091/metrics/job/mysql-backup-to-s3
-# TYPE backup_success gauge
-backup_success 1
-# TYPE backup_duration_seconds gauge
-backup_duration_seconds $DURATION
-# TYPE backup_size_bytes gauge
-backup_size_bytes $FILE_SIZE
-EOF
+                printf "# TYPE backup_success gauge\nbackup_success 1\n# TYPE backup_duration_seconds gauge\nbackup_duration_seconds %s\n# TYPE backup_size_bytes gauge\nbackup_size_bytes %s\n" "$DURATION" "$FILE_SIZE" | curl --data-binary @- http://pushgateway.monitoring.svc.cluster.local:9091/metrics/job/mysql-backup-to-s3
               else
                 echo "S3 upload failed!"
 
                 # Why: 실패해도 메트릭 push (backup_success=0)
-                cat <<EOF | curl --data-binary @- http://pushgateway.monitoring.svc.cluster.local:9091/metrics/job/mysql-backup-to-s3
-# TYPE backup_success gauge
-backup_success 0
-# TYPE backup_duration_seconds gauge
-backup_duration_seconds $DURATION
-EOF
+                printf "# TYPE backup_success gauge\nbackup_success 0\n# TYPE backup_duration_seconds gauge\nbackup_duration_seconds %s\n" "$DURATION" | curl --data-binary @- http://pushgateway.monitoring.svc.cluster.local:9091/metrics/job/mysql-backup-to-s3
                 exit 1
               fi
 
