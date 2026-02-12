@@ -8,5 +8,5 @@ appVersion: "0.42.1"  # Falco 애플리케이션 버전
 # 외부 차트를 dependency로 가져오기
 dependencies:
   - name: falco
-    version: 7.2.1  # ✅ 현재 사용 중인 버전 (helm list 확인)
+    version: 8.0.0  # ✅ 최신 버전으로 업그레이드 (values.yaml 구조 문제 해결 기대)
     repository: https://falcosecurity.github.io/charts
