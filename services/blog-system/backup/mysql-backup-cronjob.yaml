@@ -52,7 +52,7 @@ spec:
 
               # mysqldump 실행
               echo "Creating backup: $BACKUP_FILE"
-              mysqldump -h mysql-service -u root -p"$MYSQL_ROOT_PASSWORD" \
+              mysqldump -h mysql-service -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" \
                 --all-databases \
                 --single-transaction \
                 --quick \
@@ -65,11 +65,16 @@ spec:
 
               echo "=== MySQL Dump Completed: $(date) ==="
             env:
-            - name: MYSQL_ROOT_PASSWORD
+            - name: MYSQL_USER
               valueFrom:
                 secretKeyRef:
-                  name: mysql-secret
-                  key: mysql-root-password
+                  name: mysql-backup-secret
+                  key: MYSQL_USER
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-backup-secret
+                  key: MYSQL_PASSWORD
             volumeMounts:
             - name: backup-storage
               mountPath: /backup
