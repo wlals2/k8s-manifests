@@ -1,0 +1,53 @@
+# ==============================================================================
+# ArgoCD Application - Prometheus Adapter
+# ==============================================================================
+# Why: HPA Custom Metrics API 제공 (네트워크 기반 Auto-Scaling)
+#
+# 관리 방식:
+# - Helm Wrapper Chart (apps/prometheus-adapter/)
+# - Git으로 values.yaml 관리
+# - ArgoCD 자동 sync
+#
+# Dependencies:
+# - Prometheus (메트릭 소스)
+# - kube-prometheus-stack
+# ==============================================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prometheus-adapter
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/wlals2/k8s-manifests.git
+    targetRevision: main
+    path: apps/prometheus-adapter  # Wrapper Chart
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+
+  syncPolicy:
+    automated:
+      prune: true      # Git에서 삭제된 리소스 자동 제거
+      selfHeal: true   # Drift 감지 시 자동 복구
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Health 체크
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas  # HPA가 관리하므로 무시

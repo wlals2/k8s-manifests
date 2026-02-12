@@ -2,7 +2,7 @@
 # Custom Metrics API 제공 (HPA에서 Istio 메트릭 사용)
 
 prometheus:
-  url: http://prometheus.monitoring.svc.cluster.local
+  url: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local
   port: 9090
 
 rules:

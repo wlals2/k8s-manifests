@@ -1,0 +1,26 @@
+# ==============================================================================
+# Prometheus Adapter Wrapper Chart
+# ==============================================================================
+# Why: ArgoCD App of Apps 패턴으로 Helm Chart 관리
+#
+# Dependencies:
+# - Upstream Chart: prometheus-community/prometheus-adapter
+# - Version: 5.2.0 (현재 설치된 버전과 동일)
+#
+# 관리 방식:
+# - Git으로 values.yaml 관리
+# - ArgoCD가 자동 배포
+# - Helm 직접 사용 금지
+# ==============================================================================
+
+apiVersion: v2
+name: my-prometheus-adapter
+description: Wrapper Chart for Prometheus Adapter (GitOps)
+type: application
+version: 1.0.0
+appVersion: "v0.12.0"
+
+dependencies:
+  - name: prometheus-adapter
+    version: 5.2.0
+    repository: https://prometheus-community.github.io/helm-charts
