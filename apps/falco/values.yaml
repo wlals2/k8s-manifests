@@ -112,6 +112,9 @@ json_include_output_property: true
 log_level: info
 priority: info
 
+# Why: inotify handler 비활성화 (Chart 8.0.0 크래시 방지)
+watch_config_files: false
+
 # Why: gRPC 출력 활성화 (Falcosidekick 연동)
 grpc:
   enabled: true
