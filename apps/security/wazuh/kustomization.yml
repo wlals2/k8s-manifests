@@ -70,5 +70,8 @@ resources:
   - indexer_stack/wazuh-dashboard/dashboard-svc.yaml
   - indexer_stack/wazuh-dashboard/dashboard-deploy.yaml
 
+  # Why: Istio VirtualService for external access via wazuh.jiminhome.shop
+  - wazuh-dashboard-virtualservice.yaml
+
   # Why: Wazuh Agent DaemonSet (Cloud Native Pull pattern for Falco integration)
   - wazuh_agents/wazuh-agent-daemonset.yaml
