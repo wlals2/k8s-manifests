@@ -73,8 +73,5 @@ resources:
   # Why: Istio VirtualService for external access via wazuh.jiminhome.shop
   - wazuh-dashboard-virtualservice.yaml
 
-  # Why: TLS Origination - Envoy가 Dashboard Pod (5601)에 HTTPS로 연결
-  - wazuh-dashboard-destinationrule.yaml
-
   # Why: Wazuh Agent DaemonSet (Cloud Native Pull pattern for Falco integration)
   - wazuh_agents/wazuh-agent-daemonset.yaml

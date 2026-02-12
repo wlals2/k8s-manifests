@@ -80,8 +80,9 @@ spec:
                 secretKeyRef:
                   name: dashboard-cred
                   key: password
+            # Why: HTTP로 변경 (Gateway HTTP (80)와 일치, 내부 네트워크만 접근)
             - name: SERVER_SSL_ENABLED
-              value: "true"
+              value: "false"
             - name: SERVER_SSL_CERTIFICATE
               value: /usr/share/wazuh-dashboard/certs/cert.pem
             - name: SERVER_SSL_KEY
