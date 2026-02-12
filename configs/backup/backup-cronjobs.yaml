@@ -72,6 +72,7 @@ spec:
             - -ec  # -e: 에러 시 즉시 종료, -c: 명령어 실행
             - |
               echo "etcd Backup to S3 Started"
+              START_TIME=$(date +%s)
 
               # 필수 패키지 설치 (Alpine Linux)
               # apk: Alpine 패키지 관리자
@@ -125,12 +126,35 @@ spec:
                 --no-progress
 
               # Step 4: 업로드 검증
+              END_TIME=$(date +%s)
+              DURATION=$((END_TIME - START_TIME))
+              FILE_SIZE=$(stat -c%s "$BACKUP_FILE" 2>/dev/null || echo "0")
+
               if aws s3 ls $S3_PATH --region ${AWS_DEFAULT_REGION}; then
                 echo "Backup completed successfully!"
                 echo "   Location: $S3_PATH"
                 echo "   Size: $(ls -lh $BACKUP_FILE | awk '{print $5}')"
+                echo "   Duration: ${DURATION}s"
+
+                # Why: Prometheus 수집을 위한 메트릭 push (성공)
+                cat <<EOF | curl --data-binary @- http://pushgateway.monitoring.svc.cluster.local:9091/metrics/job/etcd-backup-to-s3
+# TYPE backup_success gauge
+backup_success 1
+# TYPE backup_duration_seconds gauge
+backup_duration_seconds $DURATION
+# TYPE backup_size_bytes gauge
+backup_size_bytes $FILE_SIZE
+EOF
               else
                 echo "S3 upload failed!"
+
+                # Why: 실패해도 메트릭 push (backup_success=0)
+                cat <<EOF | curl --data-binary @- http://pushgateway.monitoring.svc.cluster.local:9091/metrics/job/etcd-backup-to-s3
+# TYPE backup_success gauge
+backup_success 0
+# TYPE backup_duration_seconds gauge
+backup_duration_seconds $DURATION
+EOF
                 exit 1  # 실패 시 Job 재시도
               fi
 
@@ -232,6 +256,7 @@ spec:
             - -ec
             - |
               echo "MySQL Backup to S3 Started"
+              START_TIME=$(date +%s)
 
               # 필수 패키지 설치 (Alpine Linux)
               # mysql-client: mysqldump 도구 포함
@@ -283,12 +308,35 @@ spec:
                 --no-progress
 
               # Step 4: 업로드 검증
+              END_TIME=$(date +%s)
+              DURATION=$((END_TIME - START_TIME))
+              FILE_SIZE=$(stat -c%s "$COMPRESSED_FILE" 2>/dev/null || echo "0")
+
               if aws s3 ls $S3_PATH --region ${AWS_DEFAULT_REGION}; then
                 echo "Backup completed successfully!"
                 echo "   Location: $S3_PATH"
                 echo "   Size: $(ls -lh $COMPRESSED_FILE | awk '{print $5}')"
+                echo "   Duration: ${DURATION}s"
+
+                # Why: Prometheus 수집을 위한 메트릭 push (성공)
+                cat <<EOF | curl --data-binary @- http://pushgateway.monitoring.svc.cluster.local:9091/metrics/job/mysql-backup-to-s3
+# TYPE backup_success gauge
+backup_success 1
+# TYPE backup_duration_seconds gauge
+backup_duration_seconds $DURATION
+# TYPE backup_size_bytes gauge
+backup_size_bytes $FILE_SIZE
+EOF
               else
                 echo "S3 upload failed!"
+
+                # Why: 실패해도 메트릭 push (backup_success=0)
+                cat <<EOF | curl --data-binary @- http://pushgateway.monitoring.svc.cluster.local:9091/metrics/job/mysql-backup-to-s3
+# TYPE backup_success gauge
+backup_success 0
+# TYPE backup_duration_seconds gauge
+backup_duration_seconds $DURATION
+EOF
                 exit 1
               fi
 
