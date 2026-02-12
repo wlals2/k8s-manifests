@@ -213,7 +213,7 @@ EOF
 # 의존성:
 #   - mysql-secret Secret (backup-system namespace)
 #   - aws-s3-credentials Secret (backup-system namespace)
-#   - MySQL Service (mysql.blog-system.svc.cluster.local)
+#   - MySQL Service (mysql-service.blog-system.svc.cluster.local)
 # S3 경로: s3://jimin-backup/mysql/YYYY-MM-DD/blog-system-TIMESTAMP.sql.gz
 # ==============================================================================
 apiVersion: batch/v1
@@ -284,7 +284,7 @@ spec:
               # --routines: Stored Procedures 포함
               # --triggers: Triggers 포함
               # --events: Events 포함
-              mysqldump -h mysql.blog-system.svc.cluster.local \
+              mysqldump -h mysql-service.blog-system.svc.cluster.local \
                 -u root -p${MYSQL_ROOT_PASSWORD} \
                 --all-databases \
                 --single-transaction \
