@@ -73,9 +73,9 @@ spec:
         - name: wazuh-indexer
           image: 'wazuh/wazuh-indexer:4.14.2'
           resources:
-            # Why: 소규모 환경 (Falco 이벤트 수집), Requests 250m으로 리소스 절약
+            # Why: 실제 사용량(12m) × 2배 = 30m (리소스 정책 적용)
             requests:
-              cpu: 250m
+              cpu: 30m
               memory: 1Gi
             limits:
               cpu: 500m

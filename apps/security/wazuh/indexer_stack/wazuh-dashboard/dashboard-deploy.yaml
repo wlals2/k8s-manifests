@@ -34,6 +34,10 @@ spec:
         - name: wazuh-dashboard
           image: 'wazuh/wazuh-dashboard:4.14.2'
           resources:
+            # Why: 실제 사용량(2m) × 2배 = 10m (리소스 정책 적용)
+            requests:
+              cpu: 10m
+              memory: 256Mi
             limits:
               cpu: 500m
               memory: 1Gi

@@ -111,14 +111,14 @@ spec:
             fieldRef:
               fieldPath: spec.nodeName
 
-        # 리소스 설정
+        # Why: 실제 사용량(20m) × 2배 = 40m (리소스 정책 적용)
         resources:
           requests:
-            cpu: 500m
-            memory: 512Mi  # 시작은 512Mi로 (테스트 후 조정)
+            cpu: 40m
+            memory: 256Mi
           limits:
             cpu: 1000m
-            memory: 1Gi    # 최대 1Gi (필요시 2Gi로 증가)
+            memory: 1Gi
 
         # Security Context - 시스템 메트릭 수집을 위해 필요
         securityContext:

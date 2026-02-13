@@ -140,11 +140,11 @@ spec:
               value: "none"
             - name: OTEL_LOGS_EXPORTER
               value: "none"
-          # 리소스 제한
+          # Why: 실제 사용량(5m) × 2배 = 10m (리소스 정책 적용)
           resources:
             requests:
-              cpu: 250m
-              memory: 512Mi
+              cpu: 10m
+              memory: 256Mi
             limits:
               cpu: 500m
               memory: 1Gi
