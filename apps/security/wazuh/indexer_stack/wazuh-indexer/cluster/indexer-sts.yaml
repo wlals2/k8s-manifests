@@ -24,6 +24,14 @@ spec:
         app: wazuh-indexer
       name: wazuh-indexer
     spec:
+      # Why: 같은 노드에 indexer Pod 배치 금지 (HA + 리소스 분산)
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: wazuh-indexer
+              topologyKey: kubernetes.io/hostname
       securityContext:
         fsGroup: 1000
       # Set the wazuh-indexer volume permissions so the wazuh-indexer user can use it
@@ -65,6 +73,10 @@ spec:
         - name: wazuh-indexer
           image: 'wazuh/wazuh-indexer:4.14.2'
           resources:
+            # Why: 소규모 환경 (Falco 이벤트 수집), Requests 250m으로 리소스 절약
+            requests:
+              cpu: 250m
+              memory: 1Gi
             limits:
               cpu: 500m
               memory: 1564Mi
