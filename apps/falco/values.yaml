@@ -137,6 +137,15 @@ falco:
       talon:
         address: http://falco-talon.falco.svc.cluster.local:2803
         minimumpriority: warning
+      # Why: AI Response Service 연동 (Claude API 자동 대응)
+      customhooks:
+        - name: ai-auto-response
+          url: http://ai-response-service.security.svc.cluster.local:8000/analyze
+          method: POST
+          headers:
+            Content-Type: application/json
+          minimumpriority: warning
+          # Why: WARNING 이상만 AI 분석 (NOTICE는 노이즈 많음)
       # Note: Wazuh SIEM 연동은 보류 (Syslog 프로토콜 호환성 이슈)
       # 향후 Wazuh Agent DaemonSet 방식으로 재시도 예정
     resources:

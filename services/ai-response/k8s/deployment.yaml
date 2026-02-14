@@ -1,0 +1,97 @@
+# Why: AI Response Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-response-service
+  namespace: security
+  labels:
+    app: ai-response
+    managed-by: argocd
+spec:
+  replicas: 1
+  # Why: AI 분석은 stateless하므로 다중 replica 가능하지만, 초기에는 1개로 시작
+  selector:
+    matchLabels:
+      app: ai-response
+  template:
+    metadata:
+      labels:
+        app: ai-response
+    spec:
+      serviceAccountName: ai-response-sa
+      # Why: ServiceAccount로 Kubernetes API 접근
+
+      containers:
+        - name: ai-response
+          image: ai-response:latest
+          # Why: 이미지는 로컬 빌드 후 registry에 push 필요
+          imagePullPolicy: Always
+
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+
+          env:
+            # Claude API Key (Secret에서 주입)
+            - name: CLAUDE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: claude-api-key
+                  key: api-key
+
+            # Configuration
+            - name: LOG_LEVEL
+              value: "INFO"
+
+            - name: K8S_IN_CLUSTER
+              value: "true"
+              # Why: Pod 내부에서 실행되므로 InClusterConfig 사용
+
+            # Dry-run mode (초기 테스트)
+            - name: DRY_RUN
+              value: "true"
+              # Why: Phase 1은 Dry-run 모드로 AI 판단만 수행, 실제 대응 없음
+
+            # Risk thresholds
+            - name: RISK_THRESHOLD_ISOLATE
+              value: "50"
+
+            - name: RISK_THRESHOLD_DELETE
+              value: "80"
+
+            # Discord Webhook (Optional)
+            # - name: DISCORD_WEBHOOK_URL
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: discord-webhook
+            #       key: url
+
+          resources:
+            requests:
+              # Why: 실제 사용량 측정 후 조정 필요 (Phase 1 초기값)
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+      restartPolicy: Always

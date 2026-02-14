@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ai-response
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/wlals2/k8s-manifests.git
+    targetRevision: main
+    path: services/ai-response/k8s
+    # Why: services/ 디렉터리의 ai-response/k8s/ 경로 사용
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: security
+    # Why: security 네임스페이스에 배포
+  syncPolicy:
+    automated:
+      prune: true
+      # Why: Git에서 삭제된 리소스를 클러스터에서도 자동 삭제
+      selfHeal: true
+      # Why: kubectl로 수정된 리소스를 Git 상태로 자동 복구
+    syncOptions:
+      - CreateNamespace=true
+      # Why: security 네임스페이스 자동 생성 (없는 경우)
