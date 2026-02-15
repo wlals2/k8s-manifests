@@ -224,6 +224,16 @@ kube-prometheus-stack:
   nodeExporter:
     enabled: true
 
+  # Subchart: prometheus-node-exporter
+  # Why: ServiceMonitor에 prometheus label 추가 (Platform Conformity)
+  prometheus-node-exporter:
+    prometheus:
+      monitor:
+        enabled: true
+        # Why: Prometheus가 ServiceMonitor를 인식하도록 label 추가 (serviceMonitorSelector 일치)
+        additionalLabels:
+          prometheus: kube-prometheus
+
   # Kube-State-Metrics 활성화
   # 역할: Kubernetes 리소스 상태 메트릭 (Deployment, Pod, Node 등)
   # 필수: Kubernetes 클러스터 모니터링에 필수
