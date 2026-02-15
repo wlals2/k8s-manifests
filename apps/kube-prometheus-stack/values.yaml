@@ -218,11 +218,11 @@ kube-prometheus-stack:
   # Exporters (Node Exporter, Kube-State-Metrics)
   # ==============================================================================
 
-  # Node Exporter 비활성화
-  # 이유: Grafana Alloy로 이미 Node 메트릭 수집 중
-  # 영향: 중복 메트릭 수집 방지
+  # Node Exporter 활성화
+  # Why: 노드 디스크/CPU/메모리 메트릭 수집 (node_filesystem_*, node_cpu_*, node_memory_*)
+  # 필요성: NodeDiskHigh/NodeDiskCritical Alert 작동에 필수
   nodeExporter:
-    enabled: false
+    enabled: true
 
   # Kube-State-Metrics 활성화
   # 역할: Kubernetes 리소스 상태 메트릭 (Deployment, Pod, Node 등)
