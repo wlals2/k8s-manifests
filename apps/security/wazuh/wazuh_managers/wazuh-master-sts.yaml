@@ -156,5 +156,6 @@ spec:
         storageClassName: wazuh-storage
         resources:
           requests:
-            # Why: 실제 사용량(Database, logs, API) 고려하여 500Mi → 2Gi 확장
-            storage: 2Gi
+            # Why: Wazuh Manager는 Agent 로그, Database, API 로그가 지속 증가하므로 10Gi 할당
+            # Longhorn replica 고려: 10Gi × 3 = 30Gi (k8s-worker3 제외)
+            storage: 10Gi
