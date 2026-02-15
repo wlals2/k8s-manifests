@@ -1,0 +1,99 @@
+# PrometheusRule: 노드 디스크 사용률 모니터링
+# Why: 노드 디스크 80% 초과 시 알람 (tmpfs 제외)
+#
+# 목적:
+#   - k8s-worker1/2/3 노드의 루트 파일 시스템(/) 디스크 사용률 모니터링
+#   - tmpfs (메모리 기반 임시 파일 시스템) 제외
+#   - 80% 초과 시 Warning 알람
+#   - 90% 초과 시 Critical 알람
+#
+# 의존성:
+#   - Prometheus: node-exporter (node_filesystem_* metrics)
+#   - Discord Webhook: 알람 전송
+#
+# 참고:
+#   - tmpfs: /run, /dev/shm 등 (메모리 기반, 정상적으로 사용률 높음)
+#   - 실제 디스크: /dev/sda2, /dev/sdb1 등 (fstype=ext4, xfs 등)
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: node-disk-alert
+  namespace: monitoring
+  labels:
+    # Why: Prometheus가 이 PrometheusRule을 인식하도록 label 필수
+    prometheus: kube-prometheus
+spec:
+  groups:
+  - name: node-disk
+    interval: 30s
+    rules:
+    # Alert 1: 노드 디스크 사용률 80% 초과 (Warning)
+    - alert: NodeDiskHigh
+      # Why: tmpfs (메모리 기반) 제외, 실제 디스크만 모니터링
+      expr: |
+        (
+          (node_filesystem_size_bytes{mountpoint="/", fstype!="tmpfs"} - node_filesystem_avail_bytes{mountpoint="/", fstype!="tmpfs"})
+          / node_filesystem_size_bytes{mountpoint="/", fstype!="tmpfs"}
+        ) > 0.8
+      for: 5m
+      labels:
+        severity: warning
+        component: node
+        category: disk
+      annotations:
+        summary: "노드 디스크 사용률 80% 초과"
+        description: |
+          노드 {{ $labels.instance }} 디스크 사용률이 {{ $value | humanizePercentage }}입니다.
+
+          **현재 상태**:
+          - 노드: {{ $labels.instance }}
+          - 마운트: {{ $labels.mountpoint }}
+          - 파일 시스템: {{ $labels.fstype }}
+          - 사용률: {{ $value | humanizePercentage }}
+
+          **액션**:
+          1. 디스크 사용량 확인: `df -h /`
+          2. 큰 파일 찾기: `du -sh /var/* | sort -hr | head -10`
+          3. Docker 이미지 정리: `docker image prune -a`
+          4. 로그 파일 정리: `journalctl --vacuum-time=7d`
+
+    # Alert 2: 노드 디스크 사용률 90% 초과 (Critical)
+    - alert: NodeDiskCritical
+      expr: |
+        (
+          (node_filesystem_size_bytes{mountpoint="/", fstype!="tmpfs"} - node_filesystem_avail_bytes{mountpoint="/", fstype!="tmpfs"})
+          / node_filesystem_size_bytes{mountpoint="/", fstype!="tmpfs"}
+        ) > 0.9
+      for: 2m
+      labels:
+        severity: critical
+        component: node
+        category: disk
+      annotations:
+        summary: "🚨 노드 디스크 사용률 90% 초과 (긴급)"
+        description: |
+          노드 {{ $labels.instance }} 디스크 사용률이 {{ $value | humanizePercentage }}입니다.
+
+          **긴급 조치 필요**:
+          - 노드: {{ $labels.instance }}
+          - 사용률: {{ $value | humanizePercentage }}
+
+          **즉시 수행**:
+          ```bash
+          # 1. 디스크 사용량 확인
+          ssh {{ $labels.instance }}
+          df -h /
+
+          # 2. 큰 파일 찾기
+          du -sh /var/* | sort -hr | head -10
+
+          # 3. Docker 이미지 정리 (주의: 사용 중인 이미지 삭제 안 됨)
+          docker image prune -a -f
+
+          # 4. 로그 파일 정리
+          journalctl --vacuum-time=3d
+
+          # 5. 재확인
+          df -h /
+          ```
