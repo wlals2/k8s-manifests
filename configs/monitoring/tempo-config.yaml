@@ -66,10 +66,13 @@ data:
     querier:
       max_concurrent_queries: 20
 
-    # 메트릭
+    # Why: Trace 데이터로부터 RED 메트릭 자동 생성 → APM 대시보드에서 사용
     metrics_generator:
       registry:
         external_labels:
           source: tempo
+      processor:
+        span_metrics:
+        service_graphs:
       storage:
         path: /var/tempo/metrics

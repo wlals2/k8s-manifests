@@ -1,0 +1,359 @@
+# Grafana Dashboard: Tempo APM (Application Performance Monitoring)
+# Why: Tempo에서 수집한 Trace 데이터를 RED Method로 시각화
+#      API 병목 구간, 에러율, 응답 시간 모니터링
+#
+# 의존성:
+#   - Prometheus Datasource (span metrics from Tempo metrics_generator)
+#   - Tempo Datasource (trace 검색)
+#   - tempo-config.yaml의 metrics_generator.processor.span_metrics 활성화
+#   - servicemonitors/tempo.yaml (Prometheus → Tempo scrape)
+#
+# RED Method 적용:
+#   - Rate: 초당 요청 수 (traces_spanmetrics_calls_total)
+#   - Errors: 에러율 (status_code=STATUS_CODE_ERROR)
+#   - Duration: P50/P95/P99 응답 시간 (traces_spanmetrics_latency_bucket)
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-tempo-apm
+  namespace: monitoring
+  labels:
+    # Why: Grafana Sidecar가 자동으로 Dashboard를 로드
+    grafana_dashboard: "1"
+data:
+  tempo-apm.json: |
+    {
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "id": null,
+      "links": [],
+      "liveNow": false,
+      "panels": [
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "id": 100,
+          "title": "RED: Overview",
+          "type": "row"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "description": "서비스별 초당 요청 수 → 트래픽 패턴 파악, 갑작스러운 증가는 부하 또는 공격",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "fillOpacity": 20,
+                "lineWidth": 2,
+                "spanNulls": false
+              },
+              "unit": "reqps"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 1 },
+          "id": 1,
+          "title": "Request Rate (RPS)",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "sum(rate(traces_spanmetrics_calls_total{service=~\"$service\"}[5m])) by (service)",
+              "legendFormat": "{{service}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "description": "에러 요청 비율 → 5% 초과 시 즉시 로그 확인",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "fillOpacity": 20,
+                "lineWidth": 2,
+                "spanNulls": false
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 1 },
+                  { "color": "red", "value": 5 }
+                ]
+              },
+              "unit": "percent",
+              "min": 0
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 1 },
+          "id": 2,
+          "title": "Error Rate %",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "sum(rate(traces_spanmetrics_calls_total{service=~\"$service\", status_code=\"STATUS_CODE_ERROR\"}[5m])) by (service) / sum(rate(traces_spanmetrics_calls_total{service=~\"$service\"}[5m])) by (service) * 100",
+              "legendFormat": "{{service}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "description": "P95 응답 시간 → 500ms 초과 시 병목 구간 확인 (Tempo Trace로 drill-down)",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "fillOpacity": 20,
+                "lineWidth": 2,
+                "spanNulls": false
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.5 },
+                  { "color": "red", "value": 1.0 }
+                ]
+              },
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
+          "id": 3,
+          "title": "P95 Latency",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "histogram_quantile(0.95, sum(rate(traces_spanmetrics_latency_bucket{service=~\"$service\"}[5m])) by (le, service))",
+              "legendFormat": "P95 {{service}}",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "histogram_quantile(0.50, sum(rate(traces_spanmetrics_latency_bucket{service=~\"$service\"}[5m])) by (le, service))",
+              "legendFormat": "P50 {{service}}",
+              "refId": "B"
+            }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
+          "id": 101,
+          "title": "Operation Detail",
+          "type": "row"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "description": "API별 요청 수 → 어떤 API가 가장 많이 호출되는지 파악",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "fillOpacity": 15,
+                "lineWidth": 2,
+                "spanNulls": false
+              },
+              "unit": "reqps"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
+          "id": 4,
+          "title": "Request Rate by Operation",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "sum(rate(traces_spanmetrics_calls_total{service=~\"$service\", span_name!~\".*health.*\"}[5m])) by (span_name)",
+              "legendFormat": "{{span_name}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "description": "API별 P95 응답 시간 → 느린 API 식별",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "fillOpacity": 15,
+                "lineWidth": 2,
+                "spanNulls": false
+              },
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
+          "id": 5,
+          "title": "P95 Latency by Operation",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "histogram_quantile(0.95, sum(rate(traces_spanmetrics_latency_bucket{service=~\"$service\", span_name!~\".*health.*\"}[5m])) by (le, span_name))",
+              "legendFormat": "{{span_name}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+          "id": 102,
+          "title": "Service Graph (서비스 간 호출 관계)",
+          "type": "row"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "description": "서비스 간 호출 빈도 → WEB → WAS → MySQL 호출 체인 확인",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "fillOpacity": 20,
+                "lineWidth": 2,
+                "spanNulls": false
+              },
+              "unit": "reqps"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
+          "id": 6,
+          "title": "Service-to-Service Call Rate",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "sum(rate(traces_service_graph_request_total[5m])) by (client, server)",
+              "legendFormat": "{{client}} → {{server}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "description": "서비스 간 호출 P95 지연 → 어느 구간이 병목인지 확인",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "fillOpacity": 20,
+                "lineWidth": 2,
+                "spanNulls": false
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.5 },
+                  { "color": "red", "value": 1.0 }
+                ]
+              },
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 19 },
+          "id": 7,
+          "title": "Service-to-Service P95 Latency",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "histogram_quantile(0.95, sum(rate(traces_service_graph_request_server_seconds_bucket[5m])) by (le, client, server))",
+              "legendFormat": "{{client}} → {{server}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+          "id": 103,
+          "title": "Recent Traces (Tempo)",
+          "type": "row"
+        },
+        {
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "description": "최근 Trace 검색 → 개별 요청의 전체 경로와 소요 시간 확인",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
+          "id": 8,
+          "title": "Recent Traces",
+          "type": "table",
+          "targets": [
+            {
+              "datasource": { "type": "tempo", "uid": "tempo" },
+              "queryType": "nativeSearch",
+              "serviceName": "$service",
+              "limit": 20,
+              "refId": "A"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39,
+      "style": "dark",
+      "tags": ["tempo", "apm", "RED-method", "traces"],
+      "templating": {
+        "list": [
+          {
+            "current": {},
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
+            "definition": "label_values(traces_spanmetrics_calls_total, service)",
+            "hide": 0,
+            "includeAll": true,
+            "label": "Service",
+            "multi": false,
+            "name": "service",
+            "options": [],
+            "query": {
+              "qryType": 1,
+              "query": "label_values(traces_spanmetrics_calls_total, service)",
+              "refId": "PrometheusVariableQueryEditor-VariableQuery"
+            },
+            "refresh": 2,
+            "regex": "",
+            "skipUrlSync": false,
+            "sort": 1,
+            "type": "query"
+          }
+        ]
+      },
+      "time": { "from": "now-1h", "to": "now" },
+      "title": "Tempo APM (RED Method)",
+      "uid": "tempo-apm-red",
+      "version": 1
+    }

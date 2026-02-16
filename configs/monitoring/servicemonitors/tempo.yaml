@@ -1,0 +1,37 @@
+# ==============================================================================
+# Tempo ServiceMonitor
+# ==============================================================================
+# Why: Tempo metrics_generator가 생성하는 span 메트릭을 Prometheus에서 수집
+#      APM 대시보드 (요청 수, P95 지연, 에러율) 데이터 소스
+#
+# 의존성:
+#   - tempo-config.yaml의 metrics_generator.processor 설정
+#   - Tempo Service (app: tempo, port: http/3200)
+# ==============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: tempo
+  namespace: monitoring
+  labels:
+    # Why: Prometheus Operator가 이 ServiceMonitor를 발견하기 위함
+    prometheus: kube-prometheus
+    app: tempo
+    component: monitoring
+
+spec:
+  # Why: app=tempo 라벨을 가진 Service 자동 발견
+  selector:
+    matchLabels:
+      app: tempo
+
+  namespaceSelector:
+    matchNames:
+      - monitoring
+
+  endpoints:
+    # Why: Tempo의 HTTP 포트 (3200)에서 /metrics 노출
+    - port: http
+      interval: 30s
+      scrapeTimeout: 10s
+      path: /metrics

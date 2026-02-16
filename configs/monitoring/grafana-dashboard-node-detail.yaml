@@ -1,0 +1,577 @@
+# Grafana Dashboard: Node Detail (USE Method)
+# Why: disk-pressure, unreachable 같은 노드 문제를 조기 발견하기 위한 상세 뷰
+#
+# 의존성:
+#   - Prometheus Datasource
+#   - node-exporter (DaemonSet)
+#
+# USE Method 적용:
+#   - Utilization: CPU, Memory, Disk 사용률
+#   - Saturation: Load Average, I/O Wait
+#   - Errors: Network Drops, Disk Errors
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-node-detail
+  namespace: monitoring
+  labels:
+    # Why: Grafana Sidecar가 자동으로 Dashboard를 로드
+    grafana_dashboard: "1"
+data:
+  node-detail.json: |
+    {
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "id": null,
+      "links": [],
+      "liveNow": false,
+      "panels": [
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "id": 100,
+          "title": "USE: Utilization (사용률)",
+          "type": "row"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "description": "CPU 80% 초과 → 리소스 많이 쓰는 Pod 확인, HPA 또는 노드 추가 검토",
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "unit": "percent",
+              "min": 0,
+              "max": 100
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 6, "w": 8, "x": 0, "y": 1 },
+          "id": 1,
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "orientation": "auto",
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true
+          },
+          "title": "CPU Usage %",
+          "type": "gauge",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "(1 - avg(rate(node_cpu_seconds_total{mode=\"idle\", instance=~\"$node\"}[5m]))) * 100",
+              "legendFormat": "CPU",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "description": "Memory 80% 초과 → OOM 위험, Pod 재시작 확인",
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "unit": "percent",
+              "min": 0,
+              "max": 100
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 6, "w": 8, "x": 8, "y": 1 },
+          "id": 2,
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "orientation": "auto",
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true
+          },
+          "title": "Memory Usage %",
+          "type": "gauge",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "(1 - node_memory_MemAvailable_bytes{instance=~\"$node\"} / node_memory_MemTotal_bytes{instance=~\"$node\"}) * 100",
+              "legendFormat": "Memory",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "description": "Disk 80% 초과 → 로그/이미지 정리, Evicted Pod 삭제, disk-pressure 방지",
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "unit": "percent",
+              "min": 0,
+              "max": 100
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 6, "w": 8, "x": 16, "y": 1 },
+          "id": 3,
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "orientation": "auto",
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true
+          },
+          "title": "Root Disk Usage %",
+          "type": "gauge",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "(1 - node_filesystem_avail_bytes{instance=~\"$node\", mountpoint=\"/\", fstype!=\"tmpfs\"} / node_filesystem_size_bytes{instance=~\"$node\", mountpoint=\"/\", fstype!=\"tmpfs\"}) * 100",
+              "legendFormat": "Root Disk",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "description": "CPU 추세 파악 → 갑작스러운 증가는 Pod 폭주 또는 DoS 가능성",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "fillOpacity": 20,
+                "lineWidth": 2,
+                "spanNulls": false
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "unit": "percent",
+              "min": 0,
+              "max": 100
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
+          "id": 4,
+          "title": "CPU Usage Over Time",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "(1 - avg(rate(node_cpu_seconds_total{mode=\"idle\", instance=~\"$node\"}[5m]))) * 100",
+              "legendFormat": "CPU %",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "avg(rate(node_cpu_seconds_total{mode=\"iowait\", instance=~\"$node\"}[5m])) * 100",
+              "legendFormat": "I/O Wait %",
+              "refId": "B"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "description": "Memory 추세 → 지속적 증가는 Memory Leak 가능성",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "fillOpacity": 20,
+                "lineWidth": 2,
+                "spanNulls": false
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "unit": "percent",
+              "min": 0,
+              "max": 100
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
+          "id": 5,
+          "title": "Memory Usage Over Time",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "(1 - node_memory_MemAvailable_bytes{instance=~\"$node\"} / node_memory_MemTotal_bytes{instance=~\"$node\"}) * 100",
+              "legendFormat": "Memory %",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
+          "id": 101,
+          "title": "USE: Saturation (포화도)",
+          "type": "row"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "description": "Load > CPU 코어 수 → 시스템 과부하, Pod 스케줄링 지연 가능",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "fillOpacity": 10,
+                "lineWidth": 2,
+                "spanNulls": false
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+          "id": 6,
+          "title": "System Load Average",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "node_load1{instance=~\"$node\"}",
+              "legendFormat": "Load 1m",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "node_load5{instance=~\"$node\"}",
+              "legendFormat": "Load 5m",
+              "refId": "B"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "node_load15{instance=~\"$node\"}",
+              "legendFormat": "Load 15m",
+              "refId": "C"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "count(node_cpu_seconds_total{mode=\"idle\", instance=~\"$node\"})",
+              "legendFormat": "CPU Cores (기준선)",
+              "refId": "D"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "description": "각 마운트포인트별 디스크 사용률 → Longhorn, containerd 디스크 별도 확인",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "bars",
+                "fillOpacity": 80,
+                "lineWidth": 1
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "unit": "percent",
+              "min": 0,
+              "max": 100
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+          "id": 7,
+          "title": "Disk Usage by Mountpoint",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "(1 - node_filesystem_avail_bytes{instance=~\"$node\", fstype=~\"ext4|xfs\", mountpoint!~\"/boot.*\"} / node_filesystem_size_bytes{instance=~\"$node\", fstype=~\"ext4|xfs\", mountpoint!~\"/boot.*\"}) * 100",
+              "legendFormat": "{{mountpoint}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+          "id": 102,
+          "title": "USE: Errors + Network/Disk I/O",
+          "type": "row"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "description": "Network 트래픽 → 갑작스러운 증가는 DDoS 또는 대량 데이터 전송",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "fillOpacity": 20,
+                "lineWidth": 2,
+                "spanNulls": false
+              },
+              "unit": "Bps"
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "Transmit" },
+                "properties": [
+                  { "id": "custom.transform", "value": "negative-Y" }
+                ]
+              }
+            ]
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
+          "id": 8,
+          "title": "Network I/O",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "rate(node_network_receive_bytes_total{instance=~\"$node\", device!~\"lo|veth.*|cali.*|lxc.*|flannel.*|cni.*\"}[5m])",
+              "legendFormat": "Receive",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "rate(node_network_transmit_bytes_total{instance=~\"$node\", device!~\"lo|veth.*|cali.*|lxc.*|flannel.*|cni.*\"}[5m])",
+              "legendFormat": "Transmit",
+              "refId": "B"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "description": "Disk I/O → I/O 높으면 Longhorn rebuild 또는 대량 로그 기록 중",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "fillOpacity": 20,
+                "lineWidth": 2,
+                "spanNulls": false
+              },
+              "unit": "Bps"
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "Write" },
+                "properties": [
+                  { "id": "custom.transform", "value": "negative-Y" }
+                ]
+              }
+            ]
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
+          "id": 9,
+          "title": "Disk I/O",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "rate(node_disk_read_bytes_total{instance=~\"$node\"}[5m])",
+              "legendFormat": "Read",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "rate(node_disk_written_bytes_total{instance=~\"$node\"}[5m])",
+              "legendFormat": "Write",
+              "refId": "B"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "description": "Network 에러 → Packet Drop이 지속되면 네트워크 장애 또는 MTU 문제",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "fillOpacity": 10,
+                "lineWidth": 2,
+                "spanNulls": false
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              },
+              "unit": "pps"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 33 },
+          "id": 10,
+          "title": "Network Errors & Drops",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "rate(node_network_receive_drop_total{instance=~\"$node\", device!~\"lo|veth.*|cali.*\"}[5m])",
+              "legendFormat": "RX Drops",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "rate(node_network_transmit_drop_total{instance=~\"$node\", device!~\"lo|veth.*|cali.*\"}[5m])",
+              "legendFormat": "TX Drops",
+              "refId": "B"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "rate(node_network_receive_errs_total{instance=~\"$node\", device!~\"lo|veth.*|cali.*\"}[5m])",
+              "legendFormat": "RX Errors",
+              "refId": "C"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "rate(node_network_transmit_errs_total{instance=~\"$node\", device!~\"lo|veth.*|cali.*\"}[5m])",
+              "legendFormat": "TX Errors",
+              "refId": "D"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "description": "노드 기본 정보: Uptime, CPU 코어 수, 총 메모리",
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "blue", "value": null }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "Uptime" },
+                "properties": [
+                  { "id": "unit", "value": "dtdurations" }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "Total Memory" },
+                "properties": [
+                  { "id": "unit", "value": "bytes" }
+                ]
+              }
+            ]
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 33 },
+          "id": 11,
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "textMode": "auto"
+          },
+          "title": "Node Info",
+          "type": "stat",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "time() - node_boot_time_seconds{instance=~\"$node\"}",
+              "legendFormat": "Uptime",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "count(node_cpu_seconds_total{mode=\"idle\", instance=~\"$node\"})",
+              "legendFormat": "CPU Cores",
+              "refId": "B"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "node_memory_MemTotal_bytes{instance=~\"$node\"}",
+              "legendFormat": "Total Memory",
+              "refId": "C"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39,
+      "style": "dark",
+      "tags": ["node", "infrastructure", "USE-method"],
+      "templating": {
+        "list": [
+          {
+            "current": {},
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
+            "definition": "label_values(node_cpu_seconds_total, instance)",
+            "hide": 0,
+            "includeAll": false,
+            "label": "Node",
+            "multi": false,
+            "name": "node",
+            "options": [],
+            "query": {
+              "qryType": 1,
+              "query": "label_values(node_cpu_seconds_total, instance)",
+              "refId": "PrometheusVariableQueryEditor-VariableQuery"
+            },
+            "refresh": 2,
+            "regex": "",
+            "skipUrlSync": false,
+            "sort": 1,
+            "type": "query"
+          }
+        ]
+      },
+      "time": { "from": "now-1h", "to": "now" },
+      "title": "Node Detail (USE Method)",
+      "uid": "node-detail-use",
+      "version": 1
+    }
