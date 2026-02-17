@@ -66,6 +66,15 @@ data:
     querier:
       max_concurrent_queries: 20
 
+    # Why: metrics_generator processor는 기본 비활성화
+    #      overrides에서 명시적으로 활성화해야 실제로 동작함
+    overrides:
+      defaults:
+        metrics_generator:
+          processors:
+            - span-metrics
+            - service-graphs
+
     # Why: Trace 데이터로부터 RED 메트릭 자동 생성 → APM 대시보드에서 사용
     metrics_generator:
       registry:
