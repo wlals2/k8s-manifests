@@ -72,8 +72,8 @@ data:
       defaults:
         metrics_generator:
           processors:
-            - span-metrics
-            - service-graphs
+            - span_metrics
+            - service_graphs
 
     # Why: Trace 데이터로부터 RED 메트릭 자동 생성 → APM 대시보드에서 사용
     metrics_generator:
