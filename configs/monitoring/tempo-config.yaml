@@ -76,3 +76,7 @@ data:
         service_graphs:
       storage:
         path: /var/tempo/metrics
+        # Why: 생성된 span metrics를 Prometheus로 push (scrape가 아닌 push 방식)
+        #      Prometheus의 enableRemoteWriteReceiver와 쌍으로 동작
+        remote_write:
+          - url: http://prometheus-kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090/api/v1/write
