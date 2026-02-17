@@ -156,6 +156,5 @@ spec:
         storageClassName: wazuh-storage
         resources:
           requests:
-            # Why: Wazuh Manager는 Agent 로그, Database, API 로그가 지속 증가하므로 10Gi 할당
-            # Longhorn replica 고려: 10Gi × 3 = 30Gi (k8s-worker3 제외)
-            storage: 10Gi
+            # Why: VD feed ~10GB + Agent DB/로그 + 여유 공간 필요 (10Gi에서 디스크 풀 경험)
+            storage: 40Gi

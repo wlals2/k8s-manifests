@@ -150,4 +150,5 @@ spec:
         storageClassName: wazuh-storage
         resources:
           requests:
-            storage: 500Mi
+            # Why: OpenSearch 보안 이벤트 데이터 + 인덱스 저장 (500Mi에서 확장)
+            storage: 10Gi
