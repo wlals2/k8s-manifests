@@ -156,5 +156,5 @@ spec:
         storageClassName: wazuh-storage
         resources:
           requests:
-            # Why: VD feed ~10GB + Agent DB/로그 + 여유 공간 필요 (10Gi에서 디스크 풀 경험)
-            storage: 40Gi
+            # Why: VD feed ~10GB + Agent DB/로그 + 여유 공간 (10Gi→40Gi→60Gi 확장)
+            storage: 60Gi
