@@ -2,242 +2,173 @@
 # SLI Recording Rules
 # ==============================================================================
 # 목적: SLI(Service Level Indicator) 메트릭을 미리 계산하여 쿼리 성능 향상
-# 역할: Availability, Latency, Error Rate 등 핵심 지표를 주기적으로 계산
-# 의존성:
-#   - Blackbox Exporter: probe_success, probe_duration_seconds 메트릭 필요
-#   - NGINX Exporter: nginx_http_requests_total 메트릭 필요
-# 참고: https://prometheus.io/docs/prometheus/latest/configuration/recording_rules/
+#
+# 데이터소스 3가지:
+#   1. Blackbox Exporter → Availability (외부 관점: 접속 가능한가?)
+#   2. Istio Metrics     → Error Rate, Latency p95/p99 (실제 트래픽 기반)
+#   3. Tempo Span Metrics → 서비스별 RED (WEB/WAS/MySQL 개별 추적)
+#
+# SLO 목표:
+#   - Availability: 99% (30일 기준, 허용 다운타임 7.2시간)
+#   - Latency p95: < 500ms
+#   - Error Rate (5xx): < 1%
 # ==============================================================================
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
-  # 리소스 이름: sli-recording-rules
-  # What: PrometheusRule CRD 리소스 이름
-  # Why: Prometheus Operator가 이 이름으로 Rules를 인식
-  # Impact: 변경 시 ArgoCD Application에서도 이름 변경 필요
   name: sli-recording-rules
-
-  # Namespace: monitoring
-  # What: 이 PrometheusRule이 배포될 namespace
-  # Why: Prometheus가 monitoring namespace에서 실행 중
-  # Impact: 다른 namespace로 변경 시 Prometheus가 인식하지 못함
-  # Options: monitoring (권장), default (비권장)
   namespace: monitoring
-
   labels:
-    # CRITICAL: Prometheus가 이 Rules를 인식하려면 라벨 필수!
-    # What: Prometheus Operator의 ruleSelector와 매칭되는 라벨
-    # Why: Platform Conformity - Helm Chart 표준 라벨 사용
-    # Impact: 이 라벨이 없으면 Prometheus가 Rules를 로드하지 않음
-    # Options: prometheus: kube-prometheus (Helm Chart 기본값, 필수!)
+    # Why: Prometheus ruleSelector와 매칭 필수 (Platform Conformity)
     prometheus: kube-prometheus
-
-    # 추가 라벨 (선택 사항, 분류용)
-    # What: Prometheus 관련 리소스임을 표시
-    # Why: kubectl get prometheusrule -l app=prometheus로 필터링 가능
-    # Impact: 선택 사항, 삭제해도 동작에 영향 없음
     app: prometheus
-
-    # What: Recording Rules임을 표시
-    # Why: Alert Rules와 구분하기 위함
-    # Impact: 선택 사항, 삭제해도 동작에 영향 없음
     component: recording-rules
-
-    # What: SLO 관련 Rules임을 표시
-    # Why: SLO/SLI 관련 리소스만 필터링 가능
-    # Impact: 선택 사항, 삭제해도 동작에 영향 없음
     slo: "true"
-
 spec:
   groups:
     # ==========================================================================
-    # SLI: Availability (가용성)
+    # 1. Availability SLI (Blackbox Exporter)
     # ==========================================================================
-    # 메트릭: probe_success (Blackbox Exporter)
-    # 목표: 99% 가용성 (30일 기준)
-    # 허용 다운타임: 7.2시간/30일
-
-    # Rule Group 이름: sli-availability
-    # What: Availability SLI 메트릭을 계산하는 규칙 그룹
-    # Why: 블로그 사이트 가용성을 시간대별로 추적하기 위함
-    # Impact: 이 그룹이 없으면 SLO Alert (가용성 < 99%)가 작동하지 않음
+    # Why: 외부 관점에서 "사용자가 접속할 수 있는가?" 측정
+    # 데이터소스: probe_success (WEB 서비스 Probe)
     - name: sli-availability
-
-      # 평가 주기: 30초
-      # What: Recording Rules를 실행하는 주기
-      # Why: 실시간 모니터링을 위해 짧은 주기 필요 (기본값 1분보다 빠름)
-      # Impact: 값이 클수록 메트릭 업데이트 지연, 작을수록 Prometheus 부하 증가
-      # Options: 15s (빠름, 부하↑), 30s (권장, 균형), 1m (느림, 부하↓)
       interval: 30s
-
       rules:
-        # ==================================================================
-        # Availability SLI (1분 평균)
-        # ==================================================================
-
-        # Recording Rule 이름: sli:availability:1m
-        # What: 1분 평균 가용성을 계산하여 저장
-        # Why: 실시간 가용성 모니터링 (Grafana Dashboard용)
-        # Impact: 이 메트릭이 없으면 실시간 가용성 추세를 볼 수 없음
         - record: sli:availability:1m
+          # Why: 실시간 가용성 모니터링 (Dashboard 표시용)
+          expr: avg_over_time(probe_success{job="blackbox-http", instance="http://web-service.blog-system.svc.cluster.local:80"}[1m])
 
-          # PromQL 쿼리
-          # What: probe_success의 1분 평균값
-          # Why: Blackbox Exporter가 HTTP 요청 성공 시 1, 실패 시 0 반환
-          # Impact: blog.jiminhome.shop에 접속 불가 시 0, 정상 시 1
-          # Options:
-          #   - 1m (실시간, 권장)
-          #   - 5m (단기 추세)
-          #   - 1h (장기 추세)
-          expr: avg_over_time(probe_success{job="probe/monitoring/blog-http-probe", instance="http://blog.jiminhome.shop"}[1m])
-
-        # ==================================================================
-        # Availability SLI (5분 평균)
-        # ==================================================================
-
-        # Recording Rule 이름: sli:availability:5m
-        # What: 5분 평균 가용성을 계산하여 저장
-        # Why: 단기 가용성 추세 파악 (순간적인 장애 필터링)
-        # Impact: 1분 평균보다 부드러운 그래프 (노이즈 감소)
         - record: sli:availability:5m
-          expr: avg_over_time(probe_success{job="probe/monitoring/blog-http-probe", instance="http://blog.jiminhome.shop"}[5m])
+          # Why: 단기 추세 (순간 장애 노이즈 제거)
+          expr: avg_over_time(probe_success{job="blackbox-http", instance="http://web-service.blog-system.svc.cluster.local:80"}[5m])
 
-        # ==================================================================
-        # Availability SLI (1시간 평균)
-        # ==================================================================
-
-        # Recording Rule 이름: sli:availability:1h
-        # What: 1시간 평균 가용성을 계산하여 저장
-        # Why: SLO Alert 조건 (1시간 평균 < 99% 시 Warning 알림)
-        # Impact: 이 메트릭이 없으면 SLOAvailabilityViolation1h 알림이 작동하지 않음
         - record: sli:availability:1h
-          expr: avg_over_time(probe_success{job="probe/monitoring/blog-http-probe", instance="http://blog.jiminhome.shop"}[1h])
+          # Why: SLO Alert 조건 (1시간 평균 < 99% → Warning)
+          expr: avg_over_time(probe_success{job="blackbox-http", instance="http://web-service.blog-system.svc.cluster.local:80"}[1h])
 
-        # ==================================================================
-        # Availability SLI (30일 평균)
-        # ==================================================================
-
-        # Recording Rule 이름: sli:availability:30d
-        # What: 30일 평균 가용성을 계산하여 저장
-        # Why: SLO 달성률 계산 (월간 목표: 99% 가용성)
-        # Impact: 이 메트릭이 없으면 SLOAvailabilityViolation30d 알림이 작동하지 않음
         - record: sli:availability:30d
-          expr: avg_over_time(probe_success{job="probe/monitoring/blog-http-probe", instance="http://blog.jiminhome.shop"}[30d])
+          # Why: 월간 SLO 달성률 계산 (99% 목표)
+          expr: avg_over_time(probe_success{job="blackbox-http", instance="http://web-service.blog-system.svc.cluster.local:80"}[30d])
 
     # ==========================================================================
-    # SLI: Latency (응답 시간)
+    # 2. Latency SLI (Blackbox + Istio)
     # ==========================================================================
-    # 메트릭: probe_duration_seconds (Blackbox Exporter, Gauge)
-    # 목표: < 500ms
-    #
-    # 참고: Blackbox Exporter는 Summary 형식 메트릭을 생성하므로
-    #       histogram_quantile() 사용 불가. Gauge 값을 직접 사용.
-    #       이유: 30초 1번 측정하는 "Synthetic Check"이므로
-    #            단일 측정값 자체가 전체 상황을 대표함 (평균의 함정 없음).
-
-    # Rule Group 이름: sli-latency
-    # What: Latency (응답 시간) SLI 메트릭을 계산하는 규칙 그룹
-    # Why: 사용자 경험 품질을 측정하기 위함 (느린 응답 감지)
-    # Impact: 이 그룹이 없으면 SLO Alert (latency > 500ms)가 작동하지 않음
+    # Why: Blackbox는 Synthetic Check (30초 1번), Istio는 실제 트래픽 전수 측정
+    #      둘 다 있어야 "외부에서 본 속도" + "내부 실제 속도" 비교 가능
     - name: sli-latency
-
-      # 평가 주기: 30초
-      # Why: Latency는 빠르게 변할 수 있으므로 짧은 주기 필요
       interval: 30s
-
       rules:
-        # ==================================================================
-        # Latency (1분 평균)
-        # ==================================================================
+        # --- Blackbox 기반 (Synthetic Check, 외부 관점) ---
+        - record: sli:latency:blackbox:1m
+          # Why: Blackbox는 Gauge이므로 avg_over_time 사용 (Histogram 아님)
+          expr: avg_over_time(probe_duration_seconds{job="blackbox-http", instance="http://web-service.blog-system.svc.cluster.local:80"}[1m])
 
-        # Recording Rule 이름: sli:latency:1m
-        # What: 1분 평균 응답 시간 (초 단위)
-        # Why: Blackbox Exporter의 Gauge 값 (실시간 모니터링)
-        # Impact: 값이 0.5 (500ms)를 초과하면 사용자 경험 저하
-        # Options: avg_over_time() 사용 (1분 평균), max_over_time() (1분 최대값)
-        - record: sli:latency:1m
+        - record: sli:latency:blackbox:5m
+          expr: avg_over_time(probe_duration_seconds{job="blackbox-http", instance="http://web-service.blog-system.svc.cluster.local:80"}[5m])
 
-          # PromQL 쿼리
-          # What: probe_duration_seconds의 1분 평균값
-          # Why: Gauge 메트릭을 시간 범위 평균으로 부드럽게 처리
-          # Impact: 순간적인 튀는 값 방지 (노이즈 제거)
-          expr: avg_over_time(probe_duration_seconds{job="probe/monitoring/blog-http-probe", instance="http://blog.jiminhome.shop"}[1m])
+        # --- Istio 기반 (실제 트래픽, p95/p99) ---
+        - record: sli:latency:p95:5m
+          # Why: 실제 사용자 요청의 95번째 백분위 응답 시간
+          #      평균은 느린 요청을 숨기지만, p95는 대부분의 사용자 경험을 반영
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(istio_request_duration_milliseconds_bucket{
+                destination_service_namespace="blog-system",
+                reporter="destination"
+              }[5m])) by (le, destination_service_name)
+            )
 
-        # ==================================================================
-        # Latency (5분 평균)
-        # ==================================================================
-
-        # Recording Rule 이름: sli:latency:5m
-        # What: 5분 평균 응답 시간 (초 단위)
-        # Why: SLO Alert 조건 (latency > 500ms 시 Warning 알림)
-        # Impact: 이 메트릭이 없으면 SLOLatencyViolation 알림이 작동하지 않음
-        - record: sli:latency:5m
-          expr: avg_over_time(probe_duration_seconds{job="probe/monitoring/blog-http-probe", instance="http://blog.jiminhome.shop"}[5m])
+        - record: sli:latency:p99:5m
+          # Why: 상위 1% 최악의 응답 시간 (꼬리 지연 감지)
+          expr: |
+            histogram_quantile(0.99,
+              sum(rate(istio_request_duration_milliseconds_bucket{
+                destination_service_namespace="blog-system",
+                reporter="destination"
+              }[5m])) by (le, destination_service_name)
+            )
 
     # ==========================================================================
-    # SLI: Error Rate & Throughput (향후 추가 예정)
+    # 3. Error Rate SLI (Istio)
     # ==========================================================================
-    # 상태: NGINX Exporter 미설치로 인해 비활성화
-    # 필요 메트릭: nginx_http_requests_total (NGINX Exporter)
-    #
-    # 추후 작업:
-    #   1. NGINX Exporter sidecar 추가 (web Rollout)
-    #   2. ServiceMonitor 생성
-    #   3. Recording Rules 활성화 (Histogram 사용)
-    #
-    # 참고: 고빈도 트래픽에서는 반드시 Histogram을 사용하여
-    #       p95, p99 percentile을 계산해야 "평균의 함정"을 피할 수 있음.
+    # Why: Blackbox는 "접속 가능/불가능"만 알 수 있지만,
+    #      Istio는 모든 HTTP 요청의 5xx 비율을 정확히 측정
+    - name: sli-error-rate
+      interval: 30s
+      rules:
+        - record: sli:error_rate:5m
+          # Why: 전체 blog-system의 5xx 에러 비율 (0~1 범위)
+          #      0.01 = 1%, SLO 목표: < 1%
+          expr: |
+            sum(rate(istio_requests_total{
+              destination_service_namespace="blog-system",
+              response_code=~"5..",
+              reporter="destination"
+            }[5m]))
+            /
+            sum(rate(istio_requests_total{
+              destination_service_namespace="blog-system",
+              reporter="destination"
+            }[5m]))
 
-# ==============================================================================
-# 검증 방법 (Verification)
-# ==============================================================================
-#
-# 1. PrometheusRule 생성 확인
-#    kubectl get prometheusrule sli-recording-rules -n monitoring
-#    → NAME, AGE 표시되면 정상
-#
-# 2. Prometheus가 Rules를 인식했는지 확인
-#    kubectl exec -n monitoring prometheus-kube-prometheus-stack-prometheus-0 \
-#      -- wget -qO- http://localhost:9090/api/v1/rules | jq '.data.groups[] | select(.name | contains("sli"))'
-#    → sli-availability, sli-latency, sli-error-rate, sli-throughput 그룹 표시되면 정상
-#
-# 3. Recording Rules 동작 확인 (메트릭 조회)
-#    kubectl exec -n monitoring prometheus-kube-prometheus-stack-prometheus-0 \
-#      -- wget -qO- 'http://localhost:9090/api/v1/query?query=sli:availability:1m'
-#    → result가 비어있지 않으면 정상 (값: 0 또는 1)
-#
-# 4. Grafana에서 확인
-#    - Query: sli:availability:30d * 100  (30일 가용성 %)
-#    - Query: sli:latency_p95:5m  (p95 응답 시간, 초 단위)
-#    - Query: sli:error_rate:5m * 100  (에러율 %)
-#    - Query: sli:requests_per_second:1m  (초당 요청 수)
-#
-# ==============================================================================
-# 주의사항 (Important Notes)
-# ==============================================================================
-#
-# 1. **instance 필터 확인 필수**:
-#    - Blackbox: instance="http://blog.jiminhome.shop" (정확한 URL)
-#    - NGINX: instance=~".*web.*" (Pod 이름 패턴, web-xxxx-xxxx 매칭)
-#    - 잘못된 instance 필터 시 메트릭 수집 실패 (값 없음)
-#
-# 2. **Recording Rules는 시간이 필요**:
-#    - PrometheusRule 생성 후 30초~1분 대기 (Prometheus 자동 reload)
-#    - 즉시 조회 시 메트릭 없음 (정상 동작)
-#
-# 3. **메트릭이 없으면 Recording Rules도 없음**:
-#    - probe_success가 0이면 sli:availability:1m = 0 (다운 상태)
-#    - nginx_http_requests_total이 없으면 sli:requests_per_second:1m = 0 (트래픽 없음)
-#    - Blackbox Exporter나 NGINX Exporter가 중단되면 모든 SLI 메트릭 사라짐
-#
-# 4. **interval 변경 시 영향**:
-#    - 값을 작게 (15s): Prometheus 부하 증가, CPU/Memory 사용량 상승
-#    - 값을 크게 (1m): 메트릭 업데이트 지연, 실시간성 감소
-#    - 권장: 30s (균형)
-#
-# 5. **라벨 불일치 시 Rules 무시**:
-#    - prometheus: kube-prometheus 라벨 필수!
-#    - 라벨 없으면 Prometheus가 이 Rules를 로드하지 않음
-#    - 확인: kubectl get prometheus -n monitoring -o yaml | grep -A 3 ruleSelector
-#
-# ==============================================================================
+        - record: sli:error_rate:by_service:5m
+          # Why: 서비스별 에러율 → 문제가 WEB인지 WAS인지 특정
+          expr: |
+            sum(rate(istio_requests_total{
+              destination_service_namespace="blog-system",
+              response_code=~"5..",
+              reporter="destination"
+            }[5m])) by (destination_service_name)
+            /
+            sum(rate(istio_requests_total{
+              destination_service_namespace="blog-system",
+              reporter="destination"
+            }[5m])) by (destination_service_name)
+
+    # ==========================================================================
+    # 4. Throughput SLI (Istio)
+    # ==========================================================================
+    # Why: 트래픽 변화 감지 → 갑자기 0이면 서비스 장애, 급증이면 부하 예상
+    - name: sli-throughput
+      interval: 30s
+      rules:
+        - record: sli:throughput:rps:1m
+          # Why: 전체 blog-system 초당 요청 수 (RPS)
+          expr: |
+            sum(rate(istio_requests_total{
+              destination_service_namespace="blog-system",
+              reporter="destination"
+            }[1m]))
+
+        - record: sli:throughput:rps:by_service:1m
+          # Why: 서비스별 RPS → WEB vs WAS 트래픽 분포 파악
+          expr: |
+            sum(rate(istio_requests_total{
+              destination_service_namespace="blog-system",
+              reporter="destination"
+            }[1m])) by (destination_service_name)
+
+    # ==========================================================================
+    # 5. Tempo Service RED (서비스별 호출 체인)
+    # ==========================================================================
+    # Why: Istio는 "서비스 간" 트래픽, Tempo는 "서비스 내부 span" 측정
+    #      WAS→MySQL 호출이 느린지, WAS 내부 로직이 느린지 구분 가능
+    - name: sli-tempo-red
+      interval: 30s
+      rules:
+        - record: sli:tempo:calls_rate:1m
+          # Why: Tempo span 기반 서비스별 호출 빈도
+          expr: |
+            sum(rate(traces_spanmetrics_calls_total[1m])) by (service_name, span_name, status_code)
+
+        - record: sli:tempo:latency_p95:5m
+          # Why: Tempo span 기반 서비스별 p95 응답 시간 (내부 호출 체인 추적)
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(traces_spanmetrics_latency_bucket[5m])) by (le, service_name)
+            )
+
+        - record: sli:tempo:service_graph_rps:1m
+          # Why: 서비스 간 호출 관계 (client → server) 요청량
+          expr: |
+            sum(rate(traces_service_graph_request_total[1m])) by (client, server)

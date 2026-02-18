@@ -1,0 +1,585 @@
+# ==============================================================================
+# Grafana Dashboard ConfigMap - SLO Overview
+# ==============================================================================
+# 목적: SLI/SLO 핵심 지표를 한 화면에서 모니터링
+#
+# 구성 (4개 섹션):
+#   1. Availability - Blackbox 기반 가용성 (SLO: 99%)
+#   2. Error Rate   - Istio 기반 5xx 에러율 (SLO: < 1%)
+#   3. Latency      - Istio p95/p99 + Blackbox 평균 (SLO: p95 < 500ms)
+#   4. Service RED  - Tempo 기반 서비스별 호출/응답시간/에러
+#
+# 데이터소스: Blackbox Exporter, Istio Metrics, Tempo Span Metrics
+# ==============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-slo
+  namespace: monitoring
+  labels:
+    # Why: Grafana sidecar가 이 label로 자동 로드
+    grafana_dashboard: "1"
+    tier: monitoring
+data:
+  slo-dashboard.json: |
+    {
+      "annotations": { "list": [] },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "id": null,
+      "links": [],
+      "liveNow": false,
+      "panels": [
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "id": 100,
+          "panels": [],
+          "title": "📊 SLO Overview (목표: Availability 99% | Error Rate < 1% | Latency p95 < 500ms)",
+          "type": "row"
+        },
+        {
+          "title": "Availability (30일)",
+          "description": "30일 평균 가용성. SLO 목표: 99%. 99% 미만이면 Error Budget 소진.",
+          "type": "gauge",
+          "gridPos": { "h": 6, "w": 4, "x": 0, "y": 1 },
+          "id": 1,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sli:availability:30d * 100",
+              "legendFormat": "Availability",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 90,
+              "max": 100,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "orange", "value": 99 },
+                  { "color": "green", "value": 99.5 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true,
+            "orientation": "auto"
+          }
+        },
+        {
+          "title": "Error Rate (5분)",
+          "description": "5xx 에러 비율. SLO 목표: < 1%. Istio 실제 트래픽 기반.",
+          "type": "gauge",
+          "gridPos": { "h": 6, "w": 4, "x": 4, "y": 1 },
+          "id": 2,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "(sli:error_rate:5m or vector(0)) * 100",
+              "legendFormat": "Error Rate",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 10,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "orange", "value": 1 },
+                  { "color": "red", "value": 5 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true,
+            "orientation": "auto"
+          }
+        },
+        {
+          "title": "Latency p95 - WEB (5분)",
+          "description": "WEB 서비스 p95 응답시간. SLO 목표: < 500ms.",
+          "type": "gauge",
+          "gridPos": { "h": 6, "w": 4, "x": 8, "y": 1 },
+          "id": 3,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sli:latency:p95:5m{destination_service_name=\"web-service\"}",
+              "legendFormat": "WEB p95",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "min": 0,
+              "max": 1000,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "orange", "value": 300 },
+                  { "color": "red", "value": 500 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true,
+            "orientation": "auto"
+          }
+        },
+        {
+          "title": "Latency p95 - WAS (5분)",
+          "description": "WAS 서비스 p95 응답시간. SLO 목표: < 500ms.",
+          "type": "gauge",
+          "gridPos": { "h": 6, "w": 4, "x": 12, "y": 1 },
+          "id": 4,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sli:latency:p95:5m{destination_service_name=\"was-service\"}",
+              "legendFormat": "WAS p95",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "min": 0,
+              "max": 1000,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "orange", "value": 300 },
+                  { "color": "red", "value": 500 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true,
+            "orientation": "auto"
+          }
+        },
+        {
+          "title": "Throughput (RPS)",
+          "description": "초당 요청 수. 0이면 서비스 장애 의심.",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 4, "x": 16, "y": 1 },
+          "id": 5,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sli:throughput:rps:1m or vector(0)",
+              "legendFormat": "Total RPS",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 0.001 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "textMode": "auto",
+            "orientation": "auto"
+          }
+        },
+        {
+          "title": "Availability (1분)",
+          "description": "실시간 가용성. 1 = UP, 0 = DOWN.",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 4, "x": 20, "y": 1 },
+          "id": 6,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sli:availability:1m",
+              "legendFormat": "Availability",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                { "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } }, "type": "value" }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "textMode": "auto",
+            "orientation": "auto"
+          }
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
+          "id": 200,
+          "panels": [],
+          "title": "📈 Latency & Error Rate Trend (Istio 실제 트래픽)",
+          "type": "row"
+        },
+        {
+          "title": "Latency p95/p99 (서비스별)",
+          "description": "Istio 실제 트래픽 기반 응답시간. 500ms 이상이면 SLO 위반.",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+          "id": 7,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sli:latency:p95:5m",
+              "legendFormat": "p95 - {{ destination_service_name }}",
+              "refId": "A"
+            },
+            {
+              "expr": "sli:latency:p99:5m",
+              "legendFormat": "p99 - {{ destination_service_name }}",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "spanNulls": false,
+                "drawStyle": "line",
+                "pointSize": 5,
+                "showPoints": "auto",
+                "thresholdsStyle": { "mode": "line" }
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 500 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": { "mode": "multi", "sort": "desc" },
+            "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
+          }
+        },
+        {
+          "title": "Error Rate & Throughput",
+          "description": "Istio 기반 에러율과 트래픽량. 에러율 1% 초과 시 SLO 위반.",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+          "id": 8,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "(sli:error_rate:5m or vector(0)) * 100",
+              "legendFormat": "Error Rate %",
+              "refId": "A"
+            },
+            {
+              "expr": "sli:throughput:rps:1m or vector(0)",
+              "legendFormat": "RPS",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "drawStyle": "line",
+                "pointSize": 5,
+                "showPoints": "auto"
+              }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "Error Rate %" },
+                "properties": [
+                  { "id": "unit", "value": "percent" },
+                  { "id": "custom.axisPlacement", "value": "left" },
+                  { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } },
+                  { "id": "custom.thresholdsStyle", "value": { "mode": "line" } },
+                  { "id": "thresholds", "value": { "mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}] } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "RPS" },
+                "properties": [
+                  { "id": "unit", "value": "reqps" },
+                  { "id": "custom.axisPlacement", "value": "right" },
+                  { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "tooltip": { "mode": "multi", "sort": "desc" },
+            "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
+          }
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+          "id": 300,
+          "panels": [],
+          "title": "🔍 Service RED - Tempo Span Metrics (서비스별 상세)",
+          "type": "row"
+        },
+        {
+          "title": "서비스 호출 관계 (RPS)",
+          "description": "Tempo service graph: 서비스 간 호출 관계와 요청량.",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
+          "id": 9,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sli:tempo:service_graph_rps:1m",
+              "legendFormat": "{{ client }} → {{ server }}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 20,
+                "drawStyle": "line",
+                "pointSize": 5,
+                "showPoints": "auto"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": { "mode": "multi", "sort": "desc" },
+            "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
+          }
+        },
+        {
+          "title": "서비스별 Latency p95 (Tempo)",
+          "description": "Tempo span 기반 서비스 내부 응답시간. Istio와 다른 관점 — 내부 호출 체인 추적.",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
+          "id": 10,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sli:tempo:latency_p95:5m",
+              "legendFormat": "p95 - {{ service_name }}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "drawStyle": "line",
+                "pointSize": 5,
+                "showPoints": "auto"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": { "mode": "multi", "sort": "desc" },
+            "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
+          }
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
+          "id": 400,
+          "panels": [],
+          "title": "⏱️ Availability History (Blackbox Synthetic Check)",
+          "type": "row"
+        },
+        {
+          "title": "Availability 추세 (1m / 5m / 1h)",
+          "description": "Blackbox 기반 가용성 추세. 99% 이하로 떨어지면 SLO 위반.",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 26 },
+          "id": 11,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sli:availability:1m * 100",
+              "legendFormat": "1분 평균",
+              "refId": "A"
+            },
+            {
+              "expr": "sli:availability:5m * 100",
+              "legendFormat": "5분 평균",
+              "refId": "B"
+            },
+            {
+              "expr": "sli:availability:1h * 100",
+              "legendFormat": "1시간 평균",
+              "refId": "C"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 90,
+              "max": 100,
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "drawStyle": "line",
+                "pointSize": 5,
+                "showPoints": "auto",
+                "thresholdsStyle": { "mode": "line" }
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 99 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": { "mode": "multi", "sort": "desc" },
+            "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "min"] }
+          }
+        },
+        {
+          "title": "Blackbox Latency (Synthetic Check)",
+          "description": "Blackbox 외부 관점 응답시간 (30초마다 1번 측정).",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 26 },
+          "id": 12,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sli:latency:blackbox:1m * 1000",
+              "legendFormat": "Blackbox 1분 평균",
+              "refId": "A"
+            },
+            {
+              "expr": "sli:latency:blackbox:5m * 1000",
+              "legendFormat": "Blackbox 5분 평균",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "drawStyle": "line",
+                "pointSize": 5,
+                "showPoints": "auto",
+                "thresholdsStyle": { "mode": "line" }
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 500 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": { "mode": "multi", "sort": "desc" },
+            "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
+          }
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 39,
+      "tags": ["slo", "sli", "blog-system"],
+      "templating": { "list": [] },
+      "time": { "from": "now-6h", "to": "now" },
+      "timepicker": {},
+      "timezone": "Asia/Seoul",
+      "title": "SLO Overview",
+      "uid": "slo-overview"
+    }
