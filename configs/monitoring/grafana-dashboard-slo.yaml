@@ -306,7 +306,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
-              "expr": "probe_success{job=\"blackbox-http\", instance=\"http://was-service.blog-system.svc.cluster.local:8080\"}",
+              "expr": "probe_success{job=\"blackbox-http\", instance=\"http://was-service.blog-system.svc.cluster.local:8080/actuator/health\"}",
               "legendFormat": "WAS",
               "refId": "A"
             }
@@ -524,7 +524,7 @@ data:
               "refId": "A"
             },
             {
-              "expr": "probe_success{job=\"blackbox-http\", instance=\"http://was-service.blog-system.svc.cluster.local:8080\"}",
+              "expr": "probe_success{job=\"blackbox-http\", instance=\"http://was-service.blog-system.svc.cluster.local:8080/actuator/health\"}",
               "legendFormat": "WAS",
               "refId": "B"
             },
