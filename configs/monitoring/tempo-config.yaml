@@ -82,7 +82,13 @@ data:
           source: tempo
       processor:
         span_metrics:
+          dimensions:
+            - service.name
+            - http.method
+            - http.status_code
         service_graphs:
+          # Why: 기본값 0이면 모든 span이 drop됨 (maxItems=0 에러)
+          max_items: 10000
       storage:
         path: /var/tempo/metrics
         # Why: 생성된 span metrics를 Prometheus로 push (scrape가 아닌 push 방식)
