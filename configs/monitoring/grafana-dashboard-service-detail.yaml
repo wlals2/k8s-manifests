@@ -1,0 +1,657 @@
+# ==============================================================================
+# Grafana Dashboard ConfigMap - Service Detail (RED Method)
+# ==============================================================================
+# Why: SLO Overview가 "전체 상태"를 보여준다면, 이 대시보드는
+#      "어떤 서비스에 문제가 있는가?"를 식별하는 Level 2 대시보드.
+#
+# 구성 (5개 섹션):
+#   1. Service Status   - WEB/WAS RPS, p95, 5xx, Pod Restarts (Stat)
+#   2. Rate & Errors    - 서비스별 Request Rate (TimeSeries) + Response Code (Pie)
+#   3. Duration         - Latency Heatmap + Percentiles (p50/p95/p99)
+#   4. App Resources    - Pod CPU/Memory (Bar Gauge)
+#   5. Tempo Traces     - 서비스별 RED 요약 (Table)
+#
+# 데이터소스: Istio Metrics, SLI Recording Rules, cAdvisor, Tempo Span Metrics
+# ==============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-service-detail
+  namespace: monitoring
+  labels:
+    # Why: Grafana sidecar가 이 label로 자동 로드
+    grafana_dashboard: "1"
+data:
+  service-detail.json: |
+    {
+      "annotations": { "list": [] },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "id": null,
+      "links": [],
+      "liveNow": false,
+      "panels": [
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "id": 100,
+          "panels": [],
+          "title": "\ud83d\udea6 Service Status",
+          "type": "row"
+        },
+        {
+          "title": "WEB RPS",
+          "description": "WEB \uc11c\ube44\uc2a4 \ucd08\ub2f9 \uc694\uccad \uc218. 0\uc774\uba74 \uc11c\ube44\uc2a4 \uc7a5\uc560 \uc758\uc2ec.",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+          "id": 1,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sli:throughput:rps:by_service:1m{destination_service_name=\"web-service\"} or vector(0)",
+              "legendFormat": "WEB RPS",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 0.001 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "textMode": "auto",
+            "orientation": "auto"
+          }
+        },
+        {
+          "title": "WAS RPS",
+          "description": "WAS \uc11c\ube44\uc2a4 \ucd08\ub2f9 \uc694\uccad \uc218. 0\uc774\uba74 \uc11c\ube44\uc2a4 \uc7a5\uc560 \uc758\uc2ec.",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+          "id": 2,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sli:throughput:rps:by_service:1m{destination_service_name=\"was-service\"} or vector(0)",
+              "legendFormat": "WAS RPS",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 0.001 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "textMode": "auto",
+            "orientation": "auto"
+          }
+        },
+        {
+          "title": "WEB p95",
+          "description": "WEB \uc11c\ube44\uc2a4 p95 \uc751\ub2f5\uc2dc\uac04. 500ms \ucd08\uacfc \uc2dc SLO \uc704\ubc18.",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+          "id": 3,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sli:latency:p95:5m{destination_service_name=\"web-service\"}",
+              "legendFormat": "WEB p95",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "orange", "value": 300 },
+                  { "color": "red", "value": 500 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "textMode": "auto",
+            "orientation": "auto"
+          }
+        },
+        {
+          "title": "WAS p95",
+          "description": "WAS \uc11c\ube44\uc2a4 p95 \uc751\ub2f5\uc2dc\uac04. 500ms \ucd08\uacfc \uc2dc SLO \uc704\ubc18.",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+          "id": 4,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sli:latency:p95:5m{destination_service_name=\"was-service\"}",
+              "legendFormat": "WAS p95",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "orange", "value": 300 },
+                  { "color": "red", "value": 500 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "textMode": "auto",
+            "orientation": "auto"
+          }
+        },
+        {
+          "title": "5xx Errors (1h)",
+          "description": "1\uc2dc\uac04 \ub3d9\uc548 5xx \uc5d0\ub7ec \ub204\uc801 \uac74\uc218. 1\uac74 \uc774\uc0c1\uc774\uba74 \uc6d0\uc778 \ud30c\uc545 \ud544\uc694.",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+          "id": 5,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sum(increase(istio_requests_total{destination_service_namespace=\"blog-system\", response_code=~\"5..\", reporter=\"destination\"}[1h])) or vector(0)",
+              "legendFormat": "5xx Errors",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "orange", "value": 1 },
+                  { "color": "red", "value": 10 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "textMode": "auto",
+            "orientation": "auto"
+          }
+        },
+        {
+          "title": "Pod Restarts",
+          "description": "\uc804\uccb4 Pod \uc7ac\uc2dc\uc791 \ub204\uc801 \ud69f\uc218. 3\ud68c \uc774\uc0c1\uc774\uba74 CrashLoopBackOff \ud655\uc778.",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+          "id": 6,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sum(kube_pod_container_status_restarts_total{namespace=\"blog-system\"}) or vector(0)",
+              "legendFormat": "Restarts",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "orange", "value": 3 },
+                  { "color": "red", "value": 5 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "textMode": "auto",
+            "orientation": "auto"
+          }
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+          "id": 200,
+          "panels": [],
+          "title": "\ud83d\udcc8 Rate & Errors (RED: R + E)",
+          "type": "row"
+        },
+        {
+          "title": "\uc11c\ube44\uc2a4\ubcc4 Request Rate",
+          "description": "WEB/WAS \uc11c\ube44\uc2a4\ubcc4 \ucd08\ub2f9 \uc694\uccad\ub7c9. \ud2b8\ub798\ud53d \ud328\ud134\uacfc \uc774\uc0c1 \uc9d5\ud6c4 \ud30c\uc545\uc5d0 \ud65c\uc6a9.",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+          "id": 7,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sum(rate(istio_requests_total{destination_service_namespace=\"blog-system\", destination_service_name=\"web-service\", reporter=\"destination\"}[5m]))",
+              "legendFormat": "WEB",
+              "refId": "A"
+            },
+            {
+              "expr": "sum(rate(istio_requests_total{destination_service_namespace=\"blog-system\", destination_service_name=\"was-service\", reporter=\"destination\"}[5m]))",
+              "legendFormat": "WAS",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 15,
+                "drawStyle": "line",
+                "pointSize": 5,
+                "showPoints": "auto",
+                "spanNulls": false
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": { "mode": "multi", "sort": "desc" },
+            "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
+          }
+        },
+        {
+          "title": "Response Code Distribution",
+          "description": "1\uc2dc\uac04 \ub3d9\uc548 HTTP \uc751\ub2f5 \ucf54\ub4dc \ubd84\ud3ec. 5xx \ube44\uc728\uc774 1% \ucd08\uacfc\uc2dc SLO \uc704\ubc18.",
+          "type": "piechart",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+          "id": 8,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sum(increase(istio_requests_total{destination_service_namespace=\"blog-system\", response_code=~\"2..\", reporter=\"destination\"}[1h]))",
+              "legendFormat": "2xx Success",
+              "refId": "A"
+            },
+            {
+              "expr": "sum(increase(istio_requests_total{destination_service_namespace=\"blog-system\", response_code=~\"3..\", reporter=\"destination\"}[1h]))",
+              "legendFormat": "3xx Redirect",
+              "refId": "B"
+            },
+            {
+              "expr": "sum(increase(istio_requests_total{destination_service_namespace=\"blog-system\", response_code=~\"4..\", reporter=\"destination\"}[1h]))",
+              "legendFormat": "4xx Client Error",
+              "refId": "C"
+            },
+            {
+              "expr": "sum(increase(istio_requests_total{destination_service_namespace=\"blog-system\", response_code=~\"5..\", reporter=\"destination\"}[1h]))",
+              "legendFormat": "5xx Server Error",
+              "refId": "D"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "2xx Success" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "3xx Redirect" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "4xx Client Error" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "5xx Server Error" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "pieType": "donut",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "tooltip": { "mode": "multi", "sort": "desc" },
+            "legend": { "displayMode": "table", "placement": "right", "values": ["percent"] },
+            "displayLabels": ["name", "percent"]
+          }
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+          "id": 300,
+          "panels": [],
+          "title": "\u23f1\ufe0f Duration (RED: D)",
+          "type": "row"
+        },
+        {
+          "title": "Latency Distribution",
+          "description": "\uc751\ub2f5\uc2dc\uac04 \ubd84\ud3ec. \ubc1d\uc740 \uc601\uc5ed\uc774 \ub9ce\uc744\uc218\ub85d \ud574\ub2f9 \uc751\ub2f5\uc2dc\uac04 \uc694\uccad\uc774 \ub9ce\uc74c.",
+          "type": "heatmap",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+          "id": 9,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sum(increase(istio_request_duration_milliseconds_bucket{destination_service_namespace=\"blog-system\", reporter=\"destination\"}[5m])) by (le)",
+              "legendFormat": "{{le}}",
+              "refId": "A",
+              "format": "heatmap"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "scaleDistribution": { "type": "log", "log": 2 }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "calculate": true,
+            "calculation": {
+              "xBuckets": { "mode": "size", "value": "5m" }
+            },
+            "color": {
+              "mode": "scheme",
+              "scheme": "Oranges",
+              "steps": 128
+            },
+            "yAxis": {
+              "unit": "ms"
+            },
+            "cellGap": 1,
+            "tooltip": { "show": true, "yHistogram": true },
+            "legend": { "show": true }
+          }
+        },
+        {
+          "title": "Latency Percentiles (p50/p95/p99)",
+          "description": "\uc751\ub2f5\uc2dc\uac04 \ubc31\ubd84\uc704\uc218. p95 500ms \ucd08\uacfc \uc2dc SLO \uc704\ubc18. p50\uc740 \uc911\uc559\uac12 \uae30\uc900\uc120.",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+          "id": 10,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, sum(rate(istio_request_duration_milliseconds_bucket{destination_service_namespace=\"blog-system\", reporter=\"destination\"}[5m])) by (le))",
+              "legendFormat": "p50 (\uc911\uc559\uac12)",
+              "refId": "A"
+            },
+            {
+              "expr": "sli:latency:p95:5m",
+              "legendFormat": "p95 - {{destination_service_name}}",
+              "refId": "B"
+            },
+            {
+              "expr": "sli:latency:p99:5m",
+              "legendFormat": "p99 - {{destination_service_name}}",
+              "refId": "C"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "drawStyle": "line",
+                "pointSize": 5,
+                "showPoints": "auto",
+                "spanNulls": false,
+                "thresholdsStyle": { "mode": "line" }
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 500 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": { "mode": "multi", "sort": "desc" },
+            "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
+          }
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+          "id": 400,
+          "panels": [],
+          "title": "\ud83d\udcbb Application Resources",
+          "type": "row"
+        },
+        {
+          "title": "Pod CPU Usage",
+          "description": "Pod\ubcc4 CPU \uc0ac\uc6a9\ub960 (istio-proxy \uc81c\uc678). 80% \ucd08\uacfc \uc2dc HPA \ub610\ub294 Requests \uc870\uc815 \uac80\ud1a0.",
+          "type": "bargauge",
+          "gridPos": { "h": 6, "w": 12, "x": 0, "y": 24 },
+          "id": 11,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"blog-system\", container!=\"\", container!=\"istio-proxy\"}[5m])) by (pod) * 100",
+              "legendFormat": "{{pod}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "orange", "value": 60 },
+                  { "color": "red", "value": 80 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "orientation": "horizontal",
+            "displayMode": "gradient",
+            "showUnfilled": true,
+            "minVizWidth": 0,
+            "minVizHeight": 10
+          }
+        },
+        {
+          "title": "Pod Memory Usage",
+          "description": "Pod\ubcc4 \uba54\ubaa8\ub9ac \uc0ac\uc6a9\ub7c9 (istio-proxy \uc81c\uc678). 1GB \ucd08\uacfc \uc2dc OOM \uc704\ud5d8 \ud655\uc778.",
+          "type": "bargauge",
+          "gridPos": { "h": 6, "w": 12, "x": 12, "y": 24 },
+          "id": 12,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sum(container_memory_working_set_bytes{namespace=\"blog-system\", container!=\"\", container!=\"istio-proxy\"}) by (pod)",
+              "legendFormat": "{{pod}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "orange", "value": 500000000 },
+                  { "color": "red", "value": 1000000000 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "orientation": "horizontal",
+            "displayMode": "gradient",
+            "showUnfilled": true,
+            "minVizWidth": 0,
+            "minVizHeight": 10
+          }
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 },
+          "id": 500,
+          "panels": [],
+          "title": "\ud83d\udd0d Tempo Service Trace",
+          "type": "row"
+        },
+        {
+          "title": "\uc11c\ube44\uc2a4\ubcc4 RED \uc694\uc57d",
+          "description": "Tempo span metrics \uae30\ubc18 \uc11c\ube44\uc2a4\ubcc4 \ud638\ucd9c\ub7c9\uacfc \uc5d0\ub7ec\uc728. Istio\uc640 \ub2e4\ub978 \uad00\uc810 \u2014 \ub0b4\ubd80 span \ub808\ubca8 \ucd94\uc801.",
+          "type": "table",
+          "gridPos": { "h": 7, "w": 24, "x": 0, "y": 31 },
+          "id": 13,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sum(rate(traces_spanmetrics_calls_total[5m])) by (service_name)",
+              "legendFormat": "{{service_name}}",
+              "refId": "A",
+              "format": "table",
+              "instant": true
+            },
+            {
+              "expr": "sum(rate(traces_spanmetrics_calls_total{status_code=\"STATUS_CODE_ERROR\"}[5m])) by (service_name)",
+              "legendFormat": "{{service_name}}",
+              "refId": "B",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": { "type": "auto" },
+                "inspect": false
+              }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "service_name" },
+                "properties": [
+                  { "id": "displayName", "value": "Service" },
+                  { "id": "custom.width", "value": 250 }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "Value #A" },
+                "properties": [
+                  { "id": "displayName", "value": "Calls/s" },
+                  { "id": "unit", "value": "reqps" },
+                  { "id": "decimals", "value": 3 },
+                  { "id": "custom.width", "value": 150 }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "Value #B" },
+                "properties": [
+                  { "id": "displayName", "value": "Errors/s" },
+                  { "id": "unit", "value": "reqps" },
+                  { "id": "decimals", "value": 3 },
+                  { "id": "custom.width", "value": 150 },
+                  { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.001 }] } },
+                  { "id": "custom.cellOptions", "value": { "type": "color-text" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "Time" },
+                "properties": [
+                  { "id": "custom.hidden", "value": true }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true,
+            "sortBy": [{ "displayName": "Calls/s", "desc": true }],
+            "footer": { "show": false }
+          },
+          "transformations": [
+            {
+              "id": "merge",
+              "options": {}
+            }
+          ]
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 39,
+      "tags": ["service", "red", "blog-system"],
+      "templating": { "list": [] },
+      "time": { "from": "now-6h", "to": "now" },
+      "timepicker": {},
+      "timezone": "Asia/Seoul",
+      "title": "Service Detail (RED Method)",
+      "uid": "service-detail"
+    }

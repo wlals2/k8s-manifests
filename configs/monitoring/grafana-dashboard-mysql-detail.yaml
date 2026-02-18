@@ -3,15 +3,16 @@
 # ==============================================================================
 # 목적: MySQL 데이터베이스 상세 모니터링
 #
+# Why: 단일 대시보드에서 MySQL 핵심 지표를 한눈에 파악하기 위함
+#
 # 포함된 패널:
-# 1. MySQL 상태 개요 (Connections, Uptime)
-# 2. InnoDB Buffer Pool 사용률
-# 3. 쿼리 성능 (QPS, Slow Queries)
-# 4. Connection 상태 (Connected, Running, Aborted)
-# 5. 쿼리 종류별 분석 (SELECT, INSERT, UPDATE, DELETE)
-# 6. InnoDB Row Operations
-# 7. Table Lock 상태
-# 8. Network Traffic (Bytes Received/Sent)
+# Row 1. MySQL 상태 개요 - Stat (UP/DOWN, Uptime, Connections, Threads, QPS, Slow)
+# Row 2. InnoDB Buffer Pool - Gauge (사용률) + TimeSeries (트렌드, 페이지)
+# Row 3. 쿼리 분석 - PieChart (쿼리 유형 분포) + TimeSeries (InnoDB Row Ops)
+# Row 4. 연결 상태 - TimeSeries (Thread, Aborted)
+# Row 5. Network & I/O - TimeSeries (Traffic, Tmp Tables)
+#
+# 의존성: mysql-exporter (ServiceMonitor로 메트릭 수집)
 # ==============================================================================
 
 apiVersion: v1
@@ -21,9 +22,6 @@ metadata:
   namespace: monitoring
   labels:
     grafana_dashboard: "1"
-  labels:
-    grafana_dashboard: "1"
-    tier: monitoring
 data:
   mysql-detail.json: |
     {
@@ -44,7 +42,7 @@ data:
           "type": "row"
         },
         {
-          "datasource": "Prometheus",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -58,12 +56,12 @@ data:
           "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
           "id": 1,
           "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-          "targets": [{ "expr": "mysql_up", "legendFormat": "MySQL", "refId": "A" }],
+          "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "mysql_up", "legendFormat": "MySQL", "refId": "A" }],
           "title": "MySQL 상태",
           "type": "stat"
         },
         {
-          "datasource": "Prometheus",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -74,12 +72,12 @@ data:
           "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
           "id": 2,
           "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-          "targets": [{ "expr": "mysql_global_status_uptime", "legendFormat": "Uptime", "refId": "A" }],
+          "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "mysql_global_status_uptime", "legendFormat": "Uptime", "refId": "A" }],
           "title": "Uptime",
           "type": "stat"
         },
         {
-          "datasource": "Prometheus",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -90,12 +88,12 @@ data:
           "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
           "id": 3,
           "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-          "targets": [{ "expr": "mysql_global_status_threads_connected", "legendFormat": "Connected", "refId": "A" }],
+          "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "mysql_global_status_threads_connected", "legendFormat": "Connected", "refId": "A" }],
           "title": "Active Connections",
           "type": "stat"
         },
         {
-          "datasource": "Prometheus",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -106,12 +104,12 @@ data:
           "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
           "id": 4,
           "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-          "targets": [{ "expr": "mysql_global_status_threads_running", "legendFormat": "Running", "refId": "A" }],
+          "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "mysql_global_status_threads_running", "legendFormat": "Running", "refId": "A" }],
           "title": "Running Threads",
           "type": "stat"
         },
         {
-          "datasource": "Prometheus",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -122,12 +120,12 @@ data:
           "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
           "id": 5,
           "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-          "targets": [{ "expr": "rate(mysql_global_status_questions[5m])", "legendFormat": "QPS", "refId": "A" }],
+          "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "rate(mysql_global_status_questions[5m])", "legendFormat": "QPS", "refId": "A" }],
           "title": "Queries/sec",
           "type": "stat"
         },
         {
-          "datasource": "Prometheus",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -138,7 +136,7 @@ data:
           "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
           "id": 6,
           "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-          "targets": [{ "expr": "increase(mysql_global_status_slow_queries[1h])", "legendFormat": "Slow", "refId": "A" }],
+          "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "increase(mysql_global_status_slow_queries[1h])", "legendFormat": "Slow", "refId": "A" }],
           "title": "Slow Queries (1h)",
           "type": "stat"
         },
@@ -151,7 +149,40 @@ data:
           "type": "row"
         },
         {
-          "datasource": "Prometheus",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "description": "InnoDB Buffer Pool의 현재 사용률. 80% 이상이면 정상, 95% 이상이면 Buffer Pool 크기 증가 검토 필요.",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "min": 0,
+              "max": 100,
+              "unit": "percent",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 80 },
+                  { "color": "red", "value": 95 }
+                ]
+              }
+            }
+          },
+          "gridPos": { "h": 8, "w": 6, "x": 0, "y": 6 },
+          "id": 7,
+          "options": {
+            "minVizHeight": 75,
+            "minVizWidth": 75,
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true
+          },
+          "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "mysql_global_status_buffer_pool_pages{state=\"data\"} / mysql_global_status_buffer_pool_pages{state=\"total\"} * 100", "legendFormat": "Buffer Pool Usage", "refId": "A" }],
+          "title": "Buffer Pool Usage",
+          "type": "gauge"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -161,17 +192,17 @@ data:
               "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 0.8 }, { "color": "red", "value": 0.95 } ] }
             }
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
-          "id": 10,
+          "gridPos": { "h": 8, "w": 9, "x": 6, "y": 6 },
+          "id": 8,
           "options": { "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
           "targets": [
-            { "expr": "mysql_global_status_buffer_pool_pages{state=\"data\"} / mysql_global_status_buffer_pool_pages{state=\"total\"}", "legendFormat": "Buffer Pool Usage", "refId": "A" }
+            { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "mysql_global_status_buffer_pool_pages{state=\"data\"} / mysql_global_status_buffer_pool_pages{state=\"total\"}", "legendFormat": "Buffer Pool Usage", "refId": "A" }
           ],
-          "title": "InnoDB Buffer Pool 사용률",
+          "title": "Buffer Pool Usage Trend",
           "type": "timeseries"
         },
         {
-          "datasource": "Prometheus",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -179,13 +210,13 @@ data:
               "unit": "short"
             }
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
-          "id": 11,
+          "gridPos": { "h": 8, "w": 9, "x": 15, "y": 6 },
+          "id": 9,
           "options": { "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
           "targets": [
-            { "expr": "mysql_global_status_buffer_pool_pages{state=\"data\"}", "legendFormat": "Data Pages", "refId": "A" },
-            { "expr": "mysql_global_status_buffer_pool_pages{state=\"free\"}", "legendFormat": "Free Pages", "refId": "B" },
-            { "expr": "mysql_global_status_buffer_pool_dirty_pages", "legendFormat": "Dirty Pages", "refId": "C" }
+            { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "mysql_global_status_buffer_pool_pages{state=\"data\"}", "legendFormat": "Data Pages", "refId": "A" },
+            { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "mysql_global_status_buffer_pool_pages{state=\"free\"}", "legendFormat": "Free Pages", "refId": "B" },
+            { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "mysql_global_status_buffer_pool_dirty_pages", "legendFormat": "Dirty Pages", "refId": "C" }
           ],
           "title": "InnoDB Buffer Pool Pages",
           "type": "timeseries"
@@ -199,28 +230,40 @@ data:
           "type": "row"
         },
         {
-          "datasource": "Prometheus",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "description": "최근 1시간 동안의 쿼리 유형별 비율. SELECT 비중이 높으면 읽기 중심, INSERT/UPDATE가 높으면 쓰기 중심 워크로드.",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
-              "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "barAlignment": 0, "drawStyle": "line", "fillOpacity": 10, "gradientMode": "none", "hideFrom": { "legend": false, "tooltip": false, "viz": false }, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5, "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": false, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "off" } },
-              "unit": "ops"
-            }
+              "unit": "short"
+            },
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "SELECT" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+              { "matcher": { "id": "byName", "options": "INSERT" }, "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }] },
+              { "matcher": { "id": "byName", "options": "UPDATE" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+              { "matcher": { "id": "byName", "options": "DELETE" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+            ]
           },
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
-          "id": 20,
-          "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "id": 10,
+          "options": {
+            "displayLabels": ["name", "percent"],
+            "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "values": ["percent"] },
+            "pieType": "donut",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          },
           "targets": [
-            { "expr": "rate(mysql_global_status_commands_total{command=\"select\"}[5m])", "legendFormat": "SELECT", "refId": "A" },
-            { "expr": "rate(mysql_global_status_commands_total{command=\"insert\"}[5m])", "legendFormat": "INSERT", "refId": "B" },
-            { "expr": "rate(mysql_global_status_commands_total{command=\"update\"}[5m])", "legendFormat": "UPDATE", "refId": "C" },
-            { "expr": "rate(mysql_global_status_commands_total{command=\"delete\"}[5m])", "legendFormat": "DELETE", "refId": "D" }
+            { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "increase(mysql_global_status_commands_total{command=\"select\"}[1h])", "legendFormat": "SELECT", "refId": "A" },
+            { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "increase(mysql_global_status_commands_total{command=\"insert\"}[1h])", "legendFormat": "INSERT", "refId": "B" },
+            { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "increase(mysql_global_status_commands_total{command=\"update\"}[1h])", "legendFormat": "UPDATE", "refId": "C" },
+            { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "increase(mysql_global_status_commands_total{command=\"delete\"}[1h])", "legendFormat": "DELETE", "refId": "D" }
           ],
-          "title": "쿼리 종류별 처리량 (ops/s)",
-          "type": "timeseries"
+          "title": "Query Type Distribution (1h)",
+          "type": "piechart"
         },
         {
-          "datasource": "Prometheus",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -229,13 +272,13 @@ data:
             }
           },
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
-          "id": 21,
+          "id": 11,
           "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
           "targets": [
-            { "expr": "rate(mysql_global_status_innodb_row_ops_total{operation=\"read\"}[5m])", "legendFormat": "Rows Read", "refId": "A" },
-            { "expr": "rate(mysql_global_status_innodb_row_ops_total{operation=\"inserted\"}[5m])", "legendFormat": "Rows Inserted", "refId": "B" },
-            { "expr": "rate(mysql_global_status_innodb_row_ops_total{operation=\"updated\"}[5m])", "legendFormat": "Rows Updated", "refId": "C" },
-            { "expr": "rate(mysql_global_status_innodb_row_ops_total{operation=\"deleted\"}[5m])", "legendFormat": "Rows Deleted", "refId": "D" }
+            { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "rate(mysql_global_status_innodb_row_ops_total{operation=\"read\"}[5m])", "legendFormat": "Rows Read", "refId": "A" },
+            { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "rate(mysql_global_status_innodb_row_ops_total{operation=\"inserted\"}[5m])", "legendFormat": "Rows Inserted", "refId": "B" },
+            { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "rate(mysql_global_status_innodb_row_ops_total{operation=\"updated\"}[5m])", "legendFormat": "Rows Updated", "refId": "C" },
+            { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "rate(mysql_global_status_innodb_row_ops_total{operation=\"deleted\"}[5m])", "legendFormat": "Rows Deleted", "refId": "D" }
           ],
           "title": "InnoDB Row Operations (rows/s)",
           "type": "timeseries"
@@ -249,7 +292,7 @@ data:
           "type": "row"
         },
         {
-          "datasource": "Prometheus",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -258,18 +301,18 @@ data:
             }
           },
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
-          "id": 30,
+          "id": 12,
           "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
           "targets": [
-            { "expr": "mysql_global_status_threads_connected", "legendFormat": "Connected", "refId": "A" },
-            { "expr": "mysql_global_status_threads_running", "legendFormat": "Running", "refId": "B" },
-            { "expr": "mysql_global_status_threads_cached", "legendFormat": "Cached", "refId": "C" }
+            { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "mysql_global_status_threads_connected", "legendFormat": "Connected", "refId": "A" },
+            { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "mysql_global_status_threads_running", "legendFormat": "Running", "refId": "B" },
+            { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "mysql_global_status_threads_cached", "legendFormat": "Cached", "refId": "C" }
           ],
           "title": "Thread 상태",
           "type": "timeseries"
         },
         {
-          "datasource": "Prometheus",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -278,11 +321,11 @@ data:
             }
           },
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
-          "id": 31,
+          "id": 13,
           "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
           "targets": [
-            { "expr": "rate(mysql_global_status_aborted_clients[5m])", "legendFormat": "Aborted Clients", "refId": "A" },
-            { "expr": "rate(mysql_global_status_aborted_connects[5m])", "legendFormat": "Aborted Connects", "refId": "B" }
+            { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "rate(mysql_global_status_aborted_clients[5m])", "legendFormat": "Aborted Clients", "refId": "A" },
+            { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "rate(mysql_global_status_aborted_connects[5m])", "legendFormat": "Aborted Connects", "refId": "B" }
           ],
           "title": "Aborted Connections (/s)",
           "type": "timeseries"
@@ -296,7 +339,7 @@ data:
           "type": "row"
         },
         {
-          "datasource": "Prometheus",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -305,17 +348,17 @@ data:
             }
           },
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 33 },
-          "id": 40,
+          "id": 14,
           "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
           "targets": [
-            { "expr": "rate(mysql_global_status_bytes_received[5m])", "legendFormat": "Bytes Received", "refId": "A" },
-            { "expr": "rate(mysql_global_status_bytes_sent[5m])", "legendFormat": "Bytes Sent", "refId": "B" }
+            { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "rate(mysql_global_status_bytes_received[5m])", "legendFormat": "Bytes Received", "refId": "A" },
+            { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "rate(mysql_global_status_bytes_sent[5m])", "legendFormat": "Bytes Sent", "refId": "B" }
           ],
           "title": "Network Traffic",
           "type": "timeseries"
         },
         {
-          "datasource": "Prometheus",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -324,18 +367,18 @@ data:
             }
           },
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 33 },
-          "id": 41,
+          "id": 15,
           "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
           "targets": [
-            { "expr": "rate(mysql_global_status_created_tmp_tables[5m])", "legendFormat": "Tmp Tables (Memory)", "refId": "A" },
-            { "expr": "rate(mysql_global_status_created_tmp_disk_tables[5m])", "legendFormat": "Tmp Tables (Disk)", "refId": "B" }
+            { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "rate(mysql_global_status_created_tmp_tables[5m])", "legendFormat": "Tmp Tables (Memory)", "refId": "A" },
+            { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "rate(mysql_global_status_created_tmp_disk_tables[5m])", "legendFormat": "Tmp Tables (Disk)", "refId": "B" }
           ],
           "title": "Temporary Tables (/s)",
           "type": "timeseries"
         }
       ],
       "refresh": "30s",
-      "schemaVersion": 38,
+      "schemaVersion": 39,
       "style": "dark",
       "tags": ["mysql", "database", "detail"],
       "templating": { "list": [] },
