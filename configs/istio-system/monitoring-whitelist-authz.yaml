@@ -14,13 +14,25 @@ spec:
       app: istio-ingressgateway  # Gateway에 적용
   action: ALLOW
   rules:
-  # 1. blog는 모두 허용 (전세계 공개)
+  # 1. blog 정적 페이지는 모두 허용 (Hugo 블로그 공개)
+  # Why: 블로그 콘텐츠는 전세계 공개, API/Board/Auth는 별도 규칙으로 IP 제한
   - to:
     - operation:
         hosts: ["blog.jiminhome.shop"]
+        notPaths: ["/api/*", "/board/*", "/auth", "/auth/*"]
     # from 없음 → 모든 소스 IP 허용
 
-  # 2. 모니터링 도구는 192.168.1.0/24만 허용 (내부 전용)
+  # 2. blog API/Board/Auth는 내부 네트워크만 허용 (게시글 CRUD 보호)
+  # Why: 외부에서 게시글 생성/수정/삭제 방지
+  - to:
+    - operation:
+        hosts: ["blog.jiminhome.shop"]
+        paths: ["/api/*", "/board/*", "/auth", "/auth/*"]
+    from:
+    - source:
+        remoteIpBlocks: ["192.168.1.0/24"]
+
+  # 3. 모니터링 도구는 192.168.1.0/24만 허용 (내부 전용)
   - to:
     - operation:
         hosts:
