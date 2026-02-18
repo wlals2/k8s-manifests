@@ -37,8 +37,32 @@ spec:
         - name: wazuh-authd-pass
           secret:
             secretName: wazuh-authd-pass
+        # Why: Discord Integration 스크립트를 InitContainer에서 PVC로 복사하기 위한 소스
+        - name: discord-integration
+          configMap:
+            name: wazuh-discord-integration
+            defaultMode: 0755
       securityContext:
         fsGroup: 101
+      # Why: PVC의 /var/ossec/integrations에 커스텀 스크립트를 복사
+      # Docker 이미지에는 slack/pagerduty만 있고, Discord는 없기 때문
+      initContainers:
+        - name: copy-discord-integration
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              cp /integrations-src/custom-discord /integrations-dst/custom-discord
+              cp /integrations-src/custom-discord.py /integrations-dst/custom-discord.py
+              chmod 755 /integrations-dst/custom-discord /integrations-dst/custom-discord.py
+              echo "Discord integration scripts copied successfully"
+          volumeMounts:
+            - name: discord-integration
+              mountPath: /integrations-src
+            - name: wazuh-manager-master
+              mountPath: /integrations-dst
+              subPath: wazuh/var/ossec/integrations
       containers:
         - name: wazuh-manager
           image: 'wazuh/wazuh-manager:4.14.2'

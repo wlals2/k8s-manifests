@@ -45,6 +45,11 @@ configMapGenerator:
   - name: wazuh-agent-conf
     files:
       - wazuh_agents/wazuh-agent-conf/ossec.conf
+  # Why: Level 10+ 보안 이벤트를 Discord로 전송하는 커스텀 Integration 스크립트
+  - name: wazuh-discord-integration
+    files:
+      - wazuh_managers/integrations/custom-discord
+      - wazuh_managers/integrations/custom-discord.py
 
 resources:
   - base/wazuh-ns.yaml
