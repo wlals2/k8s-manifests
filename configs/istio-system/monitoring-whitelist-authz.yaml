@@ -24,12 +24,13 @@ spec:
 
   # 2. 뉴스 조회 API는 전세계 공개 (읽기 전용, 이미 공개된 RSS 데이터)
   # Why: /news 페이지에서 외부 방문자가 JS fetch로 뉴스를 조회할 수 있어야 함
+  #      OPTIONS: 브라우저 CORS preflight 허용 필수 (없으면 403으로 차단됨)
   #      PATCH/POST (AI 요약 업데이트, 수동 수집)는 Rule 3에서 내부 전용 유지
   - to:
     - operation:
         hosts: ["blog.jiminhome.shop"]
         paths: ["/api/news", "/api/news/category/*"]
-        methods: ["GET"]
+        methods: ["GET", "OPTIONS"]
     # from 없음 → 모든 소스 IP 허용
 
   # 3. blog API/Board/Auth는 내부 네트워크만 허용 (게시글 CRUD 보호)
