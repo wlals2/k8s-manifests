@@ -94,31 +94,41 @@ falco-talon:
               deny_all_egress: true
 
       # ========================================================================
-      # Rule 2: 패키지 관리자 실행 → K8s Events 기록 (WARNING)
+      # Rule 2: 패키지 관리자 실행 → 의심 라벨 태깅 (WARNING)
       # ========================================================================
       # Why: 컨테이너는 불변(immutable)이어야 함
       #      런타임에 apt/yum이 실행되면 공격자가 도구를 설치하는 신호
-      #      Phase 1에서는 알림만, Phase 2에서 격리 추가 예정
-      #      actions: [] → defaultNotifiers(k8sevents)가 자동으로 기록
+      #      Phase 1에서는 라벨만, Phase 2에서 격리 추가 예정
       - rule: Package Manager in Container
         match:
           rules:
             - Launch Package Management Process in Container
           priority: warning
-        actions: []
+        actions:
+          - action: Label Pod as Suspicious
+            actionner: kubernetes:label
+            parameters:
+              labels:
+                analysis/status: suspicious
+                falco-alert: package-manager-detected
 
       # ========================================================================
-      # Rule 3: 바이너리 디렉토리 쓰기 → K8s Events 기록 (ERROR)
+      # Rule 3: 바이너리 디렉토리 쓰기 → 의심 라벨 태깅 (ERROR)
       # ========================================================================
       # Why: /bin, /sbin 쓰기 = 백도어/rootkit 설치 시도
-      #      False Positive 가능성 있어 Phase 1에서는 알림만
-      #      actions: [] → defaultNotifiers(k8sevents)가 자동으로 기록
+      #      False Positive 가능성 있어 Phase 1에서는 라벨만
       - rule: Write to Binary Dir
         match:
           rules:
             - Write to Binary Dir
           priority: error
-        actions: []
+        actions:
+          - action: Label Pod as Suspicious
+            actionner: kubernetes:label
+            parameters:
+              labels:
+                analysis/status: suspicious
+                falco-alert: binary-dir-write-detected
 
   # ==============================================================================
   # 리소스 (homelab 환경)
