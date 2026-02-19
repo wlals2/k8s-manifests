@@ -53,7 +53,7 @@ falco-talon:
     #
     # 현재 Phase 1 (Dry-Run):
     #   - 모든 규칙이 실제 대응 없이 로그만 기록
-    #   - kubernetes:labelize: Pod에 quarantine 라벨 추가 (NetworkPolicy용)
+    #   - kubernetes:label: Pod에 quarantine 라벨 추가 (NetworkPolicy용)
     #   - kubernetes:networkpolicy: NetworkPolicy 생성하여 Pod 격리
     #
     # Phase 2 전환 방법:
@@ -79,7 +79,7 @@ falco-talon:
               - falco
         actions:
           - action: Labelize Pod
-            actionner: kubernetes:labelize
+            actionner: kubernetes:label
             parameters:
               labels:
                 quarantine: "true"
