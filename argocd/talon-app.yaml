@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: talon
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/wlals2/k8s-manifests.git
+    targetRevision: main
+    path: apps/talon
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: falco  # Why: Falco와 같은 namespace → 서비스 DNS 단순화
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true

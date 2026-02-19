@@ -1,0 +1,11 @@
+apiVersion: v2
+name: talon
+description: Falco Talon - Automated IPS response engine for Falco security events
+type: application
+version: 0.1.0
+appVersion: "0.3.0"
+
+dependencies:
+  - name: falco-talon
+    version: "0.4.0"
+    repository: "https://falcosecurity.github.io/falco-talon"

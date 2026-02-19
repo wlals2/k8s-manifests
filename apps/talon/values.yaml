@@ -1,0 +1,144 @@
+# ==============================================================================
+# Falco Talon values.yaml (Wrapper Chart용)
+# ==============================================================================
+# Purpose: Falco 탐지 이벤트에 자동으로 대응하는 IPS (Intrusion Prevention System)
+# Dependency: apps/falco 의 Falcosidekick이 Talon으로 Alert를 전송
+#
+# 대응 체계:
+#   Falco (탐지) → Falcosidekick (라우팅) → Talon (IPS 대응)
+#
+# Phase 전략:
+#   Phase 1 (현재): Dry-Run - 로그만 기록, 실제 격리 없음
+#   Phase 2 (1주 후): 격리 활성화 - dryRun: false 로 전환
+# ==============================================================================
+
+falco-talon:
+  replicaCount: 1
+
+  image:
+    registry: falco.docker.scarf.sh
+    repository: falcosecurity/falco-talon
+    tag: ""
+    pullPolicy: IfNotPresent
+
+  # Why: 개발 환경(homelab)에서 Replicas 1개면 leaderElection 불필요
+  podSecurityContext:
+    runAsUser: 1234
+    fsGroup: 1234
+
+  service:
+    type: ClusterIP
+    port: 2803
+
+  # ==============================================================================
+  # Talon 핵심 설정
+  # ==============================================================================
+  config:
+    listenAddress: 0.0.0.0
+    listenPort: 2803
+
+    defaultNotifiers:
+      - k8sevents  # Why: K8s Events로 대응 기록 → kubectl get events로 확인 가능
+
+    watchRules: true  # Why: ConfigMap 변경 시 재시작 없이 자동 규칙 재로드
+
+    deduplication:
+      leaderElection: false  # Why: Replica 1개이므로 리더 선출 불필요
+      timeWindowSeconds: 5
+
+    # ==========================================================================
+    # Action Rules (대응 규칙)
+    # ==========================================================================
+    # 형식: Falco rule 이름 → 매칭 → 대응 액션
+    #
+    # 현재 Phase 1 (Dry-Run):
+    #   - 모든 규칙이 실제 대응 없이 로그만 기록
+    #   - kubernetes:labelize: Pod에 quarantine 라벨 추가 (NetworkPolicy용)
+    #   - kubernetes:networkpolicy: NetworkPolicy 생성하여 Pod 격리
+    #
+    # Phase 2 전환 방법:
+    #   1. rulesOverride의 dryRun 관련 설정 제거
+    #   2. alert-* 규칙에 networkpolicy 액션 추가
+    # ==========================================================================
+    rulesOverride: |
+      # ========================================================================
+      # Rule 1: Java RCE 탐지 → Pod 격리 (CRITICAL)
+      # ========================================================================
+      # Why: Java(Spring Boot)가 Shell을 실행하면 Log4Shell/Spring4Shell RCE 확정
+      #      공격 성공 시 즉각 네트워크 격리하여 C&C 통신/횡이동 차단
+      - rule: Java Process Spawning Shell
+        match:
+          rules:
+            - Java Process Spawning Shell
+          priority: critical
+        exceptions:
+          - namespaces:
+              - kube-system
+              - monitoring
+              - argocd
+              - falco
+        actions:
+          - action: Labelize Pod
+            actionner: kubernetes:labelize
+            parameters:
+              labels:
+                quarantine: "true"
+                falco-response: "isolated"
+                isolated-reason: "java-rce-detected"
+          - action: Isolate Compromised Pod
+            actionner: kubernetes:networkpolicy
+            parameters:
+              allow_dns: true
+              allow_monitoring: true
+              deny_all_ingress: true
+              deny_all_egress: true
+
+      # ========================================================================
+      # Rule 2: 패키지 관리자 실행 → 경고 기록 (WARNING)
+      # ========================================================================
+      # Why: 컨테이너는 불변(immutable)이어야 함
+      #      런타임에 apt/yum이 실행되면 공격자가 도구를 설치하는 신호
+      #      Phase 1에서는 알림만, Phase 2에서 격리 추가 예정
+      - rule: Package Manager in Container
+        match:
+          rules:
+            - Launch Package Management Process in Container
+          priority: warning
+        actions:
+          - action: Log Event
+            actionner: k8sevents
+
+      # ========================================================================
+      # Rule 3: 바이너리 디렉토리 쓰기 → 경고 기록 (ERROR)
+      # ========================================================================
+      # Why: /bin, /sbin 쓰기 = 백도어/rootkit 설치 시도
+      #      False Positive 가능성 있어 Phase 1에서는 알림만
+      - rule: Write to Binary Dir
+        match:
+          rules:
+            - Write to Binary Dir
+          priority: error
+        actions:
+          - action: Log Event
+            actionner: k8sevents
+
+  # ==============================================================================
+  # 리소스 (homelab 환경)
+  # ==============================================================================
+  resources:
+    requests:
+      cpu: 30m    # Why: 평시 대기 상태가 대부분, 이벤트 발생 시에만 부하
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  # ==============================================================================
+  # Prometheus 메트릭 (대응 횟수, 지연시간 등)
+  # ==============================================================================
+  serviceMonitor:
+    enabled: true
+    additionalLabels:
+      # Why: kube-prometheus-stack의 serviceMonitorSelector와 일치해야 수집됨
+      prometheus: kube-prometheus
+    interval: "30s"
