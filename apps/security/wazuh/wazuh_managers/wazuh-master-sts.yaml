@@ -67,9 +67,14 @@ spec:
         - name: wazuh-manager
           image: 'wazuh/wazuh-manager:4.14.2'
           resources:
-            limits:
+            requests:
+              # Why: 실제 사용량 464Mi × 2 = 928Mi → 1Gi (OOM Kill 105회 방지)
               cpu: 400m
-              memory: 512Mi
+              memory: 1Gi
+            limits:
+              # Why: CPU는 Throttling 해소 위해 2배, Memory는 Requests와 동일 (Guaranteed QoS)
+              cpu: 800m
+              memory: 1Gi
           securityContext:
             capabilities:
               add: ["SYS_CHROOT"]
