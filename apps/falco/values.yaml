@@ -164,8 +164,8 @@ falco:
             memory: 128Mi
           limits:
             cpu: 100m
-            # Why: Falco 이벤트 캐시 목적으로 256Mi면 충분, 무제한 방지
-            memory: 256Mi
+            # Why: 실제 사용량 254Mi/256Mi(99%)로 재시작 반복 → 512Mi로 증가
+            memory: 512Mi
 
   podSecurityContext: {}
 
