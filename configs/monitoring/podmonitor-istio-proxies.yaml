@@ -52,7 +52,9 @@ spec:
       regex: (.+):15090
 
     # Why: job name을 istio-mesh로 설정 (Grafana 대시보드 표준)
-    - targetLabel: job
+    # Why: action: replace 명시 - 미지정 시 Prometheus Operator가 기본값으로 저장하여 ArgoCD Out of Sync 발생
+    - action: replace
+      targetLabel: job
       replacement: istio-mesh
 
   # Why: 모든 namespace의 Istio Proxy 수집 (blog-system, monitoring 등)
