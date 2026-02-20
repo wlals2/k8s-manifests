@@ -73,13 +73,15 @@ spec:
         - name: wazuh-indexer
           image: 'wazuh/wazuh-indexer:4.14.2'
           resources:
-            # Why: 실제 사용량(12m) × 2배 = 30m (리소스 정책 적용)
             requests:
               cpu: 30m
+              # Why: JVM Heap(Xmx=1g) 보장
               memory: 1Gi
             limits:
               cpu: 500m
-              memory: 1564Mi
+              # Why: Xmx(1Gi) + Off-heap 여유(1.5Gi) = 2.5Gi
+              # 기존 1564Mi(96% 사용)는 OOM 위험 → 2.5Gi로 증가
+              memory: 2560Mi
           env:
             - name: OPENSEARCH_JAVA_OPTS
               value: '-Xms1g -Xmx1g -Dlog4j2.formatMsgNoLookups=true'

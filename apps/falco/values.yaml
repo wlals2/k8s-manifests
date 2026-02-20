@@ -156,6 +156,16 @@ falco:
         requests:
           cpu: 20m
           memory: 64Mi
+      redis:
+        resources:
+          requests:
+            cpu: 10m
+            # Why: 실제 사용량 1078Mi는 maxmemory 미설정으로 누적 증가한 것
+            memory: 128Mi
+          limits:
+            cpu: 100m
+            # Why: Falco 이벤트 캐시 목적으로 256Mi면 충분, 무제한 방지
+            memory: 256Mi
 
   podSecurityContext: {}
 
