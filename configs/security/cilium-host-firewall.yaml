@@ -1,0 +1,32 @@
+# ==============================================================================
+# Cilium Host Firewall - SSH 접근 제한
+# ==============================================================================
+# Purpose: 노드 호스트 레벨에서 SSH(22) 접근을 내부 네트워크만 허용
+# Why: 외부 SSH brute force 공격을 네트워크 레벨에서 원천 차단
+#
+# 동작 원리:
+#   CiliumClusterwideNetworkPolicy + nodeSelector → 노드 호스트 트래픽 제어
+#   ingress 규칙이 있으면 → 매칭 트래픽만 허용, 나머지 차단 (implicit deny)
+#
+# Dependencies:
+#   - Cilium Host Firewall 활성화 필요 (cilium-config: enable-host-firewall: true)
+#   - Cilium 1.18.6+
+# ==============================================================================
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: host-firewall-ssh
+spec:
+  # Why: 모든 노드(k8s-cp, worker1/2/3)에 동일 정책 적용
+  nodeSelector:
+    matchLabels: {}
+
+  ingress:
+    # Why: 홈랩 내부 네트워크(192.168.1.0/24)에서만 SSH 허용
+    # 외부 인터넷에서 오는 SSH 시도는 이 규칙에 매칭되지 않으므로 자동 차단
+    - fromCIDR:
+        - 192.168.1.0/24
+      toPorts:
+        - ports:
+            - port: "22"
+              protocol: TCP
