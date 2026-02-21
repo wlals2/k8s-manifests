@@ -10,10 +10,8 @@ spec:
     # Connection Pool 설정
     connectionPool:
       tcp:
+        # Why: MySQL은 TCP 프로토콜이므로 http 섹션 제거 (Istio가 HTTP로 처리 시도하는 것 방지)
         maxConnections: 20        # 최대 동시 연결 20개
-      http:
-        http1MaxPendingRequests: 10
-        maxRequestsPerConnection: 5
 
     # Outlier Detection (Circuit Breaking)
     outlierDetection:

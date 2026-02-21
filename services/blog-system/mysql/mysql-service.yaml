@@ -13,4 +13,6 @@ spec:
   - port: 3306
     targetPort: 3306
     protocol: TCP
-    name: mysql
+    # Why: "tcp-" 접두사 → Istio가 Protocol Detection 없이 순수 TCP로 처리
+    #      "mysql" 이름은 Istio가 프로토콜 감지 시도 → Server-First 프로토콜과 데드락
+    name: tcp-mysql
