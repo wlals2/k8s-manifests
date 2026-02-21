@@ -92,6 +92,20 @@ spec:
               subPath: ossec.conf
               readOnly: true
 
+            # Why: firewall-drop Active Response가 iptables를 실행해야 하는데
+            # 컨테이너 이미지에 iptables가 없음 → 호스트 /usr/sbin을 마운트
+            # Wazuh Agent의 주요 바이너리는 /var/ossec/에 있어 이 마운트가 영향 없음
+            - name: host-usr-sbin
+              mountPath: /usr/sbin
+              readOnly: true
+
+            # Why: Ubuntu 22.04의 iptables는 심볼릭 링크 체인 사용
+            # /usr/sbin/iptables → /etc/alternatives/iptables → /usr/sbin/iptables-nft
+            # 이 체인이 컨테이너 내에서 해석되려면 /etc/alternatives도 마운트 필요
+            - name: host-etc-alternatives
+              mountPath: /etc/alternatives
+              readOnly: true
+
           resources:
             limits:
               cpu: 200m
@@ -117,3 +131,16 @@ spec:
         - name: wazuh-agent-config
           configMap:
             name: wazuh-agent-conf
+
+        # Why: 호스트 /usr/sbin 마운트 (firewall-drop Active Response용 iptables)
+        - name: host-usr-sbin
+          hostPath:
+            path: /usr/sbin
+            type: Directory
+
+        # Why: Ubuntu alternatives 심볼릭 링크 체인 해결
+        # iptables → /etc/alternatives/iptables → iptables-nft 체인 작동
+        - name: host-etc-alternatives
+          hostPath:
+            path: /etc/alternatives
+            type: Directory
