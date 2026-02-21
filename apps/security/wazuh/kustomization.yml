@@ -50,6 +50,11 @@ configMapGenerator:
     files:
       - wazuh_managers/integrations/custom-discord
       - wazuh_managers/integrations/custom-discord.py
+  # Why: Falco → MITRE ATT&CK 분류 + 에스컬레이션 룰 (frequency+timeframe)
+  #      InitContainer가 Pod 시작 시 PVC의 /var/ossec/etc/rules/에 복사
+  - name: wazuh-falco-rules
+    files:
+      - wazuh_managers/wazuh_conf/wazuh-falco-rules.xml
 
 resources:
   - base/wazuh-ns.yaml

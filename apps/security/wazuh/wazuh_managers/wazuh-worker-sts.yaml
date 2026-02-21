@@ -44,8 +44,30 @@ spec:
         - name: filebeat-certs
           secret:
             secretName: indexer-certs
+        # Why: Falco→MITRE ATT&CK 에스컬레이션 룰을 PVC에 복사하기 위한 소스
+        - name: falco-rules
+          configMap:
+            name: wazuh-falco-rules
       securityContext:
         fsGroup: 101
+      # Why: PVC가 /var/ossec/etc 전체를 마운트하므로 ConfigMap 직접 마운트 불가
+      #      InitContainer로 Pod 시작 시 파일을 PVC rules 디렉터리에 복사
+      initContainers:
+        - name: copy-falco-rules
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /rules-dst
+              cp /rules-src/wazuh-falco-rules.xml /rules-dst/wazuh-falco-rules.xml
+              echo "Falco rules copied: $(ls /rules-dst/)"
+          volumeMounts:
+            - name: falco-rules
+              mountPath: /rules-src
+            - name: wazuh-manager-worker
+              mountPath: /rules-dst
+              subPath: wazuh/var/ossec/etc/rules
       containers:
         - name: wazuh-manager
           image: 'wazuh/wazuh-manager:4.14.2'
