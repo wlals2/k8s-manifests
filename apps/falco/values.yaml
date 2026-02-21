@@ -163,6 +163,10 @@ falco:
         customConfig:
           - maxmemory-policy allkeys-lru
           - maxmemory 200mb
+          # Why: Falco UI 이벤트 캐시는 영속성 불필요 → RDB 저장 비활성화
+          # 핵심: 재시작 시 dump.rdb 로드로 1Gi 초과 OOM Kill 반복 방지
+          - save ""
+          - appendonly no
         resources:
           requests:
             cpu: 10m
