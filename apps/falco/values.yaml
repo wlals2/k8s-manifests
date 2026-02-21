@@ -157,18 +157,19 @@ falco:
           cpu: 20m
           memory: 64Mi
       redis:
-        # Why: maxmemory 미설정 시 Falco 이벤트가 무한 누적 → OOM 반복 (256Mi→512Mi→OOM)
-        # maxmemory 설정으로 512mb 초과 시 allkeys-lru 정책으로 오래된 데이터 자동 삭제
+        # Why: maxmemory는 데이터 공간만 제한 (프로세스 overhead 미포함)
+        # Redis overhead(client buffer, 내부 구조) ~300MB → maxmemory 200mb + 300MB overhead = 500MB total
+        # 512mb로 설정 시: 512MB data + 400MB overhead = 910MB → 1Gi Limit 초과 → OOM Kill 90회
         customConfig:
           - maxmemory-policy allkeys-lru
-          - maxmemory 512mb
+          - maxmemory 200mb
         resources:
           requests:
             cpu: 10m
             memory: 256Mi
           limits:
             cpu: 100m
-            # Why: maxmemory 512mb + 안전 마진 (redis overhead, OS buffer)
+            # Why: maxmemory 200mb + Redis overhead ~300MB = ~500MB → 1Gi면 여유 충분
             memory: 1Gi
 
   podSecurityContext: {}
