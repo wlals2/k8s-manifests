@@ -1,17 +1,15 @@
 # ==============================================================================
-# Cilium Host Firewall - 노드 레벨 방화벽
+# Cilium Host Firewall - SSH 외부 접근 차단
 # ==============================================================================
-# Purpose: 노드 호스트 레벨에서 포트별 접근 제어
+# Purpose: 외부에서 오는 SSH Brute Force 공격을 노드 레벨에서 원천 차단
 #
 # 동작 원리:
-#   ingress 규칙이 있으면 → 매칭 트래픽만 허용, 나머지 차단 (implicit deny)
-#   따라서 클러스터 정상 동작에 필요한 포트를 모두 명시해야 함
+#   ingressDeny: 외부(0.0.0.0/0)에서 SSH(22) → 차단
+#   ingress:     내부(192.168.1.0/24)에서 SSH(22) → 허용
 #
-# 허용 정책:
-#   SSH(22)        : 내부 네트워크(192.168.1.0/24)만 허용
-#   HTTP/HTTPS     : 전체 허용 (블로그 외부 접근)
-#   클러스터 내부  : Pod/Service CIDR 전체 허용 (kubelet, etcd, Cilium 등)
-#   내부 네트워크  : 192.168.1.0/24 전체 허용 (관리용)
+# Why ingressDeny를 사용하는가:
+#   ingress만 쓰면 implicit deny → HTTP/HTTPS 등 다른 포트도 모두 차단됨
+#   ingressDeny를 쓰면 SSH만 선택적으로 제한 → 다른 트래픽에 영향 없음
 #
 # Dependencies:
 #   - Cilium Host Firewall 활성화 필요 (cilium-config: enable-host-firewall: true)
@@ -24,22 +22,21 @@ spec:
   nodeSelector:
     matchLabels: {}
 
-  ingress:
-    # Why: 홈랩 내부 네트워크 전체 허용 (SSH, kubectl, 관리 트래픽)
-    - fromCIDR:
-        - 192.168.1.0/24
-
-    # Why: 외부에서 블로그/서비스 접근 허용 (MetalLB → Istio Gateway)
+  # Why: 외부 인터넷에서 SSH 시도 차단 (Brute Force 방어)
+  ingressDeny:
     - fromCIDR:
         - 0.0.0.0/0
       toPorts:
         - ports:
-            - port: "80"
-              protocol: TCP
-            - port: "443"
+            - port: "22"
               protocol: TCP
 
-    # Why: 클러스터 내부 Pod/Service 간 통신 허용
-    # kubelet(10250), etcd(2379/2380), Cilium health(4240), VXLAN(8472) 등 포함
+  # Why: 내부 네트워크에서는 SSH 허용 (관리용)
+  # ingressDeny보다 ingress가 우선순위 높음 → 내부는 허용됨
+  ingress:
     - fromCIDR:
-        - 10.0.0.0/8
+        - 192.168.1.0/24
+      toPorts:
+        - ports:
+            - port: "22"
+              protocol: TCP
