@@ -1,18 +1,23 @@
 # ==============================================================================
-# Cilium Host Firewall - SSH 외부 접근 차단
+# Cilium Host Firewall - SSH 접근 제어
 # ==============================================================================
-# Purpose: 외부에서 오는 SSH Brute Force 공격을 노드 레벨에서 원천 차단
+# Purpose: 노드 SSH 접근을 내부 + Cloudflare WARP 기기만 허용, 외부 브루트포스 차단
 #
-# 동작 원리:
-#   ingressDeny: 외부(0.0.0.0/0)에서 SSH(22) → 차단
-#   ingress:     내부(192.168.1.0/24)에서 SSH(22) → 허용
+# 허용 대상:
+#   1. 내부 네트워크 (192.168.1.0/24): 홈랩 직접 접속
+#   2. Cloudflare WARP CGNAT (100.64.0.0/10): WARP Connector 가상 NIC 대역
+#      Why: WARP 클라이언트 → Cloudflare → WARP Connector(가상 NIC 100.x.x.x) → sshd
 #
-# Why ingressDeny를 사용하는가:
-#   ingress만 쓰면 implicit deny → HTTP/HTTPS 등 다른 포트도 모두 차단됨
-#   ingressDeny를 쓰면 SSH만 선택적으로 제한 → 다른 트래픽에 영향 없음
+# 차단 대상:
+#   외부 인터넷 (0.0.0.0/0): SSH Brute Force 방어
+#   ingressDeny가 ingress보다 낮은 우선순위 → 허용 규칙이 우선 적용됨
+#
+# 다른 포트 (HTTP/HTTPS 등):
+#   ingress/ingressDeny 규칙 없음 → 기존 방식 그대로 통과
+#   Cloudflare Tunnel 서비스 노출: cloudflared outbound 연결 → inbound 불필요
 #
 # Dependencies:
-#   - Cilium Host Firewall 활성화 필요 (cilium-config: enable-host-firewall: true)
+#   - Cilium Host Firewall 활성화 (enable-host-firewall: true)
 # ==============================================================================
 apiVersion: cilium.io/v2
 kind: CiliumClusterwideNetworkPolicy
@@ -22,20 +27,28 @@ spec:
   nodeSelector:
     matchLabels: {}
 
-  # Why: 외부 인터넷에서 SSH 시도 차단 (Brute Force 방어)
-  ingressDeny:
+  ingress:
+    # Why: 홈랩 내부 네트워크 SSH 허용
     - fromCIDR:
-        - 0.0.0.0/0
+        - 192.168.1.0/24
       toPorts:
         - ports:
             - port: "22"
               protocol: TCP
 
-  # Why: 내부 네트워크에서는 SSH 허용 (관리용)
-  # ingressDeny보다 ingress가 우선순위 높음 → 내부는 허용됨
-  ingress:
+    # Why: Cloudflare WARP Connector 가상 NIC 대역 허용
+    # WARP 클라이언트 → Cloudflare → WARP Connector(100.64.0.0/10) → sshd
     - fromCIDR:
-        - 192.168.1.0/24
+        - 100.64.0.0/10
+      toPorts:
+        - ports:
+            - port: "22"
+              protocol: TCP
+
+  # Why: 위 허용 대상 외 모든 외부에서 SSH 차단 (Brute Force 방어)
+  ingressDeny:
+    - fromCIDR:
+        - 0.0.0.0/0
       toPorts:
         - ports:
             - port: "22"
