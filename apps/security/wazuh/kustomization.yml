@@ -55,6 +55,11 @@ configMapGenerator:
   - name: wazuh-falco-rules
     files:
       - wazuh_managers/wazuh_conf/wazuh-falco-rules.xml
+  # Why: 컨테이너 로그 prefix 제거 후 Falco JSON 파싱 (기본 JSON 디코더 미작동)
+  #      InitContainer가 Pod 시작 시 PVC의 /var/ossec/etc/decoders/에 복사
+  - name: wazuh-falco-decoder
+    files:
+      - wazuh_managers/wazuh_conf/wazuh-falco-decoder.xml
 
 resources:
   - base/wazuh-ns.yaml

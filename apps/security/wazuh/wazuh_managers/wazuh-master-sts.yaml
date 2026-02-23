@@ -46,6 +46,10 @@ spec:
         - name: falco-rules
           configMap:
             name: wazuh-falco-rules
+        # Why: 컨테이너 로그 prefix 제거 + Falco JSON 파싱 디코더
+        - name: falco-decoder
+          configMap:
+            name: wazuh-falco-decoder
       securityContext:
         fsGroup: 101
       # Why: PVC의 /var/ossec/integrations에 커스텀 스크립트를 복사
@@ -85,6 +89,22 @@ spec:
             - name: wazuh-manager-master
               mountPath: /rules-dst
               subPath: wazuh/var/ossec/etc/rules
+        # Why: 컨테이너 로그 prefix 제거 디코더를 PVC의 /var/ossec/etc/decoders/에 복사
+        - name: copy-falco-decoder
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /decoders-dst
+              cp /decoder-src/wazuh-falco-decoder.xml /decoders-dst/wazuh-falco-decoder.xml
+              echo "Falco decoder copied: $(ls /decoders-dst/)"
+          volumeMounts:
+            - name: falco-decoder
+              mountPath: /decoder-src
+            - name: wazuh-manager-master
+              mountPath: /decoders-dst
+              subPath: wazuh/var/ossec/etc/decoders
       containers:
         - name: wazuh-manager
           image: 'wazuh/wazuh-manager:4.14.2'
