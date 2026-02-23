@@ -37,6 +37,8 @@ spec:
         sidecar.istio.io/proxyCPULimit: "200m"
         sidecar.istio.io/proxyMemory: "40Mi"
         sidecar.istio.io/proxyMemoryLimit: "128Mi"
+        # Why: istio-proxy 준비 전 spring-boot가 MySQL DNS 쿼리 시 UnknownHostException 방지
+        proxy.istio.io/config: '{"holdApplicationUntilProxyStarts": true}'
     spec:
       # ==============================================================================
       # SecurityContext (보안 강화)
