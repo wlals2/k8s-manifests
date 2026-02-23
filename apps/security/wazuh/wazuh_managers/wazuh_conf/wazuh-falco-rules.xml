@@ -1,16 +1,6 @@
 <!-- Wazuh Integration Rule: Falco → MITRE ATT&CK -->
 <!-- Why: Falco 알람을 MITRE ATT&CK으로 분류하여 Kill Chain 시각화 -->
 <!--
-목적:
-  - Falco 로그를 파싱하여 Wazuh 알람으로 변환
-  - MITRE ATT&CK Technique ID 매핑
-  - Severity Level 조정 (Warning/Critical)
-  - 에스컬레이션: 반복 발생 시 Level 격상 (frequency + timeframe)
-
-의존성:
-  - Fluentd: Falco 로그 전송 (Syslog UDP)
-  - Wazuh Manager: Rule 로드
-
 에스컬레이션 정책:
   - 1회 발생 → 해당 Level로 Wazuh 기록
   - WARNING × 3 / 5min → Level 12 격상 → Discord 알람
@@ -18,12 +8,11 @@
 
 Discord 알람 임계값 (master.conf integration level=10):
   Level 0-9 : 기록만, Discord 알람 없음
-  Level 10+  : Discord 알람 발송
-  Level 12+  : Email + Discord (email_alert_level=12)
+  Level 10+ : Discord 알람 발송
+  Level 12+ : Email + Discord (email_alert_level=12)
 
-참고:
-  - Wazuh Rule Syntax: https://documentation.wazuh.com/current/user-manual/ruleset/ruleset-xml-syntax/index.html
-  - MITRE ATT&CK: https://attack.mitre.org/
+수정 이력:
+  2026-02-23: <tactic> 태그 제거 (Wazuh 미지원), output_fields 중첩 필드 제거
 -->
 
 <group name="falco,kubernetes,">
@@ -39,49 +28,41 @@ Discord 알람 임계값 (master.conf integration level=10):
   <!-- Network: Outbound Connection                                  -->
   <!-- ============================================================ -->
 
-  <!-- Rule 100010: Outbound Connection (MITRE T1071 - Command and Control) -->
   <rule id="100010" level="8">
     <if_sid>100001</if_sid>
     <field name="rule">Outbound or Inbound Traffic not to Authorized Server</field>
     <description>Falco: Unexpected outbound connection detected</description>
     <mitre>
-      <id>T1071</id>  <!-- Application Layer Protocol -->
-      <tactic>Command and Control</tactic>
+      <id>T1071</id>
     </mitre>
     <group>attack.command_and_control,</group>
   </rule>
 
-  <!-- Rule 100011: Outbound Connection 커스텀 규칙 (Unexpected Outbound Connection) -->
   <rule id="100011" level="8">
     <if_sid>100001</if_sid>
     <field name="rule">Unexpected Outbound Connection</field>
     <description>Falco: Unexpected outbound connection to uncommon port</description>
     <mitre>
       <id>T1071</id>
-      <tactic>Command and Control</tactic>
     </mitre>
     <group>attack.command_and_control,</group>
   </rule>
 
-  <!-- Rule 100070: Outbound Connection 반복 → CRITICAL 격상 (에스컬레이션) -->
   <!-- Why: 단발성 아웃바운드는 오탐 가능성, 5분 내 3회 반복 시 C2 통신으로 판단 -->
   <rule id="100070" level="12" frequency="3" timeframe="300">
     <if_matched_sid>100010</if_matched_sid>
-    <description>Falco: Multiple outbound connections detected (Escalated: Possible C2 Communication)</description>
+    <description>Falco: Multiple outbound connections detected (Escalated: Possible C2)</description>
     <mitre>
       <id>T1071</id>
-      <tactic>Command and Control</tactic>
     </mitre>
     <group>attack.command_and_control,correlation,escalation,</group>
   </rule>
 
-  <!-- Rule 100071: 커스텀 Outbound Connection 반복 → CRITICAL 격상 -->
   <rule id="100071" level="12" frequency="3" timeframe="300">
     <if_matched_sid>100011</if_matched_sid>
-    <description>Falco: Unexpected outbound connection 3+ times in 5min (Escalated: Possible C2 Communication)</description>
+    <description>Falco: Unexpected outbound 3+ times in 5min (Escalated: Possible C2)</description>
     <mitre>
       <id>T1071</id>
-      <tactic>Command and Control</tactic>
     </mitre>
     <group>attack.command_and_control,correlation,escalation,</group>
   </rule>
@@ -90,27 +71,22 @@ Discord 알람 임계값 (master.conf integration level=10):
   <!-- Credential Access                                             -->
   <!-- ============================================================ -->
 
-  <!-- Rule 100020: Sensitive File Access (MITRE T1552 - Credential Access) -->
   <rule id="100020" level="10">
     <if_sid>100001</if_sid>
     <field name="rule">Read sensitive file</field>
-    <field name="output_fields.fd.name">\.+\/(passwd|shadow|id_rsa|\.aws\/credentials)</field>
     <description>Falco: Sensitive file access detected (Credential Theft)</description>
     <mitre>
-      <id>T1552.001</id>  <!-- Unsecured Credentials: Credentials In Files -->
-      <tactic>Credential Access</tactic>
+      <id>T1552.001</id>
     </mitre>
     <group>attack.credential_access,</group>
   </rule>
 
-  <!-- Rule 100060: ConfigMap/Secret Access (MITRE T1552 - Credential Access) -->
   <rule id="100060" level="10">
     <if_sid>100001</if_sid>
     <field name="rule">Read ConfigMap or Secret</field>
     <description>Falco: Kubernetes Secret access detected</description>
     <mitre>
-      <id>T1552.007</id>  <!-- Container API -->
-      <tactic>Credential Access</tactic>
+      <id>T1552.007</id>
     </mitre>
     <group>attack.credential_access,kubernetes,</group>
   </rule>
@@ -119,14 +95,12 @@ Discord 알람 임계값 (master.conf integration level=10):
   <!-- Privilege Escalation                                          -->
   <!-- ============================================================ -->
 
-  <!-- Rule 100030: Privilege Escalation (MITRE T1068 - Exploitation for Privilege Escalation) -->
   <rule id="100030" level="12">
     <if_sid>100001</if_sid>
     <field name="rule">Privilege Escalation</field>
     <description>Falco: Privilege escalation attempt detected</description>
     <mitre>
-      <id>T1068</id>  <!-- Exploitation for Privilege Escalation -->
-      <tactic>Privilege Escalation</tactic>
+      <id>T1068</id>
     </mitre>
     <group>attack.privilege_escalation,</group>
   </rule>
@@ -135,28 +109,23 @@ Discord 알람 임계값 (master.conf integration level=10):
   <!-- Execution: Java RCE / Reverse Shell                          -->
   <!-- ============================================================ -->
 
-  <!-- Rule 100040: Reverse Shell (MITRE T1059 - Command and Scripting Interpreter) -->
   <rule id="100040" level="15">
     <if_sid>100001</if_sid>
     <field name="rule">Shell spawned</field>
-    <field name="output_fields.proc.cmdline">\.+\/(bash|sh|nc|netcat)</field>
     <description>Falco: Reverse shell detected (Critical)</description>
     <mitre>
-      <id>T1059.004</id>  <!-- Unix Shell -->
-      <tactic>Execution</tactic>
+      <id>T1059.004</id>
     </mitre>
     <group>attack.execution,pci_dss_10.6.1,</group>
   </rule>
 
-  <!-- Rule 100041: Java Process Spawning Shell (Log4Shell/Spring4Shell RCE) -->
   <!-- Why: Java가 Shell을 실행하는 것은 RCE 공격이 성공했다는 강력한 신호 -->
   <rule id="100041" level="15">
     <if_sid>100001</if_sid>
     <field name="rule">Java Process Spawning Shell</field>
-    <description>Falco: Java process spawned shell (CRITICAL: RCE attack like Log4Shell)</description>
+    <description>Falco: Java process spawned shell (CRITICAL: RCE like Log4Shell)</description>
     <mitre>
       <id>T1059.004</id>
-      <tactic>Execution</tactic>
     </mitre>
     <group>attack.execution,rce,java,pci_dss_10.6.1,</group>
   </rule>
@@ -165,14 +134,12 @@ Discord 알람 임계값 (master.conf integration level=10):
   <!-- Container Escape                                              -->
   <!-- ============================================================ -->
 
-  <!-- Rule 100050: Container Escape (MITRE T1611 - Escape to Host) -->
   <rule id="100050" level="15">
     <if_sid>100001</if_sid>
     <field name="rule">Container Escape</field>
     <description>Falco: Container escape attempt detected (Critical)</description>
     <mitre>
-      <id>T1611</id>  <!-- Escape to Host -->
-      <tactic>Privilege Escalation</tactic>
+      <id>T1611</id>
     </mitre>
     <group>attack.privilege_escalation,</group>
   </rule>
@@ -181,29 +148,24 @@ Discord 알람 임계값 (master.conf integration level=10):
   <!-- Execution: Package Manager (Immutability Violation)          -->
   <!-- ============================================================ -->
 
-  <!-- Rule 100080: Package Manager in Container (1회 발생) -->
   <!-- Why: 빌드 시에만 패키지 설치, 런타임에 apt/yum 실행 = 공격자 도구 설치 의심 -->
   <!-- Level 7: 단발성은 오탐 가능 → Discord 알람 없이 기록만 -->
   <rule id="100080" level="7">
     <if_sid>100001</if_sid>
     <field name="rule">Launch Package Management Process in Container</field>
-    <description>Falco: Package manager ran inside container (WARNING: Immutability violation)</description>
+    <description>Falco: Package manager ran inside container (WARNING)</description>
     <mitre>
       <id>T1059</id>
-      <tactic>Execution</tactic>
     </mitre>
     <group>attack.execution,container,immutability,</group>
   </rule>
 
-  <!-- Rule 100081: Package Manager 반복 탐지 → CRITICAL 격상 (에스컬레이션) -->
   <!-- Why: 5분 내 3회 반복 = 공격자가 체계적으로 도구를 설치하는 패턴 -->
-  <!--      단발성 오탐이 아닌, 지속적 공격 행동 → Discord 알람으로 격상 -->
   <rule id="100081" level="12" frequency="3" timeframe="300">
     <if_matched_sid>100080</if_matched_sid>
-    <description>Falco: Package manager ran 3+ times in 5min (Escalated: Active tool installation attack)</description>
+    <description>Falco: Package manager 3+ times in 5min (Escalated: Active attack)</description>
     <mitre>
       <id>T1059</id>
-      <tactic>Execution</tactic>
     </mitre>
     <group>attack.execution,container,immutability,correlation,escalation,</group>
   </rule>
@@ -212,29 +174,24 @@ Discord 알람 임계값 (master.conf integration level=10):
   <!-- Persistence: Binary Directory Write (Rootkit/Backdoor)       -->
   <!-- ============================================================ -->
 
-  <!-- Rule 100090: Write to Binary Dir (1회 발생) -->
   <!-- Why: /bin, /sbin 쓰기 = 백도어/rootkit 설치 시도 -->
-  <!-- Level 10: ERROR 수준, 단발성도 Discord 알람 발송 (즉시 조사 필요) -->
+  <!-- Level 10: 단발성도 Discord 알람 발송 (즉시 조사 필요) -->
   <rule id="100090" level="10">
     <if_sid>100001</if_sid>
     <field name="rule">Write to Binary Dir</field>
-    <description>Falco: Binary directory write detected (ERROR: Possible rootkit/backdoor installation)</description>
+    <description>Falco: Binary directory write detected (Possible rootkit)</description>
     <mitre>
-      <id>T1543</id>  <!-- Create or Modify System Process -->
-      <tactic>Persistence</tactic>
+      <id>T1543</id>
     </mitre>
     <group>attack.persistence,container,rootkit,</group>
   </rule>
 
-  <!-- Rule 100091: Binary Dir Write 반복 탐지 → CRITICAL 격상 (에스컬레이션) -->
   <!-- Why: 2분 내 2회 반복 = 적극적 rootkit 설치 진행 중 -->
-  <!--      즉각 조치 필요 → Level 15 (최고 심각도) -->
   <rule id="100091" level="15" frequency="2" timeframe="120">
     <if_matched_sid>100090</if_matched_sid>
-    <description>Falco: Binary dir write 2+ times in 2min (CRITICAL: Active rootkit installation in progress)</description>
+    <description>Falco: Binary dir write 2+ in 2min (CRITICAL: Active rootkit)</description>
     <mitre>
       <id>T1543</id>
-      <tactic>Persistence</tactic>
     </mitre>
     <group>attack.persistence,container,rootkit,correlation,escalation,</group>
   </rule>
