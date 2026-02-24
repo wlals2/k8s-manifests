@@ -8,6 +8,13 @@ falco:
       kind: auto
 
   customRules:
+    # Why: Wazuh syscheck가 /etc/pam.d 등 민감 파일을 주기적으로 스캔하여
+    # "Read sensitive file untrusted" False Positive 대량 발생 → 예외 처리
+    falco-exceptions.yaml: |
+      - rule: Read sensitive file untrusted
+        append: true
+        condition: and not proc.name in (wazuh-syscheckd)
+
     blog-rules.yaml: |
       # ==================================================================
       # Rule 1: Java Process Spawning Shell (RCE 방어) - CRITICAL
