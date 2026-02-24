@@ -24,7 +24,7 @@ spec:
       containers:
         - name: ai-response
           # Why: ghcr.io 사용 (기존 blog-web과 동일 패턴)
-          image: ghcr.io/wlals2/ai-response:v1
+          image: ghcr.io/wlals2/ai-response:v2
           imagePullPolicy: Always
 
           ports:

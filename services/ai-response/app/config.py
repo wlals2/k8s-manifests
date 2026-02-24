@@ -42,10 +42,14 @@ class Config:
     def validate(cls) -> None:
         """
         Validate required configuration
-        Why: 필수 환경 변수 누락 시 조기 실패
+        Why: API Key 없이도 서비스 시작 가능 (health check 응답)
+             /analyze 호출 시에만 에러 반환
         """
         if not cls.CLAUDE_API_KEY:
-            raise ValueError("CLAUDE_API_KEY is required")
+            import logging
+            logging.getLogger(__name__).warning(
+                "CLAUDE_API_KEY is not set. Service will start but /analyze will fail."
+            )
 
     @classmethod
     def get_response_action(cls, risk_score: int) -> str:
