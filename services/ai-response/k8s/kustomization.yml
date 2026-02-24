@@ -8,6 +8,7 @@ resources:
   - serviceaccount.yaml
   - role.yaml
   - rolebinding.yaml
+  - ghcr-sealedsecret.yaml
   - discord-webhook-sealedsecret.yaml
   - deployment.yaml
   - service.yaml

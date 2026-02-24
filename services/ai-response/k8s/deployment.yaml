@@ -18,6 +18,8 @@ spec:
         app: ai-response
     spec:
       serviceAccountName: ai-response-sa
+      imagePullSecrets:
+        - name: ghcr-secret
 
       containers:
         - name: ai-response
