@@ -8,12 +8,12 @@ falco:
       kind: auto
 
   customRules:
-    # Why: Wazuh syscheck가 호스트에서 /etc/pam.d 등 민감 파일을 주기적 스캔
+    # Why: Wazuh 프로세스들이 호스트에서 민감 파일을 주기적으로 읽음 (FIM, SCA 스캔)
     falco-exceptions.yaml: |
       - rule: Read sensitive file untrusted
         override:
           condition: append
-        condition: and not proc.name in (wazuh-syscheckd)
+        condition: and not proc.name in (wazuh-syscheckd, wazuh-modulesd)
 
     blog-rules.yaml: |
       # ==================================================================
