@@ -10,6 +10,7 @@ resources:
   - rolebinding.yaml
   - ghcr-sealedsecret.yaml
   - discord-webhook-sealedsecret.yaml
+  - claude-api-key-sealedsecret.yaml
   - deployment.yaml
   - service.yaml
 
