@@ -8,12 +8,17 @@ falco:
       kind: auto
 
   customRules:
-    # Why: Wazuh syscheck가 /etc/pam.d 등 민감 파일을 주기적으로 스캔하여
-    # "Read sensitive file untrusted" False Positive 대량 발생 → 예외 처리
+    # Why: Wazuh 관련 프로세스/컨테이너가 False Positive 대량 발생
+    # - wazuh-syscheckd: 호스트에서 /etc/pam.d 등 민감 파일 주기적 스캔
+    # - wazuh-manager: 컨테이너 내부에서 apt 사용 (취약점 DB 갱신)
     falco-exceptions.yaml: |
       - rule: Read sensitive file untrusted
         append: true
         condition: and not proc.name in (wazuh-syscheckd)
+
+      - rule: Launch Package Management Process in Container
+        append: true
+        condition: and not container.image.repository in (wazuh/wazuh-manager)
 
     blog-rules.yaml: |
       # ==================================================================
