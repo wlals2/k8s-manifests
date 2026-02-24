@@ -95,7 +95,9 @@ falco:
           fd.type in (ipv4, ipv6) and
           not fd.lport in (80, 443, 8080, 3306, 53) and
           not fd.sip in ("127.0.0.1", "::1") and
-          not proc.name in (curl, wget, git)
+          not proc.name in (curl, wget, git, coredns, kube-apiserver, cadvisor, grafana-server, node_exporter, mysqld_exporter, speaker, metrics-server) and
+          not k8s.ns.name in (kube-system, argocd, longhorn-system) and
+          not container.name startswith ai-response
         output: >
           🔵 NOTICE: 예상치 못한 외부 연결 시도 감지
           (connection=%fd.name lport=%fd.lport rport=%fd.rport
