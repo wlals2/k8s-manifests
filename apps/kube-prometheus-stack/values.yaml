@@ -189,6 +189,29 @@ kube-prometheus-stack:
       datasources:
         enabled: true
 
+    # Why: Tempo datasource 등록 - Trace 시각화, Logs/Metrics 3축 연계
+    additionalDataSources:
+      - name: Tempo
+        type: tempo
+        uid: tempo
+        url: http://tempo.monitoring.svc.cluster.local:3200
+        access: proxy
+        isDefault: false
+        jsonData:
+          nodeGraphEnabled: true
+          tracesToLogsV2:
+            enabled: true
+            datasourceUid: P8E80F9AEF21F6940
+            filterByTraceID: true
+            filterBySpanID: true
+          tracesToMetricsV2:
+            enabled: true
+            datasourceUid: prometheus
+          serviceMap:
+            datasourceUid: prometheus
+          lokiSearch:
+            datasourceUid: P8E80F9AEF21F6940
+
     # Persistent Storage (선택 사항)
     # 이유: Dashboard 설정 보존 (Sidecar 사용 시 불필요)
     # 권장: 비활성화 (ConfigMap으로 관리)
