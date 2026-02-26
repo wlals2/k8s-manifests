@@ -1,0 +1,53 @@
+# Purpose: root(UID 0)로 실행하는 컨테이너 차단
+# Why: root 컨테이너 탈출 시 노드 전체에 영향 (container breakout)
+#      WAS/WEB는 이미 runAsUser: 65534로 준수 중
+#      MySQL은 공식 이미지가 root로 실행되므로 예외 처리
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-non-root
+spec:
+  validationFailureAction: Audit
+  validationFailureActionOverrides:
+    - action: Enforce
+      namespaces:
+        - blog-system
+  background: true
+  rules:
+    - name: require-non-root-pod
+      match:
+        any:
+        - resources:
+            kinds: [Pod]
+      exclude:
+        any:
+        # Why: 시스템 namespace 제외 (Falco eBPF, Cilium 등 privileged 필요)
+        - resources:
+            namespaces:
+              - kube-system
+              - istio-system
+              - monitoring
+              - security
+              - argocd
+              - kyverno
+              - cert-manager
+        # Why: MySQL은 공식 이미지가 root로 실행됨 (mysql:8.0 기본값)
+        #      MySQL을 non-root로 전환하려면 별도 커스텀 이미지 필요 → 범위 밖
+        - resources:
+            namespaces:
+              - blog-system
+            selector:
+              matchLabels:
+                app: mysql
+      validate:
+        message: "root(UID 0) 실행 금지: securityContext.runAsNonRoot: true 또는 runAsUser를 0이 아닌 값으로 설정하세요"
+        anyPattern:
+          # Pod 레벨에서 설정하거나
+          - spec:
+              securityContext:
+                runAsNonRoot: true
+          # Container 레벨에서 설정
+          - spec:
+              containers:
+                - securityContext:
+                    runAsNonRoot: true

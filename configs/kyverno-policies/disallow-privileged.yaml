@@ -1,0 +1,42 @@
+# Purpose: privileged: true 컨테이너 차단
+# Why: privileged 컨테이너 = 호스트 커널에 직접 접근 가능
+#      탈출 시 노드 전체 장악 → 가장 위험한 설정
+#      Falco, Cilium 등 정당한 사용은 시스템 namespace에서만 허용
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-privileged
+spec:
+  validationFailureAction: Audit
+  validationFailureActionOverrides:
+    - action: Enforce
+      namespaces:
+        - blog-system
+  background: true
+  rules:
+    - name: disallow-privileged-containers
+      match:
+        any:
+        - resources:
+            kinds: [Pod]
+      exclude:
+        any:
+        - resources:
+            namespaces:
+              - kube-system
+              - istio-system
+              - monitoring
+              - security   # Why: Falco는 eBPF를 위해 privileged 필요
+              - argocd
+              - kyverno
+              - cert-manager
+      validate:
+        message: "privileged 컨테이너 금지: securityContext.privileged: true 제거하세요"
+        pattern:
+          spec:
+            containers:
+              - =(securityContext):
+                  =(privileged): "false | null"
+            =(initContainers):
+              - =(securityContext):
+                  =(privileged): "false | null"

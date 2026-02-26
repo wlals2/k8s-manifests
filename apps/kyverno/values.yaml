@@ -1,0 +1,23 @@
+kyverno:
+  # Why: 홈랩 환경이므로 replica를 최소로 설정
+  #      프로덕션에서는 admissionController 3, 나머지 2 권장
+  admissionController:
+    replicas: 1
+
+  backgroundController:
+    replicas: 1
+
+  cleanupController:
+    replicas: 1
+
+  reportsController:
+    replicas: 1
+
+  config:
+    # Why: Kyverno가 다운됐을 때 모든 배포가 막히는 상황 방지
+    #      홈랩에서는 가용성 우선 (보안보다 복구 가능성이 중요)
+    webhooks:
+      - name: validate.kyverno.svc-fail
+        failurePolicy: Ignore
+      - name: mutate.kyverno.svc-fail
+        failurePolicy: Ignore

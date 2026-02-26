@@ -1,0 +1,47 @@
+# Purpose: CPU/Memory limits 없는 컨테이너 차단
+# Why: limits 없으면 단일 Pod이 노드 전체 CPU/Memory를 점유 가능 (noisy neighbor)
+#      이미 WAS/WEB는 limits 설정됨, 신규 배포 시 강제
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-resource-limits
+spec:
+  validationFailureAction: Audit
+  validationFailureActionOverrides:
+    - action: Enforce
+      namespaces:
+        - blog-system
+  background: true
+  rules:
+    - name: require-limits
+      match:
+        any:
+        - resources:
+            kinds: [Pod]
+      exclude:
+        any:
+        - resources:
+            namespaces:
+              - kube-system
+              - istio-system
+              - monitoring
+              - security
+              - argocd
+              - kyverno
+              - cert-manager
+        # Why: MySQL Exporter는 limits 설정이 없을 수 있음 → 별도 처리
+        - resources:
+            namespaces:
+              - blog-system
+            selector:
+              matchLabels:
+                app: mysql
+      validate:
+        message: "CPU/Memory limits를 반드시 설정하세요 (resources.limits.cpu, resources.limits.memory)"
+        pattern:
+          spec:
+            containers:
+              - resources:
+                  limits:
+                    cpu: "?*"
+                    memory: "?*"

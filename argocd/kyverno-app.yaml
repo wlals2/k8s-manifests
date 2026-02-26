@@ -1,0 +1,26 @@
+# Purpose: Kyverno Policy Engine ArgoCD Application
+# Why: Helm Wrapper Chart를 GitOps로 배포
+#      apps/kyverno/ → Kyverno 엔진 설치
+#      configs/kyverno-policies/ → 정책들은 별도 App으로 분리 (kyverno-policies-app.yaml)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kyverno
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/wlals2/k8s-manifests.git
+    targetRevision: main
+    path: apps/kyverno
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kyverno
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true

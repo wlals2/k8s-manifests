@@ -1,0 +1,27 @@
+# Purpose: Kyverno 정책들 ArgoCD Application
+# Why: Kyverno 엔진(kyverno-app)과 정책을 분리
+#      엔진 설치 완료 후 정책 적용 순서 보장 (syncWave로 순서 제어)
+#      정책만 수정할 때 엔진 재배포 없이 가능
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kyverno-policies
+  namespace: argocd
+  annotations:
+    # Why: Kyverno 엔진(wave 0)이 완전히 뜬 후 정책 적용
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/wlals2/k8s-manifests.git
+    targetRevision: main
+    path: configs/kyverno-policies
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kyverno
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

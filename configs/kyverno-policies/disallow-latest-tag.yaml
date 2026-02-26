@@ -1,0 +1,64 @@
+# Purpose: latest 태그 이미지 배포 차단
+# Why: latest 태그는 언제 어떤 버전이 배포될지 알 수 없어 재현 불가능한 상태를 만든다
+#      CI/CD에서는 이미 v{run_number} 태그를 사용하지만, kubectl apply 직접 배포 시에도 강제
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-latest-tag
+spec:
+  # Why: blog-system은 Enforce(차단), 나머지는 Audit(기록만)
+  validationFailureAction: Audit
+  validationFailureActionOverrides:
+    - action: Enforce
+      namespaces:
+        - blog-system
+  background: true  # Why: 이미 배포된 리소스도 백그라운드에서 스캔
+  rules:
+    - name: require-image-tag
+      match:
+        any:
+        - resources:
+            kinds: [Pod]
+      exclude:
+        any:
+        # Why: 시스템 namespace는 제외 (registry.k8s.io 공식 이미지 등)
+        - resources:
+            namespaces:
+              - kube-system
+              - istio-system
+              - monitoring
+              - security
+              - argocd
+              - kyverno
+      validate:
+        message: "latest 태그 사용 금지: 명시적 버전 태그를 사용하세요 (예: ghcr.io/wlals2/board-was:v29)"
+        pattern:
+          spec:
+            containers:
+              - image: "*:*"  # "image:tag" 형식 강제 (latest 포함 모든 태그)
+            =(initContainers):
+              - image: "*:*"
+
+    - name: disallow-latest
+      match:
+        any:
+        - resources:
+            kinds: [Pod]
+      exclude:
+        any:
+        - resources:
+            namespaces:
+              - kube-system
+              - istio-system
+              - monitoring
+              - security
+              - argocd
+              - kyverno
+      validate:
+        message: "latest 태그 사용 금지: 명시적 버전 태그를 사용하세요"
+        pattern:
+          spec:
+            containers:
+              - image: "!*:latest"
+            =(initContainers):
+              - image: "!*:latest"
