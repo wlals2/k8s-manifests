@@ -13,11 +13,9 @@ kyverno:
   reportsController:
     replicas: 1
 
-  config:
+  features:
     # Why: Kyverno가 다운됐을 때 모든 배포가 막히는 상황 방지
     #      홈랩에서는 가용성 우선 (보안보다 복구 가능성이 중요)
-    webhooks:
-      - name: validate.kyverno.svc-fail
-        failurePolicy: Ignore
-      - name: mutate.kyverno.svc-fail
-        failurePolicy: Ignore
+    #      enabled: true → 모든 webhook의 failurePolicy를 Ignore로 강제
+    forceFailurePolicyIgnore:
+      enabled: true
