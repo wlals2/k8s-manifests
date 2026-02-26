@@ -1,5 +1,7 @@
 # Why: Falco Alert를 AI로 분석하고 자동 대응하는 서비스
 # 추후 AI 판단 데이터를 축적한 뒤 Talon Rule로 변환하여 비용 0 운영 전환
+# Why: 2026-02-26 비활성화 - Claude API 비용 절감 목적 (Talon IPS만 운영)
+#      재활성화: replicas: 1로 변경
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -8,7 +10,7 @@ metadata:
   labels:
     app: ai-response
 spec:
-  replicas: 1
+  replicas: 0
   selector:
     matchLabels:
       app: ai-response
