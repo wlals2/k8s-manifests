@@ -24,3 +24,6 @@ spec:
       selfHeal: true
     syncOptions:
     - CreateNamespace=true
+    # Why: Kyverno CRD가 262144 bytes 한도 초과
+    #      ServerSideApply는 annotation에 전체 manifest를 저장하지 않아서 크기 제한 우회
+    - ServerSideApply=true
