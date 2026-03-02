@@ -10,6 +10,37 @@ data:
         listen  [::]:80;
         server_name  localhost;
 
+        # ==============================================================
+        # HTTP 보안 헤더 (ZAP 스캔 결과 기반 — 2026-03-02)
+        # ==============================================================
+
+        # Why: XSS 방어. 브라우저가 외부 출처 스크립트/리소스 로드를 차단.
+        #      'self': 동일 도메인만 허용
+        #      blog.jiminhome.shop: Hugo 블로그 ↔ WAS API 교차 허용
+        #      fonts.googleapis.com, fonts.gstatic.com: Google Fonts CDN
+        #      unsafe-inline: Hugo 테마 인라인 스타일 허용 (strict-dynamic으로 추후 강화 가능)
+        add_header Content-Security-Policy "default-src 'self' https://blog.jiminhome.shop; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; frame-ancestors 'none'" always;
+
+        # Why: Clickjacking 방어. 다른 사이트가 iframe으로 삽입 불가.
+        #      frame-ancestors 'none' (CSP)와 중복이지만 구형 브라우저 호환성을 위해 유지.
+        add_header X-Frame-Options "DENY" always;
+
+        # Why: MIME 스니핑 방어. 브라우저가 Content-Type을 임의로 변경하지 않도록 강제.
+        #      공격자가 .txt 파일에 JS 코드를 넣고 스크립트로 실행하는 공격 차단.
+        add_header X-Content-Type-Options "nosniff" always;
+
+        # Why: HSTS. 이후 1년(31536000초)간 이 도메인은 HTTPS로만 접속.
+        #      SSL Stripping 공격 차단.
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+        # Why: Referrer 정책. 외부 링크 클릭 시 URL 정보 누출 최소화.
+        #      동일 도메인은 전체 URL, 외부 도메인은 origin만 전송.
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+        # Why: 브라우저 기능(카메라, 마이크, 위치) 권한 차단.
+        #      블로그 서비스에는 불필요한 브라우저 API 모두 비활성화.
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+
         # Health check endpoint
         location /health {
             access_log off;
