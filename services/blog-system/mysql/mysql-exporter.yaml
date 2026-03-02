@@ -29,9 +29,19 @@ spec:
         prometheus.io/port: "9104"
         prometheus.io/path: "/metrics"
     spec:
+      # Why: Kyverno require-non-root 정책 준수 (9104 포트는 특권 불필요)
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        fsGroup: 65534
       containers:
       - name: mysql-exporter
         image: prom/mysqld-exporter:v0.16.0
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          readOnlyRootFilesystem: true
         args:
         - --config.my-cnf=/etc/mysql-exporter/.my.cnf
         - --collect.info_schema.tables
