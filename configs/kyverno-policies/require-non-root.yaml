@@ -1,7 +1,8 @@
 # Purpose: root(UID 0)로 실행하는 컨테이너 차단
 # Why: root 컨테이너 탈출 시 노드 전체에 영향 (container breakout)
-#      WAS/WEB는 이미 runAsUser: 65534로 준수 중
-#      MySQL은 공식 이미지가 root로 실행되므로 예외 처리
+#      WAS: runAsUser: 65534로 준수 중
+#      WEB(nginx): 80포트 바인딩에 root 필요 → 예외 처리
+#      MySQL: 공식 이미지가 root로 실행 → 예외 처리
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
@@ -39,6 +40,14 @@ spec:
             selector:
               matchLabels:
                 app: mysql
+        # Why: nginx는 80포트 바인딩에 root 필요 (master process → worker는 non-root)
+        #      근본 해결: nginxinc/nginx-unprivileged 이미지 전환 시 이 예외 제거 가능
+        - resources:
+            namespaces:
+              - blog-system
+            selector:
+              matchLabels:
+                app: web
       validate:
         message: "root(UID 0) 실행 금지: securityContext.runAsNonRoot: true 또는 runAsUser를 0이 아닌 값으로 설정하세요"
         anyPattern:
