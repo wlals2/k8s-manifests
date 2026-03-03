@@ -91,9 +91,9 @@ kube-prometheus-stack:
 
       # 메트릭 보관 기간
       # 형식: Nd (N일), Nh (N시간)
-      # 권장: 7d (1주일) - 홈랩 환경
-      # 변경 시: 디스크 공간 고려 (7d → 30d면 4배 증가)
-      retention: 7d
+      # Why: 30d SLO 계산을 위해 30일치 데이터 필요 (7d → 30d로 변경)
+      # PVC 여유: 현재 2.5G/20G (13%) → 30d 예상 ~11G (55%) 충분
+      retention: 30d
 
       # 메트릭 쿼리 시간 제한
       # 이유: 복잡한 PromQL 쿼리로 인한 OOM 방지
@@ -118,8 +118,8 @@ kube-prometheus-stack:
               - ReadWriteOnce
 
             # 스토리지 용량
-            # 계산: 약 1GB/day (기본 scrape_interval: 30s)
-            # 7d retention → 7GB + 여유분 = 20GB 권장
+            # 계산: 약 357MB/day (실측: 7d = 2.5G)
+            # 30d retention → ~11GB + 여유분 = 20GB 충분 (55% 예상)
             resources:
               requests:
                 storage: 20Gi
