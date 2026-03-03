@@ -1,0 +1,41 @@
+# ==============================================================================
+# WAS ServiceMonitor
+# ==============================================================================
+# 목적: Spring Boot WAS의 JVM/애플리케이션 메트릭 수집
+# 의존성:
+#   - pom.xml: micrometer-registry-prometheus 의존성 필요
+#   - was-configmap.yaml: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=prometheus 설정 필요
+#   - was-service.yaml: app=was 라벨, port name=http (8080)
+#
+# 수집 메트릭:
+#   - jvm_memory_used_bytes: Heap/Non-Heap 메모리 사용량 (OOM 전조 감지)
+#   - jvm_gc_pause_seconds: GC 정지 시간 (성능 저하 감지)
+#   - jvm_threads_live_threads: 활성 스레드 수
+#   - http_server_requests_seconds: Spring MVC 요청 레이턴시
+#   - hikaricp_connections_*: DB 커넥션 풀 상태
+# ==============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: was
+  namespace: monitoring
+  labels:
+    # Why: Prometheus serviceMonitorSelector.matchLabels와 일치해야 수집 대상으로 인식
+    prometheus: kube-prometheus
+    app: was
+    component: backend
+spec:
+  selector:
+    matchLabels:
+      app: was  # was-service.yaml의 라벨과 일치
+
+  # Why: ServiceMonitor는 monitoring namespace에 있지만 WAS는 blog-system에 있음
+  namespaceSelector:
+    matchNames:
+      - blog-system
+
+  endpoints:
+    - port: http  # was-service.yaml의 port name과 일치
+      path: /actuator/prometheus  # Why: micrometer-registry-prometheus가 노출하는 엔드포인트
+      interval: 30s
+      scrapeTimeout: 10s

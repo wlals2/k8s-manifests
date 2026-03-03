@@ -25,3 +25,7 @@ data:
 
   # MySQL 사용자명 (민감하지 않음)
   SPRING_DATASOURCE_USERNAME: root
+
+  # Why: /actuator/prometheus 엔드포인트 활성화 → Prometheus ServiceMonitor가 JVM 메트릭 수집
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
+  MANAGEMENT_METRICS_EXPORT_PROMETHEUS_ENABLED: "true"
