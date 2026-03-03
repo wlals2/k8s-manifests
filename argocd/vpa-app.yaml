@@ -1,0 +1,36 @@
+# ==============================================================================
+# ArgoCD Application - VPA (Vertical Pod Autoscaler)
+# ==============================================================================
+# 목적: VPA GitOps 편입 — 기존 helm install(cowboysysop) → fairwinds-stable Wrapper Chart
+# Why: 리소스 낭비 발견 (recommender/updater 500Mi → 실제 ~65Mi) 조정 필요
+#      kubectl patch는 GitOps hook에 의해 차단 → Wrapper Chart로 값 관리
+#
+# 마이그레이션 순서:
+#   1. helm uninstall vpa -n kube-system
+#   2. ArgoCD가 vpa-app.yaml 감지 → 재설치 (값은 values.yaml에서)
+# ==============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vpa
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/wlals2/k8s-manifests.git
+    targetRevision: main
+    path: apps/vpa
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,59 @@
+# ==============================================================================
+# VPA (Vertical Pod Autoscaler) Values
+# ==============================================================================
+# 목적: Pod CPU/Memory Request 최적값 자동 계산 (Off 모드 = 권장값만 계산)
+# 의존성: Prometheus (메트릭 소스), blog-system VPA 오브젝트 (was-vpa, web-vpa)
+# ==============================================================================
+# CRITICAL: Wrapper Chart에서는 dependency name을 prefix로 사용해야 함!
+# Chart.yaml의 dependencies.name: vpa
+# ==============================================================================
+
+vpa:
+  # ==============================================================================
+  # Recommender
+  # ==============================================================================
+  # 역할: 실제 리소스 사용량을 관찰하고 최적 Request 값을 계산
+  # 작동 원리: Prometheus에서 container_cpu_usage_seconds_total, container_memory_usage_bytes 수집
+  #           → 통계 모델로 99th percentile 기반 권장값 도출
+  recommender:
+    enabled: true
+    # Why: 실제 사용량 ~68Mi 기반 조정 (기존 500Mi는 7배 과다 예약)
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+  # ==============================================================================
+  # Updater
+  # ==============================================================================
+  # 역할: VPA Mode가 Auto/Recreate일 때 권장값을 실제 Pod에 적용 (Pod 재시작)
+  # Off 모드에서는 권장값만 계산하고 Pod를 건드리지 않으므로 Updater는 거의 동작 안 함
+  updater:
+    enabled: true
+    # Why: 실제 사용량 ~64Mi 기반 조정 (기존 500Mi는 7배 과다 예약)
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+  # ==============================================================================
+  # Admission Controller
+  # ==============================================================================
+  # 역할: Pod 생성 시 VPA 권장값을 Request에 자동 주입 (Auto/Initial 모드)
+  # Off 모드에서는 동작하지 않음 — 하지만 Webhook은 항상 등록 상태 유지
+  admissionController:
+    enabled: true
+    # Why: 실제 사용량 ~55Mi 기반 조정 (기존 200Mi는 3.6배 과다 예약)
+    resources:
+      requests:
+        cpu: 50m
+        memory: 100Mi
+      limits:
+        cpu: 200m
+        memory: 200Mi
