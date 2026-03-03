@@ -233,13 +233,14 @@ kube-prometheus-stack:
       storage: {}
 
       # 리소스 제한
+      # Why: 실제 사용량 ~33Mi 기반 조정 (기존 128Mi는 4배 과다 예약)
       resources:
         requests:
-          cpu: 100m
-          memory: 128Mi
+          cpu: 10m
+          memory: 64Mi
         limits:
           cpu: 200m
-          memory: 256Mi
+          memory: 128Mi
 
   # ==============================================================================
   # Exporters (Node Exporter, Kube-State-Metrics)
