@@ -34,3 +34,8 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      # Why: Helm Chart가 ClusterRole/ClusterRoleBinding 등 많은 리소스 생성 → 필드 충돌 방지
+      #      kube-prometheus-stack과 동일한 이유 (참조: argocd/kube-prometheus-stack-app.yaml)
+      - ServerSideApply=true
+      # Why: CRD apply 순서에 따라 아직 등록 안 된 리소스 타입(VPA CRD 등) dry-run 시 에러 방지
+      - SkipDryRunOnMissingResource=true
