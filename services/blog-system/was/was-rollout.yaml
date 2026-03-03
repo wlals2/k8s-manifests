@@ -35,7 +35,7 @@ spec:
         # Istio sidecar 리소스 최적화
         sidecar.istio.io/proxyCPU: "10m"
         sidecar.istio.io/proxyCPULimit: "200m"
-        sidecar.istio.io/proxyMemory: "40Mi"
+        sidecar.istio.io/proxyMemory: "128Mi"
         sidecar.istio.io/proxyMemoryLimit: "128Mi"
         # Why: istio-proxy 준비 전 spring-boot가 MySQL DNS 쿼리 시 UnknownHostException 방지
         proxy.istio.io/config: '{"holdApplicationUntilProxyStarts": true}'
@@ -142,11 +142,14 @@ spec:
               value: "none"
             - name: OTEL_LOGS_EXPORTER
               value: "none"
-          # Why: 실제 사용량(5m) × 2배 = 10m (리소스 정책 적용)
+          # Why: VPA 41일 데이터 기반 권장값 적용
+          # CPU: VPA target 100m (기존 10m은 실제 사용량 대비 과소 예약)
+          # Memory: VPA target 560Mi + 여유 40Mi (기존 256Mi는 실제 사용량 ~557Mi보다 낮아 OOM 위험)
+          # istio-proxy: annotation의 proxyMemory도 40Mi→128Mi로 함께 조정
           resources:
             requests:
-              cpu: 10m
-              memory: 256Mi
+              cpu: 100m
+              memory: 600Mi
             limits:
               cpu: 500m
               memory: 1Gi
