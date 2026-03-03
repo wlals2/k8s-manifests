@@ -89,9 +89,13 @@ spec:
           ports:
             - containerPort: 8080
               name: http
-          # 환경변수 주입 (ConfigMap + Secret + OpenTelemetry)
+          # 환경변수 주입 (ConfigMap 전체 + Secret + OpenTelemetry)
+          # Why envFrom: ConfigMap 키 추가 시 Rollout 수정 없이 자동 반영
+          envFrom:
+            - configMapRef:
+                name: was-config
           env:
-            # Spring Boot 데이터소스
+            # Spring Boot 데이터소스 (configMapKeyRef는 envFrom으로 대체되었으나 아래 Secret은 별도 주입)
             - name: SPRING_DATASOURCE_URL
               valueFrom:
                 configMapKeyRef:
