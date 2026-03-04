@@ -33,17 +33,17 @@ spec:
   # ==============================================================================
   # Why: kyverno-api subchart의 policies.kyverno.io CRD 11개가 OutOfSync 표시
   #
-  #      근본 원인:
-  #        Kubernetes API server가 CRD apply 시 spec.conversion({strategy:None})을
-  #        자동 주입 → Chart에는 없는 필드 → ArgoCD가 diff 감지
-  #        (CRD의 managedFields는 SSA로 strip됨 — managedFieldsManagers 방식 불가)
+  #      근본 원인 (ArgoCD UI Diff로 최종 확인):
+  #        Chart가 metadata.labels: {} (빈 labels)를 렌더링하지만
+  #        클러스터 CRD에는 labels 필드 자체가 없음 → diff 감지
   #
-  #      해결: jsonPointers로 spec.conversion, status 필드를 diff에서 제외
-  #            RespectIgnoreDifferences=true 와 함께 sync 시에도 적용
+  #      추가: spec.conversion ({strategy:None})도 K8s API server가 자동 주입
+  #            status도 runtime 생성 필드
   # ==============================================================================
   ignoreDifferences:
     - group: apiextensions.k8s.io
       kind: CustomResourceDefinition
       jsonPointers:
-        - /spec/conversion  # Kubernetes API server가 자동 주입하는 변환 전략
+        - /metadata/labels  # Chart가 labels: {} 렌더링하지만 클러스터엔 labels 없음
+        - /spec/conversion  # K8s API server가 자동 주입하는 변환 전략
         - /status           # CRD 상태 필드 (runtime 생성)
