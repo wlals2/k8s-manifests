@@ -77,7 +77,7 @@ spec:
             runAsUser: 0
       containers:
         - name: spring-boot
-          image: ghcr.io/wlals2/board-was:v58
+          image: ghcr.io/wlals2/board-was:v59
           imagePullPolicy: Always
           # Container 레벨 보안 설정
           securityContext:
