@@ -137,6 +137,25 @@ falco-talon:
                 analysis/status: suspicious
                 falco-alert: binary-dir-write-detected
 
+      # ========================================================================
+      # Rule 4: 앱 컨테이너 Shell 실행 → 의심 라벨 태깅 (WARNING)
+      # ========================================================================
+      # Why: Immutable Container에서 shell 실행 = 침투 성공 신호
+      #      Rule 1(Java RCE)은 부모=java만 탐지하여 빈 구간 존재
+      #      kubectl exec, web shell, sidecar 침투 등 모든 경로 커버
+      - rule: Shell in Application Container
+        match:
+          rules:
+            - Shell Spawned in Application Container
+          priority: warning
+        actions:
+          - action: Label Pod as Suspicious
+            actionner: kubernetes:label
+            parameters:
+              labels:
+                analysis/status: suspicious
+                falco-alert: shell-in-container
+
   # ==============================================================================
   # 리소스 (homelab 환경)
   # ==============================================================================

@@ -81,6 +81,35 @@ falco:
         tags: [maturity_stable, container, filesystem, mitre_persistence, T1543]
 
       # ==================================================================
+      # Rule 5: Shell Spawned in Application Container - WARNING
+      # ==================================================================
+      # 목적: 앱 컨테이너에서 shell 실행 = 침투 성공 신호 (부모 프로세스 무관)
+      # Why: Rule 1(Java RCE)은 proc.pname=java만 탐지 → kubectl exec,
+      #      web shell, sidecar 침투 등 Java 외 경로를 놓침
+      # 원칙: Immutable Container에서 shell 실행 이유 = 0%
+      # 오탐 방지:
+      #   - 시스템 namespace 제외 (kube-system, monitoring 등)
+      #   - Istio sidecar/initContainer 이미지 제외
+      #   - backup CronJob namespace 제외
+      #   - blog-system의 mysql-backup CronJob 컨테이너 제외
+      - rule: Shell Spawned in Application Container
+        desc: Any shell execution in application container indicates compromise regardless of parent process
+        condition: >
+          spawned_process and
+          container and
+          proc.name in (bash, sh, ksh, zsh, dash) and
+          not k8s.ns.name in (kube-system, monitoring, argocd, falco, istio-system, security, backup-system, longhorn-system, metallb-system, sealed-secrets) and
+          not container.image.repository in (docker.io/istio/proxyv2, docker.io/curlimages/curl) and
+          not container.name in (istio-init, otel-agent-download, mysql-backup)
+        output: >
+          ⚠️ WARNING: 앱 컨테이너에서 Shell이 실행되었습니다! (침투 의심)
+            (user=%user.name pod=%k8s.pod.name namespace=%k8s.ns.name
+             parent=%proc.pname cmd=%proc.cmdline container=%container.name
+             image=%container.image.repository)
+        priority: WARNING
+        tags: [maturity_stable, container, process, shell, mitre_execution, T1059]
+
+      # ==================================================================
       # Rule 4: Unexpected Outbound Connection (Reverse Shell 방어) - NOTICE
       # ==================================================================
       # 목적: 예상치 못한 외부 연결 감지 (C&C 서버 통신, 데이터 유출)
