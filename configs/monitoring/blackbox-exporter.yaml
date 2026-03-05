@@ -77,6 +77,10 @@ spec:
     metadata:
       labels:
         app: blackbox-exporter
+        # Why: Webhook 3 (object.sidecar-injector)의 objectSelector가 label 기반
+        #      monitoring namespace에 istio-injection/istio.io/rev label이 없으므로
+        #      Pod-level label로 injection 대상 지정 필수
+        sidecar.istio.io/inject: "true"
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9115"
