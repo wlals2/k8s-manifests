@@ -4,18 +4,18 @@
 # 목적: was-service 접근 제어
 #
 # 보안 원칙:
-# - blog-system namespace의 pod에서만 접근 허용
+# - /api/*, /auth/* → 모든 출발지 허용 (외부 사용자 접근 대상)
+# - /actuator/*     → monitoring namespace만 허용 (내부 전용)
 # - 포트 8080만 허용
-# - /api/*, /actuator/* 경로만 허용
-# - 기타 모든 접근 차단 (외부 직접 접근 불가)
+# - 기타 모든 접근 차단
 #
 # 주의:
-# - mTLS DISABLE 모드이므로 principals 조건 사용 불가
-# - namespace 기반 접근 제어만 적용
+# - mTLS PERMISSIVE 모드이므로 principals 조건 사용 불가
+# - namespace 기반 접근 제어 사용
 #
 # 효과:
-# - 외부 → was 직접 접근 차단
-# - blog-system namespace → was만 허용
+# - 외부 → /actuator/* 직접 접근 차단 (Istio가 단일 보안 게이트)
+# - Spring Boot 앱 설정 변경에 무관하게 Istio가 강제 차단
 # ==============================================================================
 apiVersion: security.istio.io/v1beta1
 kind: AuthorizationPolicy
@@ -33,27 +33,37 @@ spec:
   action: ALLOW
 
   rules:
-  # Rule 1: 애플리케이션 트래픽 (8080 포트)
-  # Why: blog-system namespace 내부 트래픽만 허용
+  # Rule 1: 애플리케이션 트래픽 — 모든 출발지 허용
+  # Why: /api/*, /auth/* 는 외부 사용자가 접근하는 공개 경로
+  # Why: /actuator/* 를 여기서 제거 → monitoring namespace만 허용하는 Rule 2/3으로 분리
   - to:
     - operation:
-        ports: ["8080"]  # WAS 포트만 허용
-        paths: ["/api/*", "/actuator/*", "/auth", "/auth/*"]  # API, 모니터링, OAuth 경로만
+        ports: ["8080"]
+        paths: ["/api/*", "/auth", "/auth/*"]
 
-  # Rule 2: Blackbox Exporter Health Check (monitoring namespace → was:8080/actuator/health)
-  # Why: 외부 가용성 모니터링용
-  # Why: Health check 엔드포인트만 허용 (보안 강화)
+  # Rule 2: Health Check (monitoring namespace → /actuator/health)
+  # Why: K8s Probe 및 Blackbox Exporter 가용성 모니터링용
   - from:
     - source:
         namespaces: ["monitoring"]
     to:
     - operation:
         ports: ["8080"]
-        paths: ["/actuator/health"]
+        paths: ["/actuator/health", "/actuator/health/*"]
 
-  # Rule 3: Prometheus 메트릭 수집 (15090 포트, 클러스터 내부 전체 허용)
-  # Why: Istio Proxy 메트릭을 Prometheus가 스크랩하도록 허용
-  # Why: 메트릭 전용 포트로 민감 정보 없음, from 조건 불필요
+  # Rule 3: Prometheus 메트릭 수집 (monitoring namespace → /actuator/prometheus)
+  # Why: Prometheus ServiceMonitor가 메트릭을 스크랩하도록 허용
+  # Why: Rule 1에서 분리 — actuator 경로는 monitoring namespace만 접근 가능
+  - from:
+    - source:
+        namespaces: ["monitoring"]
+    to:
+    - operation:
+        ports: ["8080"]
+        paths: ["/actuator/prometheus"]
+
+  # Rule 4: Istio Proxy 메트릭 포트 (15090)
+  # Why: Prometheus가 Envoy 사이드카 메트릭을 스크랩하도록 허용
   - to:
     - operation:
-        ports: ["15090"]  # Istio Proxy 메트릭 포트
+        ports: ["15090"]
