@@ -218,6 +218,33 @@ kube-prometheus-stack:
     persistence:
       enabled: false
 
+    # Why: Daily Report 대시보드를 PNG로 캡처 → Discord 이미지 전송
+    #      Chromium 기반이므로 Grafana Pod과 분리 배포 (OOM 방지)
+    imageRenderer:
+      enabled: true
+      replicas: 1
+      image:
+        repository: grafana/grafana-image-renderer
+        tag: latest
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+      env:
+        BROWSER_TZ: Asia/Seoul
+      networkPolicy:
+        limitIngress: false
+        limitEgress: false
+
+    # Why: Image Renderer Service URL을 Grafana에 알려줘야 /render API 작동
+    grafana.ini:
+      rendering:
+        server_url: http://kube-prometheus-stack-grafana-image-renderer:8081/render
+        callback_url: http://kube-prometheus-stack-grafana:80/
+
   # ==============================================================================
   # AlertManager
   # ==============================================================================

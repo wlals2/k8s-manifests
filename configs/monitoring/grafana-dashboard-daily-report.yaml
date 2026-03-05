@@ -1,0 +1,953 @@
+# ==============================================================================
+# Grafana Dashboard ConfigMap - Daily Report (Morning Briefing)
+# ==============================================================================
+# 목적: 하루 전체를 한눈에 파악하는 "Morning Briefing" 대시보드
+#       daily-report.sh가 수집하는 인사이트를 Grafana 네이티브로 시각화
+#
+# 의존성:
+#   - PrometheusRule: sli:availability, sli:error_rate, sli:latency, sli:throughput
+#   - Blackbox Exporter: probe_success (WEB/WAS health check)
+#   - MySQL Exporter: mysql_up
+#   - Loki: Falcosidekick 로그 (priority label)
+#   - Node Exporter: node_cpu, node_memory, node_filesystem
+#
+# 레이아웃 (6개 Row):
+#   Row 1: SLO 요약         - Gauge 4개 (30d/24h Availability, Error Rate, Latency p95)
+#   Row 2: 서비스 상태       - Stat 5개 (RPS, WEB/WAS/MySQL, Pod Restarts)
+#   Row 3: 보안 이벤트       - Stat 3개 (Falco C/W/E 건수) + Table (Rule별 분포)
+#   Row 4: 인프라 리소스     - Bar Gauge 3개 (노드별 CPU/Memory/Disk)
+#   Row 5: 24h 추세         - TimeSeries 2개 (Latency + Error/RPS)
+#   Row 6: 에러 로그         - Stat 1개 (에러 건수) + Logs 패널
+# ==============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-daily-report
+  namespace: monitoring
+  labels:
+    # Why: Grafana sidecar가 이 label로 자동 로드
+    grafana_dashboard: "1"
+data:
+  daily-report.json: |
+    {
+      "annotations": { "list": [] },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "id": null,
+      "links": [
+        {
+          "asDropdown": false,
+          "icon": "external link",
+          "includeVars": false,
+          "keepTime": false,
+          "tags": [],
+          "targetBlank": true,
+          "title": "SLO Detail",
+          "tooltip": "SLO Overview 대시보드로 이동",
+          "type": "link",
+          "url": "/d/slo-overview"
+        },
+        {
+          "asDropdown": false,
+          "icon": "external link",
+          "includeVars": false,
+          "keepTime": false,
+          "tags": [],
+          "targetBlank": true,
+          "title": "Service Detail",
+          "tooltip": "Service Detail 대시보드로 이동",
+          "type": "link",
+          "url": "/d/service-detail"
+        }
+      ],
+      "liveNow": false,
+      "panels": [
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "id": 100,
+          "panels": [],
+          "title": "📊 SLO 요약",
+          "type": "row"
+        },
+        {
+          "title": "Availability (30d)",
+          "description": "30일 평균 가용성. SLO 목표: 99% (허용 다운타임 7.2시간)",
+          "type": "gauge",
+          "gridPos": { "h": 6, "w": 6, "x": 0, "y": 1 },
+          "id": 1,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sli:availability:30d * 100",
+              "legendFormat": "Availability",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 90,
+              "max": 100,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "orange", "value": 99 },
+                  { "color": "green", "value": 99.5 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true,
+            "orientation": "auto"
+          }
+        },
+        {
+          "title": "Availability (24h)",
+          "description": "24시간 평균 가용성. 최근 장애 시점 특정에 활용",
+          "type": "gauge",
+          "gridPos": { "h": 6, "w": 6, "x": 6, "y": 1 },
+          "id": 2,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "avg_over_time(probe_success{job=\"blackbox-http\", instance=\"http://web-service.blog-system.svc.cluster.local:80\"}[24h]) * 100",
+              "legendFormat": "Availability 24h",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 90,
+              "max": 100,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "orange", "value": 99 },
+                  { "color": "green", "value": 99.5 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true,
+            "orientation": "auto"
+          }
+        },
+        {
+          "title": "Error Rate (5m)",
+          "description": "5xx 에러 비율. SLO 목표: < 1%",
+          "type": "gauge",
+          "gridPos": { "h": 6, "w": 6, "x": 12, "y": 1 },
+          "id": 3,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "(sli:error_rate:5m or vector(0)) * 100",
+              "legendFormat": "Error Rate",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 10,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "orange", "value": 1 },
+                  { "color": "red", "value": 5 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true,
+            "orientation": "auto"
+          }
+        },
+        {
+          "title": "WAS Latency p95",
+          "description": "WAS 서비스 p95 응답시간. SLO: < 500ms",
+          "type": "gauge",
+          "gridPos": { "h": 6, "w": 6, "x": 18, "y": 1 },
+          "id": 4,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sli:latency:p95:5m{destination_service_name=\"was-service\"}",
+              "legendFormat": "WAS p95",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "min": 0,
+              "max": 1000,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "orange", "value": 300 },
+                  { "color": "red", "value": 500 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true,
+            "orientation": "auto"
+          }
+        },
+
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
+          "id": 200,
+          "panels": [],
+          "title": "🖥️ 서비스 상태",
+          "type": "row"
+        },
+        {
+          "title": "Total RPS",
+          "description": "초당 요청 수. 0이면 서비스 장애 의심",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 5, "x": 0, "y": 8 },
+          "id": 5,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sli:throughput:rps:1m or vector(0)",
+              "legendFormat": "Total RPS",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 0.001 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "textMode": "auto",
+            "orientation": "auto"
+          }
+        },
+        {
+          "title": "WEB Status",
+          "description": "Blackbox Exporter 기반 WEB 서비스 상태",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 5, "x": 5, "y": 8 },
+          "id": 6,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "probe_success{job=\"blackbox-http\", instance=\"http://web-service.blog-system.svc.cluster.local:80\"}",
+              "legendFormat": "WEB",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": { "text": "DOWN", "color": "red" },
+                    "1": { "text": "UP", "color": "green" }
+                  }
+                }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "textMode": "auto",
+            "orientation": "auto"
+          }
+        },
+        {
+          "title": "WAS Status",
+          "description": "Blackbox Exporter 기반 WAS 서비스 상태",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 5, "x": 10, "y": 8 },
+          "id": 7,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "probe_success{job=\"blackbox-http\", instance=\"http://was-service.blog-system.svc.cluster.local:8080/actuator/health\"}",
+              "legendFormat": "WAS",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": { "text": "DOWN", "color": "red" },
+                    "1": { "text": "UP", "color": "green" }
+                  }
+                }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "textMode": "auto",
+            "orientation": "auto"
+          }
+        },
+        {
+          "title": "MySQL Status",
+          "description": "MySQL Exporter 기반 DB 상태",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 5, "x": 15, "y": 8 },
+          "id": 8,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "mysql_up{job=\"mysql-exporter\"}",
+              "legendFormat": "MySQL",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": { "text": "DOWN", "color": "red" },
+                    "1": { "text": "UP", "color": "green" }
+                  }
+                }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "textMode": "auto",
+            "orientation": "auto"
+          }
+        },
+        {
+          "title": "Pod Restarts (24h)",
+          "description": "blog-system 24시간 내 Pod 재시작 합계. 0 이상이면 OOM/CrashLoop 확인",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 8 },
+          "id": 9,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"blog-system\"}[24h]))",
+              "legendFormat": "Restarts",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "orange", "value": 1 },
+                  { "color": "red", "value": 5 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "textMode": "auto",
+            "orientation": "auto"
+          }
+        },
+
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 12 },
+          "id": 300,
+          "panels": [],
+          "title": "🛡️ 보안 이벤트 (Falco)",
+          "type": "row"
+        },
+        {
+          "title": "Critical",
+          "description": "Falco CRITICAL 이벤트 건수. 0 이상: RCE/권한상승 의심 → 즉시 조사",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 13 },
+          "id": 10,
+          "datasource": "Loki",
+          "targets": [
+            {
+              "datasource": "Loki",
+              "expr": "sum(count_over_time({priority=\"Critical\"} [$__range]))",
+              "legendFormat": "Critical",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center",
+            "textMode": "auto",
+            "orientation": "auto"
+          }
+        },
+        {
+          "title": "Warning",
+          "description": "Falco WARNING 이벤트 건수. 급증 시 패키지 설치/shell 실행 감지 확인",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 13 },
+          "id": 11,
+          "datasource": "Loki",
+          "targets": [
+            {
+              "datasource": "Loki",
+              "expr": "sum(count_over_time({priority=\"Warning\"} [$__range]))",
+              "legendFormat": "Warning",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 5 },
+                  { "color": "orange", "value": 20 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center",
+            "textMode": "auto",
+            "orientation": "auto"
+          }
+        },
+        {
+          "title": "Error",
+          "description": "Falco ERROR 이벤트 건수. 바이너리 디렉터리 쓰기 시도 등 확인",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 13 },
+          "id": 12,
+          "datasource": "Loki",
+          "targets": [
+            {
+              "datasource": "Loki",
+              "expr": "sum(count_over_time({priority=\"Error\"} [$__range]))",
+              "legendFormat": "Error",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 5 },
+                  { "color": "orange", "value": 20 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center",
+            "textMode": "auto",
+            "orientation": "auto"
+          }
+        },
+        {
+          "title": "Falco Rule별 이벤트 분포",
+          "description": "최빈 rule 식별 → 노이즈 vs 실제 위협 판단",
+          "type": "table",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
+          "id": 13,
+          "datasource": "Loki",
+          "targets": [
+            {
+              "datasource": "Loki",
+              "expr": "sum by (rule, priority) (count_over_time({priority=~\"Critical|Warning|Error\"} [$__range]))",
+              "legendFormat": "",
+              "refId": "A",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "orange", "value": 10 },
+                  { "color": "red", "value": 50 }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "priority" },
+                "properties": [
+                  { "id": "custom.width", "value": 80 }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "rule" },
+                "properties": [
+                  { "id": "custom.width", "value": 300 }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true,
+            "sortBy": [{ "displayName": "Value", "desc": true }],
+            "cellHeight": "sm"
+          },
+          "transformations": [
+            {
+              "id": "sortBy",
+              "options": { "sort": [{ "field": "Value", "desc": true }] }
+            }
+          ]
+        },
+
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 },
+          "id": 400,
+          "panels": [],
+          "title": "🖥️ 인프라 리소스",
+          "type": "row"
+        },
+        {
+          "title": "노드별 CPU 사용률",
+          "description": "> 80%: kubectl top으로 HPA 상태 확인",
+          "type": "bargauge",
+          "gridPos": { "h": 6, "w": 8, "x": 0, "y": 22 },
+          "id": 14,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "(1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) by (instance)) * 100",
+              "legendFormat": "{{instance}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "red", "value": 80 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "orientation": "horizontal",
+            "displayMode": "gradient",
+            "showUnfilled": true,
+            "minVizWidth": 0,
+            "minVizHeight": 10
+          }
+        },
+        {
+          "title": "노드별 Memory 사용률",
+          "description": "> 85%: OOM 확인, Limit 증설 검토",
+          "type": "bargauge",
+          "gridPos": { "h": 6, "w": 8, "x": 8, "y": 22 },
+          "id": 15,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100",
+              "legendFormat": "{{instance}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "red", "value": 85 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "orientation": "horizontal",
+            "displayMode": "gradient",
+            "showUnfilled": true,
+            "minVizWidth": 0,
+            "minVizHeight": 10
+          }
+        },
+        {
+          "title": "노드별 Root Disk 사용률",
+          "description": "> 80%: 로그/이미지 정리, disk-pressure 방지",
+          "type": "bargauge",
+          "gridPos": { "h": 6, "w": 8, "x": 16, "y": 22 },
+          "id": 16,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "(1 - node_filesystem_avail_bytes{mountpoint=\"/\", fstype!=\"tmpfs\"} / node_filesystem_size_bytes{mountpoint=\"/\", fstype!=\"tmpfs\"}) * 100",
+              "legendFormat": "{{instance}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "red", "value": 80 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "orientation": "horizontal",
+            "displayMode": "gradient",
+            "showUnfilled": true,
+            "minVizWidth": 0,
+            "minVizHeight": 10
+          }
+        },
+
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 },
+          "id": 500,
+          "panels": [],
+          "title": "📈 24h 추세",
+          "type": "row"
+        },
+        {
+          "title": "Latency p95 / p99",
+          "description": "상승 추세: Slow Query 또는 Tempo 분산 추적으로 원인 추적",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 29 },
+          "id": 17,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "sli:latency:p95:5m{destination_service_name=\"was-service\"}",
+              "legendFormat": "WAS p95",
+              "refId": "A"
+            },
+            {
+              "expr": "sli:latency:p99:5m{destination_service_name=\"was-service\"}",
+              "legendFormat": "WAS p99",
+              "refId": "B"
+            },
+            {
+              "expr": "sli:latency:p95:5m{destination_service_name=\"web-service\"}",
+              "legendFormat": "WEB p95",
+              "refId": "C"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisLabel": "ms",
+                "axisPlacement": "auto",
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "showPoints": "never",
+                "spanNulls": false,
+                "thresholdsStyle": { "mode": "dashed" }
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "orange", "value": 300 },
+                  { "color": "red", "value": 500 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          }
+        },
+        {
+          "title": "Error Rate + Throughput",
+          "description": "에러율과 트래픽량의 상관관계 분석",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 29 },
+          "id": 18,
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "(sli:error_rate:5m or vector(0)) * 100",
+              "legendFormat": "Error Rate %",
+              "refId": "A"
+            },
+            {
+              "expr": "sli:throughput:rps:1m or vector(0)",
+              "legendFormat": "RPS",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisPlacement": "auto",
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "showPoints": "never",
+                "spanNulls": false,
+                "thresholdsStyle": { "mode": "off" }
+              }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "Error Rate %" },
+                "properties": [
+                  { "id": "unit", "value": "percent" },
+                  { "id": "custom.axisPlacement", "value": "left" },
+                  { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "RPS" },
+                "properties": [
+                  { "id": "unit", "value": "reqps" },
+                  { "id": "custom.axisPlacement", "value": "right" },
+                  { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          }
+        },
+
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 37 },
+          "id": 600,
+          "panels": [],
+          "title": "📋 에러 로그",
+          "type": "row"
+        },
+        {
+          "title": "blog-system 에러 건수",
+          "description": "> 50건: stack trace 분석 필요",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 38 },
+          "id": 19,
+          "datasource": "Loki",
+          "targets": [
+            {
+              "datasource": "Loki",
+              "expr": "sum(count_over_time({namespace=\"blog-system\"} |~ \"(?i)error|exception|fatal\" [$__range]))",
+              "legendFormat": "Errors",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 10 },
+                  { "color": "red", "value": 50 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center",
+            "textMode": "auto",
+            "orientation": "auto"
+          }
+        },
+        {
+          "title": "에러 로그 스트림",
+          "description": "blog-system 최근 에러/예외 로그",
+          "type": "logs",
+          "gridPos": { "h": 8, "w": 18, "x": 6, "y": 38 },
+          "id": 20,
+          "datasource": "Loki",
+          "targets": [
+            {
+              "datasource": "Loki",
+              "expr": "{namespace=\"blog-system\"} |~ \"(?i)error|exception|fatal\"",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "showCommonLabels": false,
+            "wrapLogMessage": true,
+            "prettifyLogMessage": false,
+            "enableLogDetails": true,
+            "dedupStrategy": "none",
+            "sortOrder": "Descending"
+          }
+        }
+      ],
+      "refresh": "5m",
+      "schemaVersion": 39,
+      "style": "dark",
+      "tags": ["daily-report", "morning-briefing", "blog-system"],
+      "templating": { "list": [] },
+      "time": { "from": "now-24h", "to": "now" },
+      "timepicker": {},
+      "timezone": "Asia/Seoul",
+      "title": "Daily Report",
+      "uid": "daily-report",
+      "version": 1,
+      "weekStart": ""
+    }
