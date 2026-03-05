@@ -264,15 +264,14 @@ spec:
   # Ingress - 포트 80은 모두 허용
   ingress:
   # Rule 1: 모든 소스 → web:80 허용
+  # Why: WEB은 Istio Ingress Gateway로부터 트래픽을 받는 진입점
+  # Why: L7(HTTP 경로/메서드) 제어는 Istio AuthorizationPolicy가 담당 (ADR-001)
   - fromEntities:
     - all  # 모든 소스 (외부 Ingress 포함)
     toPorts:
     - ports:
       - port: "80"
         protocol: TCP
-      rules:
-        http:
-        - {}  # 모든 HTTP 요청 허용
 
   # Rule 2: Istio sidecar 메트릭/헬스체크 (클러스터 전체 허용)
   # Why: Prometheus가 monitoring namespace에서 15090 포트 스크랩
