@@ -10,12 +10,13 @@
 # - 기타 모든 접근 차단
 #
 # 주의:
-# - mTLS PERMISSIVE 모드이므로 principals 조건 사용 불가
-# - namespace 기반 접근 제어 사용
+# - mTLS PERMISSIVE 모드에서 source.namespaces는 mTLS identity(SPIFFE ID) 기반
+# - mesh 미참여 Pod(monitoring namespace 등)은 identity=unknown → namespace 매칭 불가
+# - 따라서 /actuator/health는 from 조건 없이 허용 (ClusterIP로 내부 접근만 가능)
 #
 # 효과:
-# - 외부 → /actuator/* 직접 접근 차단 (Istio가 단일 보안 게이트)
-# - Spring Boot 앱 설정 변경에 무관하게 Istio가 강제 차단
+# - 외부 → /actuator/prometheus 직접 접근 차단 (monitoring namespace만)
+# - /actuator/health는 Blackbox Exporter 호환성을 위해 전체 허용
 # ==============================================================================
 apiVersion: security.istio.io/v1beta1
 kind: AuthorizationPolicy
@@ -41,12 +42,11 @@ spec:
         ports: ["8080"]
         paths: ["/api/*", "/auth", "/auth/*"]
 
-  # Rule 2: Health Check (monitoring namespace → /actuator/health)
-  # Why: K8s Probe 및 Blackbox Exporter 가용성 모니터링용
-  - from:
-    - source:
-        namespaces: ["monitoring"]
-    to:
+  # Rule 2: Health Check (/actuator/health — 전체 허용)
+  # Why: Blackbox Exporter(monitoring ns)가 sidecar 없이 접근 → mTLS identity 없음
+  #      source.namespaces는 SPIFFE ID 기반이라 mesh 미참여 Pod에서 매칭 불가 → 403
+  #      /actuator/health는 read-only 상태 정보만 반환, ClusterIP로 내부 접근만 가능
+  - to:
     - operation:
         ports: ["8080"]
         paths: ["/actuator/health", "/actuator/health/*"]

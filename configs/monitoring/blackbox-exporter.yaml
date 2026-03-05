@@ -77,17 +77,9 @@ spec:
     metadata:
       labels:
         app: blackbox-exporter
-        # Why: Webhook 3 (object.sidecar-injector)의 objectSelector가 label 기반
-        #      monitoring namespace에 istio-injection/istio.io/rev label이 없으므로
-        #      Pod-level label로 injection 대상 지정 필수
-        sidecar.istio.io/inject: "true"
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9115"
-        # Why: WAS actuator/health Probe가 403 반환 — was-authz의
-        #      from.source.namespaces: ["monitoring"] 조건이 mTLS identity 기반이라
-        #      sidecar 없으면 source namespace 증명 불가 → 차단됨
-        sidecar.istio.io/inject: "true"
     spec:
       containers:
       - name: blackbox-exporter
