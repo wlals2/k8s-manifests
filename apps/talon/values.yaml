@@ -117,11 +117,18 @@ falco-talon:
       # ========================================================================
       # Why: /bin, /sbin 쓰기 = 백도어/rootkit 설치 시도
       #      False Positive 가능성 있어 Phase 1에서는 라벨만
+      # exceptions.namespaces:
+      #   backup-system — etcd-backup, mysql-backup이 Alpine 이미지에서
+      #   `apk add aws-cli` 실행 → /usr/bin에 정상적으로 쓰는 오탐
+      #   CronJob 특성상 Pod가 완료 후 즉시 삭제되어 라벨 적용도 실패함
       - rule: Write to Binary Dir
         match:
           rules:
             - Write to Binary Dir
           priority: error
+        exceptions:
+          - namespaces:
+              - backup-system  # Why: apk add가 정상 동작인 백업 CronJob 네임스페이스
         actions:
           - action: Label Pod as Suspicious
             actionner: kubernetes:label
