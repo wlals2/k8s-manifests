@@ -15,11 +15,12 @@ spec:
   action: ALLOW
   rules:
   # 1. blog 정적 페이지는 모두 허용 (Hugo 블로그 공개)
-  # Why: 블로그 콘텐츠는 전세계 공개, API/Board/Auth는 별도 규칙으로 IP 제한
+  # Why: 블로그 콘텐츠는 전세계 공개, API/Board/Auth/Status는 별도 규칙으로 IP 제한
+  # Why: /status*는 Trivy CVE, Falco 보안 이벤트 등 민감 정보 포함 → 내부 전용 (Rule 3)
   - to:
     - operation:
         hosts: ["blog.jiminhome.shop"]
-        notPaths: ["/api/*", "/board/*", "/auth", "/auth/*"]
+        notPaths: ["/api/*", "/board/*", "/auth", "/auth/*", "/status", "/status/*"]
     # from 없음 → 모든 소스 IP 허용
 
   # 2. 뉴스 조회 API는 전세계 공개 (읽기 전용, 이미 공개된 RSS 데이터)
@@ -33,12 +34,13 @@ spec:
         methods: ["GET", "OPTIONS"]
     # from 없음 → 모든 소스 IP 허용
 
-  # 3. blog API/Board/Auth는 내부 네트워크만 허용 (게시글 CRUD 보호)
-  # Why: 외부에서 게시글 생성/수정/삭제, 뉴스 쓰기 작업 방지
+  # 3. blog API/Board/Auth/Status는 내부 네트워크만 허용
+  # Why: 외부에서 게시글 CRUD, 뉴스 쓰기 작업 방지
+  # Why: /status는 Trivy CVE 상세, Falco CRITICAL 이벤트, SLO 위반 등 보안 민감 정보 포함
   - to:
     - operation:
         hosts: ["blog.jiminhome.shop"]
-        paths: ["/api/*", "/board/*", "/auth", "/auth/*"]
+        paths: ["/api/*", "/board/*", "/auth", "/auth/*", "/status", "/status/*"]
     from:
     - source:
         remoteIpBlocks: ["192.168.1.0/24"]
