@@ -23,19 +23,8 @@ spec:
         notPaths: ["/api/*", "/board/*", "/auth", "/auth/*", "/status", "/status/*"]
     # from 없음 → 모든 소스 IP 허용
 
-  # 2. 뉴스 조회 API는 전세계 공개 (읽기 전용, 이미 공개된 RSS 데이터)
-  # Why: /news 페이지에서 외부 방문자가 JS fetch로 뉴스를 조회할 수 있어야 함
-  #      OPTIONS: 브라우저 CORS preflight 허용 필수 (없으면 403으로 차단됨)
-  #      PATCH/POST (AI 요약 업데이트, 수동 수집)는 Rule 3에서 내부 전용 유지
-  - to:
-    - operation:
-        hosts: ["blog.jiminhome.shop"]
-        paths: ["/api/news", "/api/news/category/*"]
-        methods: ["GET", "OPTIONS"]
-    # from 없음 → 모든 소스 IP 허용
-
-  # 3. blog API/Board/Auth/Status는 내부 네트워크만 허용
-  # Why: 외부에서 게시글 CRUD, 뉴스 쓰기 작업 방지
+  # 2. blog API/Board/Auth/Status는 내부 네트워크만 허용
+  # Why: 외부에서 게시글 CRUD 방지
   # Why: /status는 Trivy CVE 상세, Falco CRITICAL 이벤트, SLO 위반 등 보안 민감 정보 포함
   - to:
     - operation:
@@ -45,7 +34,7 @@ spec:
     - source:
         remoteIpBlocks: ["192.168.1.0/24"]
 
-  # 3. 모니터링 도구는 192.168.1.0/24만 허용 (내부 전용)
+  # 3. 모니터링 도구는 내부 네트워크만 허용
   - to:
     - operation:
         hosts:
