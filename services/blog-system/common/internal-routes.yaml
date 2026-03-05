@@ -1,0 +1,35 @@
+# ==============================================================================
+# internal-routes - 내부 전용 관리 도메인 (internal.jiminhome.shop)
+# ==============================================================================
+# 목적: Cloudflare Tunnel 미등록 도메인으로 /status 등 민감 경로를 내부망 전용으로 분리
+# 의존성: blog-gateway, web-service DestinationRule (stable subset)
+# Why: remoteIpBlocks 기반 IP 제어는 Cilium SNAT(10.0.0.56)로 무력화됨
+#      도메인 자체를 외부 DNS에서 제거하여 구조적으로 접근 경로를 차단
+# ==============================================================================
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: internal-routes
+  namespace: blog-system
+  labels:
+    app: blog
+spec:
+  hosts:
+  - "internal.jiminhome.shop"
+  gateways:
+  - blog-gateway
+  http:
+  - match:
+    - uri:
+        prefix: "/"
+    route:
+    - destination:
+        host: web-service
+        subset: stable
+        port:
+          number: 80
+    retries:
+      attempts: 3
+      perTryTimeout: 2s
+      retryOn: 5xx,reset,connect-failure
+    timeout: 10s

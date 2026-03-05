@@ -1,5 +1,10 @@
 ---
-# 모니터링 도구 접근 제어 (L7 - Host 헤더 기반)
+# ==============================================================================
+# monitoring-whitelist - Host별 접근 제어 (L7 - Istio Gateway)
+# ==============================================================================
+# 목적: blog는 공개/내부 경로 분리, 모니터링 도구는 내부망 전용
+# 의존성: Istio IngressGateway, *.jiminhome.shop 도메인
+# ==============================================================================
 # ADR 001 원칙: Cilium(L3/L4) 개방, Istio(L7) Host별 IP 제한
 apiVersion: security.istio.io/v1beta1
 kind: AuthorizationPolicy
@@ -7,34 +12,53 @@ metadata:
   name: monitoring-whitelist
   namespace: istio-system
   annotations:
-    description: "Host별 IP 제어: blog는 모두 허용, 모니터링 도구는 192.168.1.0/24만"
+    description: "Host별 IP 제어: blog 공개/내부 분리, internal/모니터링은 192.168.1.0/24만"
 spec:
   selector:
     matchLabels:
-      app: istio-ingressgateway  # Gateway에 적용
+      app: istio-ingressgateway
   action: ALLOW
   rules:
-  # 1. blog 정적 페이지는 모두 허용 (Hugo 블로그 공개)
-  # Why: 블로그 콘텐츠는 전세계 공개, API/Board/Auth/Status는 별도 규칙으로 IP 제한
-  # Why: /status*는 Trivy CVE, Falco 보안 이벤트 등 민감 정보 포함 → 내부 전용 (Rule 3)
+  # 1. blog 정적 페이지는 전세계 공개
+  # Why: /api/*, /board/*, /auth*, /status*는 내부 전용 — 나머지 Hugo 콘텐츠는 공개
   - to:
     - operation:
         hosts: ["blog.jiminhome.shop"]
         notPaths: ["/api/*", "/board/*", "/auth", "/auth/*", "/status", "/status/*"]
-    # from 없음 → 모든 소스 IP 허용
 
-  # 2. blog API/Board/Auth/Status는 내부 네트워크만 허용
-  # Why: 외부에서 게시글 CRUD 방지
-  # Why: /status는 Trivy CVE 상세, Falco CRITICAL 이벤트, SLO 위반 등 보안 민감 정보 포함
+  # 2. 뉴스 조회 API는 전세계 공개 (읽기 전용)
+  # Why: /news 페이지에서 외부 방문자가 JS fetch로 뉴스를 조회해야 함
+  #      OPTIONS: 브라우저 CORS preflight 허용 필수
+  #      PATCH/POST (AI 요약, 수동 수집)는 Rule 3에서 내부 전용 유지
   - to:
     - operation:
         hosts: ["blog.jiminhome.shop"]
-        paths: ["/api/*", "/board/*", "/auth", "/auth/*", "/status", "/status/*"]
+        paths: ["/api/news", "/api/news/category/*"]
+        methods: ["GET", "OPTIONS"]
+
+  # 3. blog API/Board/Auth는 내부 네트워크만 허용
+  # Why: 외부에서 게시글 CRUD, 뉴스 쓰기 작업 방지
+  # Note: /status는 internal.jiminhome.shop으로 분리 (Rule 4)
+  - to:
+    - operation:
+        hosts: ["blog.jiminhome.shop"]
+        paths: ["/api/*", "/board/*", "/auth", "/auth/*"]
     from:
     - source:
         remoteIpBlocks: ["192.168.1.0/24"]
 
-  # 3. 모니터링 도구는 내부 네트워크만 허용
+  # 4. internal.jiminhome.shop — /status 등 민감 정보 내부 전용
+  # Why: Cloudflare Tunnel 미등록 도메인 → 외부 DNS 미존재
+  #      내부 hosts 파일(192.168.1.200)로만 접근 가능 → 도메인 분리 자체가 접근 제어
+  #      Cilium SNAT(10.0.0.56) 문제를 IP 규칙 없이 구조적으로 해결
+  - to:
+    - operation:
+        hosts: ["internal.jiminhome.shop"]
+    from:
+    - source:
+        remoteIpBlocks: ["192.168.1.0/24"]
+
+  # 5. 모니터링 도구는 192.168.1.0/24만 허용 (내부 전용)
   - to:
     - operation:
         hosts:
@@ -48,4 +72,4 @@ spec:
         - "wazuh.jiminhome.shop"
     from:
     - source:
-        remoteIpBlocks: ["192.168.1.0/24"]  # 사내 IP만
+        remoteIpBlocks: ["192.168.1.0/24"]
