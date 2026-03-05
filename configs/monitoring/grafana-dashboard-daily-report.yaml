@@ -456,7 +456,8 @@ data:
               "datasource": "Loki",
               "expr": "sum(count_over_time({priority=\"Critical\"} [$__range]))",
               "legendFormat": "Critical",
-              "refId": "A"
+              "refId": "A",
+              "instant": true
             }
           ],
           "fieldConfig": {
@@ -473,7 +474,7 @@ data:
             "overrides": []
           },
           "options": {
-            "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
             "colorMode": "background",
             "graphMode": "area",
             "justifyMode": "center",
@@ -493,7 +494,8 @@ data:
               "datasource": "Loki",
               "expr": "sum(count_over_time({priority=\"Warning\"} [$__range]))",
               "legendFormat": "Warning",
-              "refId": "A"
+              "refId": "A",
+              "instant": true
             }
           ],
           "fieldConfig": {
@@ -511,7 +513,7 @@ data:
             "overrides": []
           },
           "options": {
-            "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
             "colorMode": "background",
             "graphMode": "area",
             "justifyMode": "center",
@@ -531,7 +533,8 @@ data:
               "datasource": "Loki",
               "expr": "sum(count_over_time({priority=\"Error\"} [$__range]))",
               "legendFormat": "Error",
-              "refId": "A"
+              "refId": "A",
+              "instant": true
             }
           ],
           "fieldConfig": {
@@ -549,7 +552,7 @@ data:
             "overrides": []
           },
           "options": {
-            "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
             "colorMode": "background",
             "graphMode": "area",
             "justifyMode": "center",
@@ -886,7 +889,8 @@ data:
               "datasource": "Loki",
               "expr": "sum(count_over_time({namespace=\"blog-system\"} |~ \"(?i)error|exception|fatal\" [$__range]))",
               "legendFormat": "Errors",
-              "refId": "A"
+              "refId": "A",
+              "instant": true
             }
           ],
           "fieldConfig": {
@@ -904,7 +908,7 @@ data:
             "overrides": []
           },
           "options": {
-            "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
             "colorMode": "background",
             "graphMode": "area",
             "justifyMode": "center",
