@@ -457,7 +457,6 @@ data:
               "expr": "sum(count_over_time({priority=\"Critical\"} [$__range]))",
               "legendFormat": "Critical",
               "refId": "A",
-              "instant": true
             }
           ],
           "fieldConfig": {
@@ -495,7 +494,6 @@ data:
               "expr": "sum(count_over_time({priority=\"Warning\"} [$__range]))",
               "legendFormat": "Warning",
               "refId": "A",
-              "instant": true
             }
           ],
           "fieldConfig": {
@@ -534,7 +532,6 @@ data:
               "expr": "sum(count_over_time({priority=\"Error\"} [$__range]))",
               "legendFormat": "Error",
               "refId": "A",
-              "instant": true
             }
           ],
           "fieldConfig": {
@@ -573,7 +570,6 @@ data:
               "expr": "sum by (rule, priority) (count_over_time({priority=~\"Critical|Warning|Error\"} [$__range]))",
               "legendFormat": "",
               "refId": "A",
-              "instant": true
             }
           ],
           "fieldConfig": {
@@ -890,7 +886,6 @@ data:
               "expr": "sum(count_over_time({namespace=\"blog-system\"} |~ \"(?i)error|exception|fatal\" [$__range]))",
               "legendFormat": "Errors",
               "refId": "A",
-              "instant": true
             }
           ],
           "fieldConfig": {
