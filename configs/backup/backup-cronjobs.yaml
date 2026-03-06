@@ -1,12 +1,8 @@
 # ==============================================================================
 # etcd 백업 CronJob
 # ==============================================================================
-# 목적: etcd snapshot을 S3에 자동 백업 (7일 보관)
-# 실행: 매일 새벽 2시
-# 의존성:
-#   - aws-s3-credentials Secret (backup-system namespace)
-#   - etcd 인증서 (/etc/kubernetes/pki/etcd)
-#   - Control Plane 노드 (nodeName: k8s-cp)
+# 목적: etcd snapshot을 S3에 자동 백업 (7일 보관, 일 1회)
+# 의존성: aws-s3-credentials Secret, etcd 인증서, k8s-cp 노드
 # S3 경로: s3://jimin-backup/etcd/YYYY-MM-DD/snapshot-TIMESTAMP.db
 # ==============================================================================
 apiVersion: batch/v1
@@ -17,110 +13,66 @@ metadata:
   labels:
     app: etcd-backup
 spec:
-  # 스케줄: 매일 새벽 2시에 실행
-  # 형식: "분 시 일 월 요일" (Cron 표현식)
-  # 예: "0 2 * * *" = 매일 02:00
-  # 변경 가능: 백업 시간대 조정 시 수정
   schedule: "0 2 * * *"
-
-  # Job 이력 보관 개수
-  # successfulJobsHistoryLimit: 최근 7개 성공 Job 보관
-  # failedJobsHistoryLimit: 최근 3개 실패 Job 보관
-  # 이유: 디버깅 및 모니터링용
-  successfulJobsHistoryLimit: 7
+  successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
-
-  # 중복 실행 정책
-  # Forbid: 이전 백업이 진행 중이면 새 백업 시작 안 함
-  # 옵션: Allow (병렬 실행), Replace (기존 종료 후 시작)
-  # 권장: Forbid (백업 파일 충돌 및 etcd 부하 방지)
   concurrencyPolicy: Forbid
 
   jobTemplate:
     spec:
+      # Why: 기본값 6은 재시도마다 S3에 중복 업로드 발생 → 2회로 제한
+      backoffLimit: 2
       template:
         metadata:
           labels:
             app: etcd-backup
         spec:
-          # hostNetwork: true
-          # 설명: Host 네트워크 사용 (Pod가 Node IP 사용)
-          # 이유: etcd는 127.0.0.1:2379에서만 접근 가능
-          # 영향: Pod IP가 아닌 Node IP로 etcd 접근
+          # Why: etcd는 127.0.0.1:2379에서만 접근 가능 → hostNetwork 필수
           hostNetwork: true
-
-          # nodeName: Control Plane 노드 지정
-          # 이유: etcd는 Control Plane 노드에서만 실행 중
-          # 변경 금지: k8s-cp가 아닌 다른 노드에서 실행 불가
+          # Why: etcd는 Control Plane에서만 실행
           nodeName: k8s-cp
-
-          # restartPolicy: Job 실패 시 재시도
-          # OnFailure: 실패 시 Pod 재시작 (최대 6회)
-          # Never: 실패 시 재시작 안 함
-          # 권장: OnFailure (일시적 네트워크 오류 대응)
           restartPolicy: OnFailure
 
           containers:
           - name: etcd-backup
-            # 이미지: Alpine Linux (경량, 100MB)
-            # 버전: 3.19 (2024년 안정 버전)
-            # 장점: 이미지 작음, apk 패키지 관리 쉬움
             image: alpine:3.19
 
             command:
             - /bin/sh
-            - -ec  # -e: 에러 시 즉시 종료, -c: 명령어 실행
+            - -ec
             - |
-              echo "etcd Backup to S3 Started"
+              echo "=== etcd Backup to S3 Started ==="
               START_TIME=$(date +%s)
 
-              # 필수 패키지 설치 (Alpine Linux)
-              # apk: Alpine 패키지 관리자
-              # --no-cache: 캐시 사용 안 함 (이미지 크기 최소화)
-              # aws-cli: S3 업로드 도구
-              # curl, wget: HTTP 도구
               apk add --no-cache aws-cli curl wget tar
 
-              # etcdctl 설치 (GitHub Release)
-              # 이유: Alpine에 etcd 패키지 없음
-              # 버전: v3.5.11 (2024년 안정 버전)
+              # Why: Alpine에 etcdctl 패키지 없음 → GitHub Release에서 설치
               ETCD_VER=v3.5.11
               wget -q https://github.com/etcd-io/etcd/releases/download/${ETCD_VER}/etcd-${ETCD_VER}-linux-amd64.tar.gz
               tar -xzf etcd-${ETCD_VER}-linux-amd64.tar.gz
               cp etcd-${ETCD_VER}-linux-amd64/etcdctl /usr/local/bin/
               rm -rf etcd-${ETCD_VER}-linux-amd64*
 
-              # 환경 변수 설정
-              # DATE: 백업 날짜 (YYYY-MM-DD 형식)
-              # TIMESTAMP: 고유 백업 파일명 (YYYYMMDD-HHMMSS)
               DATE=$(date +%Y-%m-%d)
               TIMESTAMP=$(date +%Y%m%d-%H%M%S)
               BACKUP_FILE="/tmp/etcd-snapshot-$TIMESTAMP.db"
-              S3_BUCKET="jimin-backup"  # S3 버킷 이름 (실제 버킷과 일치해야 함)
+              S3_BUCKET="jimin-backup"
               S3_PATH="s3://$S3_BUCKET/etcd/$DATE/snapshot-$TIMESTAMP.db"
 
-              # Step 1: etcd snapshot 생성
+              # Step 1: etcd snapshot
               echo "Creating etcd snapshot..."
-              # ETCDCTL_API=3: etcd v3 API 사용
-              # --endpoints: etcd 서버 주소 (127.0.0.1:2379, hostNetwork 필요)
-              # --cacert, --cert, --key: TLS 인증서 (etcd는 TLS 필수)
               ETCDCTL_API=3 etcdctl snapshot save $BACKUP_FILE \
                 --endpoints=https://127.0.0.1:2379 \
                 --cacert=/etc/kubernetes/pki/etcd/ca.crt \
                 --cert=/etc/kubernetes/pki/etcd/server.crt \
                 --key=/etc/kubernetes/pki/etcd/server.key
 
-              # Step 2: snapshot 검증
+              # Step 2: snapshot 무결성 검증
               echo "Verifying snapshot..."
-              # -w table: 테이블 형식 출력
-              # 이유: snapshot 무결성 확인 (손상된 백업 방지)
               ETCDCTL_API=3 etcdctl snapshot status $BACKUP_FILE -w table
 
               # Step 3: S3 업로드
               echo "Uploading to S3: $S3_PATH"
-              # aws s3 cp: S3에 파일 복사
-              # --region: S3 리전 (환경 변수에서 가져옴)
-              # --no-progress: 진행률 표시 안 함 (로그 간결화)
               aws s3 cp $BACKUP_FILE $S3_PATH \
                 --region ${AWS_DEFAULT_REGION} \
                 --no-progress
@@ -135,38 +87,52 @@ spec:
                 echo "   Location: $S3_PATH"
                 echo "   Size: $(ls -lh $BACKUP_FILE | awk '{print $5}')"
                 echo "   Duration: ${DURATION}s"
-
-                # Why: Prometheus 수집을 위한 메트릭 push (성공)
-                printf "# TYPE backup_success gauge\nbackup_success 1\n# TYPE backup_duration_seconds gauge\nbackup_duration_seconds %s\n# TYPE backup_size_bytes gauge\nbackup_size_bytes %s\n" "$DURATION" "$FILE_SIZE" | curl --data-binary @- http://pushgateway.monitoring.svc.cluster.local:9091/metrics/job/etcd-backup-to-s3
               else
-                echo "S3 upload failed!"
-
-                # Why: 실패해도 메트릭 push (backup_success=0)
-                printf "# TYPE backup_success gauge\nbackup_success 0\n# TYPE backup_duration_seconds gauge\nbackup_duration_seconds %s\n" "$DURATION" | curl --data-binary @- http://pushgateway.monitoring.svc.cluster.local:9091/metrics/job/etcd-backup-to-s3
-                exit 1  # 실패 시 Job 재시도
+                echo "ERROR: S3 upload verification failed!"
+                rm -f $BACKUP_FILE
+                # Why: 메트릭 push는 best-effort (실패해도 백업 성공/실패 판단에 영향 없음)
+                printf "# TYPE backup_success gauge\nbackup_success 0\n# TYPE backup_duration_seconds gauge\nbackup_duration_seconds %s\n" "$DURATION" \
+                  | curl -s --max-time 5 --data-binary @- http://pushgateway.monitoring.svc.cluster.local:9091/metrics/job/etcd-backup-to-s3 || true
+                exit 1
               fi
 
-              # Step 5: 로컬 파일 정리
-              # 이유: Pod 디스크 사용량 최소화
+              # Step 5: 7일 이전 백업 삭제 (retention)
+              # Why: S3 백업이 무한히 쌓이는 것 방지 → 7일치만 보관
+              echo "Cleaning up old backups (retention: 7 days)..."
+              # Why: Alpine BusyBox date는 GNU date -d 미지원 → epoch 연산 사용
+              CUTOFF_DATE=$(date -d "@$(( $(date +%s) - 7*86400 ))" +%Y-%m-%d)
+              if [ -n "$CUTOFF_DATE" ]; then
+                aws s3 ls s3://$S3_BUCKET/etcd/ --region ${AWS_DEFAULT_REGION} | awk '{print $2}' | tr -d '/' | while read dir; do
+                  if [ "$dir" \< "$CUTOFF_DATE" ] || [ "$dir" = "$CUTOFF_DATE" ]; then
+                    echo "  Deleting old backup: etcd/$dir/"
+                    aws s3 rm s3://$S3_BUCKET/etcd/$dir/ --recursive --region ${AWS_DEFAULT_REGION}
+                  fi
+                done
+                echo "Cleanup completed."
+              else
+                echo "WARNING: Could not calculate cutoff date, skipping cleanup."
+              fi
+
+              # Step 6: 로컬 파일 정리
               rm -f $BACKUP_FILE
 
+              # Step 7: 메트릭 push (best-effort, 실패해도 Job은 성공)
+              printf "# TYPE backup_success gauge\nbackup_success 1\n# TYPE backup_duration_seconds gauge\nbackup_duration_seconds %s\n# TYPE backup_size_bytes gauge\nbackup_size_bytes %s\n" "$DURATION" "$FILE_SIZE" \
+                | curl -s --max-time 5 --data-binary @- http://pushgateway.monitoring.svc.cluster.local:9091/metrics/job/etcd-backup-to-s3 || true
+
+              echo "=== etcd Backup Completed ==="
+
             env:
-            # AWS 인증 정보
-            # Secret에서 가져옴: backup-system namespace의 aws-s3-credentials
-            # 주의: Secret이 없으면 Pod 생성 실패 (CreateContainerConfigError)
-            # Secret 생성: SealedSecret으로 암호화하여 Git 관리
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
                   name: aws-s3-credentials
                   key: AWS_ACCESS_KEY_ID
-
             - name: AWS_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
                   name: aws-s3-credentials
                   key: AWS_SECRET_ACCESS_KEY
-
             - name: AWS_DEFAULT_REGION
               valueFrom:
                 secretKeyRef:
@@ -174,19 +140,12 @@ spec:
                   key: AWS_DEFAULT_REGION
 
             volumeMounts:
-            # etcd 인증서 마운트
-            # 위치: Control Plane 노드의 /etc/kubernetes/pki/etcd
-            # 권한: 읽기 전용 (readOnly: true)
-            # 이유: etcd는 TLS 인증서로만 접근 가능
-            # 주의: Control Plane 노드에서만 사용 가능
+            # Why: etcd는 TLS 인증서로만 접근 가능
             - name: etcd-certs
               mountPath: /etc/kubernetes/pki/etcd
-              readOnly: true  # 보안: 인증서 수정 방지
+              readOnly: true
 
           volumes:
-          # hostPath: Node의 디렉터리 마운트
-          # type: Directory (디렉터리가 존재해야 함)
-          # 경로: /etc/kubernetes/pki/etcd (kubeadm 기본 경로)
           - name: etcd-certs
             hostPath:
               path: /etc/kubernetes/pki/etcd
