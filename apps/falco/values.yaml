@@ -101,7 +101,7 @@ falco:
           container and
           proc.name in (bash, sh, ksh, zsh, dash) and
           not k8s.ns.name in (kube-system, monitoring, argocd, falco, istio-system, security, backup-system, longhorn-system, metallb-system, sealed-secrets) and
-          not container.image.repository in (docker.io/istio/proxyv2, docker.io/curlimages/curl) and
+          not container.image.repository in (docker.io/istio/proxyv2, docker.io/curlimages/curl, moby/buildkit) and
           not container.name in (istio-init, otel-agent-download, mysql-backup, mysql, etcd-backup)
         output: >
           ⚠️ WARNING: 앱 컨테이너에서 Shell이 실행되었습니다! (침투 의심)
@@ -126,7 +126,8 @@ falco:
           fd.type in (ipv4, ipv6) and
           not fd.lport in (80, 443, 8080, 3306, 53, 9104) and
           not fd.sip in ("127.0.0.1", "::1") and
-          not k8s.ns.name in (kube-system, monitoring, argocd, falco, istio-system, security, backup-system, longhorn-system, metallb-system, sealed-secrets, cert-manager)
+          not k8s.ns.name in (kube-system, monitoring, argocd, falco, istio-system, security, backup-system, longhorn-system, metallb-system, sealed-secrets, cert-manager) and
+          not container.image.repository in (moby/buildkit)
         output: >
           🔵 NOTICE: 예상치 못한 외부 연결 시도 감지
           (connection=%fd.name lport=%fd.lport rport=%fd.rport
