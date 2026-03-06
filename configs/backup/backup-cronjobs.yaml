@@ -193,9 +193,9 @@ spec:
 
           containers:
           - name: mysql-backup
-            # Why: mysql:8.0 이미지 사용 — Alpine MariaDB 클라이언트는
-            #      MySQL 8.0 caching_sha2_password 플러그인 미지원
-            image: mysql:8.0
+            # Why: mysql:8.0-debian 사용 — Alpine MariaDB는 caching_sha2_password 미지원
+            #      8.0(Oracle Linux)은 apt-get 없음, debian 태그는 apt-get 사용 가능
+            image: mysql:8.0-debian
 
             command:
             - /bin/sh
