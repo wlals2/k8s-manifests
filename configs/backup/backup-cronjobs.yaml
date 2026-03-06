@@ -193,10 +193,9 @@ spec:
 
           containers:
           - name: mysql-backup
-            # 이미지: Alpine Linux (경량, 100MB)
-            # 버전: 3.19 (2024년 안정 버전)
-            # 장점: 이미지 작음, apk 패키지 관리 쉬움
-            image: alpine:3.19
+            # Why: mysql:8.0 이미지 사용 — Alpine MariaDB 클라이언트는
+            #      MySQL 8.0 caching_sha2_password 플러그인 미지원
+            image: mysql:8.0
 
             command:
             - /bin/sh
@@ -205,12 +204,8 @@ spec:
               echo "MySQL Backup to S3 Started"
               START_TIME=$(date +%s)
 
-              # 필수 패키지 설치 (Alpine Linux)
-              # mysql-client: mysqldump 도구 포함
-              # aws-cli: S3 업로드 도구
-              # gzip: SQL 파일 압축 도구
-              # curl: HTTP 도구 (디버깅용)
-              apk add --no-cache mysql-client aws-cli gzip curl
+              # Why: mysql:8.0 이미지에 aws-cli/curl 없음 → apt로 설치
+              apt-get update -qq && apt-get install -y -qq awscli curl gzip > /dev/null 2>&1
 
               DATE=$(date +%Y-%m-%d)
               TIMESTAMP=$(date +%Y%m%d-%H%M%S)
@@ -231,10 +226,8 @@ spec:
               # --routines: Stored Procedures 포함
               # --triggers: Triggers 포함
               # --events: Events 포함
-              # Why: MySQL 8.0 caching_sha2_password → MariaDB client 호환성 문제 해결
               mysqldump -h mysql-service.blog-system.svc.cluster.local \
                 -u root -p${MYSQL_ROOT_PASSWORD} \
-                --default-auth=mysql_native_password \
                 --all-databases \
                 --single-transaction \
                 --quick \

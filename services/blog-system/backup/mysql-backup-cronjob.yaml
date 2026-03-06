@@ -34,6 +34,10 @@ spec:
           annotations:
             sidecar.istio.io/inject: "false"
         spec:
+          # Why: Kyverno require-non-root 정책 충족
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
           # ==============================================================
           # Init Container: MySQL Backup (mysqldump)
           # ==============================================================
