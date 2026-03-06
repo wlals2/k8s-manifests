@@ -268,12 +268,14 @@ spec:
                 echo "   Duration: ${DURATION}s"
 
                 # Why: Prometheus 수집을 위한 메트릭 push (성공)
-                printf "# TYPE backup_success gauge\nbackup_success 1\n# TYPE backup_duration_seconds gauge\nbackup_duration_seconds %s\n# TYPE backup_size_bytes gauge\nbackup_size_bytes %s\n" "$DURATION" "$FILE_SIZE" | curl --data-binary @- http://pushgateway.monitoring.svc.cluster.local:9091/metrics/job/mysql-backup-to-s3
+                # Why: 메트릭 push는 best-effort (hostNetwork 환경에서 클러스터 DNS 미해석 가능)
+                printf "# TYPE backup_success gauge\nbackup_success 1\n# TYPE backup_duration_seconds gauge\nbackup_duration_seconds %s\n# TYPE backup_size_bytes gauge\nbackup_size_bytes %s\n" "$DURATION" "$FILE_SIZE" \
+                  | curl -s --max-time 5 --data-binary @- http://pushgateway.monitoring.svc.cluster.local:9091/metrics/job/mysql-backup-to-s3 || true
               else
                 echo "S3 upload failed!"
-
-                # Why: 실패해도 메트릭 push (backup_success=0)
-                printf "# TYPE backup_success gauge\nbackup_success 0\n# TYPE backup_duration_seconds gauge\nbackup_duration_seconds %s\n" "$DURATION" | curl --data-binary @- http://pushgateway.monitoring.svc.cluster.local:9091/metrics/job/mysql-backup-to-s3
+                rm -f $COMPRESSED_FILE
+                printf "# TYPE backup_success gauge\nbackup_success 0\n# TYPE backup_duration_seconds gauge\nbackup_duration_seconds %s\n" "$DURATION" \
+                  | curl -s --max-time 5 --data-binary @- http://pushgateway.monitoring.svc.cluster.local:9091/metrics/job/mysql-backup-to-s3 || true
                 exit 1
               fi
 
