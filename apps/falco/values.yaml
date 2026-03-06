@@ -50,7 +50,8 @@ falco:
           container and
           proc.name in (apk, apt, apt-get, yum, rpm, dnf, pip, pip3, npm) and
           not proc.pname in (package_mgmt_binaries) and
-          not container.image.repository in (wazuh/wazuh-manager)
+          not container.image.repository in (wazuh/wazuh-manager) and
+          not container.name in (mysql-backup)
         output: >
           ⚠️ WARNING: 컨테이너 내부에서 패키지 관리자가 실행되었습니다!
             (user=%user.name pod=%k8s.pod.name namespace=%k8s.ns.name
@@ -72,7 +73,8 @@ falco:
           (fd.name startswith /bin/ or
            fd.name startswith /usr/bin/ or
            fd.name startswith /sbin/ or
-           fd.name startswith /usr/sbin/)
+           fd.name startswith /usr/sbin/) and
+          not container.name in (mysql-backup)
         output: >
           🔴 ERROR: 바이너리 디렉토리에 쓰기 시도 감지!
           (user=%user.name file=%fd.name pod=%k8s.pod.name
@@ -124,8 +126,7 @@ falco:
           fd.type in (ipv4, ipv6) and
           not fd.lport in (80, 443, 8080, 3306, 53) and
           not fd.sip in ("127.0.0.1", "::1") and
-          not proc.name in (coredns, kube-apiserver, cadvisor, grafana-server, node_exporter, mysqld_exporter, speaker, metrics-server, argocd-repo-serv, vpa-admission-co) and
-          not container.name startswith ai-response
+          not k8s.ns.name in (kube-system, monitoring, argocd, falco, istio-system, security, longhorn-system, metallb-system, sealed-secrets, cert-manager)
         output: >
           🔵 NOTICE: 예상치 못한 외부 연결 시도 감지
           (connection=%fd.name lport=%fd.lport rport=%fd.rport
@@ -175,14 +176,10 @@ falco:
       talon:
         address: http://falco-talon.falco.svc.cluster.local:2803
         minimumpriority: warning
-      # Why: AI Response Service로 Alert 전송 → Claude API 분석 → 자동 대응
-      # Phase 1: DRY-RUN (AI 판단만, 실제 대응 없음)
-      webhook:
-        address: http://ai-response-service.security.svc.cluster.local:8000/analyze
-        method: POST
-        minimumpriority: warning
-      # Note: Wazuh SIEM 연동은 보류 (Syslog 프로토콜 호환성 이슈)
-      # 향후 Wazuh Agent DaemonSet 방식으로 재시도 예정
+      # Note: AI Response Service webhook 제거 (2026-03-06)
+      # Why: ai-response-service Pod 미배포(0/0) → Falcosidekick 재시도 에러 루프 발생
+      # Note: Wazuh SIEM 연동은 Wazuh Agent가 호스트에 로컬 설치되어 직접 수집 중
+      # Falco → Wazuh 경로는 현재 미사용 (Syslog 프로토콜 호환성 이슈로 보류)
     resources:
       limits:
         cpu: 100m
