@@ -124,7 +124,7 @@ falco:
           outbound and
           container and
           fd.type in (ipv4, ipv6) and
-          not fd.lport in (80, 443, 8080, 3306, 53, 9104) and
+          not fd.rport in (80, 443, 8080, 3306, 53, 9104) and
           not fd.sip in ("127.0.0.1", "::1") and
           not k8s.ns.name in (kube-system, monitoring, argocd, falco, istio-system, security, backup-system, longhorn-system, metallb-system, sealed-secrets, cert-manager) and
           not container.image.repository in (moby/buildkit)
