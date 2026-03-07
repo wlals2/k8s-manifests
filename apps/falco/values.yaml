@@ -102,7 +102,7 @@ falco:
           proc.name in (bash, sh, ksh, zsh, dash) and
           not k8s.ns.name in (kube-system, monitoring, argocd, falco, istio-system, security, backup-system, longhorn-system, metallb-system, sealed-secrets) and
           not container.image.repository in (docker.io/istio/proxyv2, docker.io/curlimages/curl, moby/buildkit) and
-          not container.name in (istio-init, otel-agent-download, mysql-backup, mysql, etcd-backup)
+          not container.name in (istio-init, otel-agent-download, mysqldump, s3-upload, mysql, etcd-backup)
         output: >
           ⚠️ WARNING: 앱 컨테이너에서 Shell이 실행되었습니다! (침투 의심)
             (user=%user.name pod=%k8s.pod.name namespace=%k8s.ns.name
