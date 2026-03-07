@@ -23,6 +23,17 @@ falco:
           condition: append
         condition: and not (k8s.ns.name = "metallb-system" and proc.name = "speaker")
 
+      # Why: Longhorn instance-manager가 replica 프로세스 stdout/stderr를 gRPC 스트림으로
+      #      수집할 때 dup3 syscall 사용. fd.sip=::1(루프백) 조건으로 외부 연결은 여전히 탐지
+      #      판단 근거: runtime.md 오탐 목록 (2026-03-08)
+      - rule: Redirect STDOUT/STDIN to Network Connection in Container
+        override:
+          condition: append
+        condition: >
+          and not (k8s.ns.name = "longhorn-system"
+                   and container.image.repository = "docker.io/longhornio/longhorn-instance-manager"
+                   and fd.sip = "::1")
+
     blog-rules.yaml: |
       # ==================================================================
       # Rule 1: Java Process Spawning Shell (RCE 방어) - CRITICAL
