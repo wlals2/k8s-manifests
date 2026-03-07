@@ -123,8 +123,9 @@ spec:
 
               echo "=== Backup Job Completed: $(date) ==="
             env:
+            # Why: backup-system의 mysql-backup-to-s3와 같은 버킷 사용
             - name: S3_BUCKET
-              value: "jimin-mysql-backup"
+              value: "jimin-backup"
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
