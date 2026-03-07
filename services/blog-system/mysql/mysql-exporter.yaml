@@ -29,6 +29,8 @@ spec:
         prometheus.io/port: "9104"
         prometheus.io/path: "/metrics"
     spec:
+      # Why: kube-apiserver 호출 불필요 — Pod 탈취 시 API 토큰 악용 방지 (ADR-016)
+      automountServiceAccountToken: false
       # Why: Kyverno require-non-root 정책 준수 (9104 포트는 특권 불필요)
       securityContext:
         runAsNonRoot: true

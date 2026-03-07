@@ -34,6 +34,8 @@ spec:
           annotations:
             sidecar.istio.io/inject: "false"
         spec:
+          # Why: kube-apiserver 호출 불필요 — Pod 탈취 시 API 토큰 악용 방지 (ADR-016)
+          automountServiceAccountToken: false
           # Why: Kyverno require-non-root 정책 충족
           securityContext:
             runAsNonRoot: true

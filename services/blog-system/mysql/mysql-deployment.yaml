@@ -17,6 +17,8 @@ spec:
       annotations:
         sidecar.istio.io/inject: "false"  # MySQL은 Istio mesh에서 제외
     spec:
+      # Why: kube-apiserver 호출 불필요 — Pod 탈취 시 API 토큰 악용 방지 (ADR-016)
+      automountServiceAccountToken: false
       containers:
       - name: mysql
         image: mysql:8.0

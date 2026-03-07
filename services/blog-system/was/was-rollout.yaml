@@ -40,13 +40,8 @@ spec:
         # Why: istio-proxy 준비 전 spring-boot가 MySQL DNS 쿼리 시 UnknownHostException 방지
         proxy.istio.io/config: '{"holdApplicationUntilProxyStarts": true}'
     spec:
-      # ==============================================================================
-      # SecurityContext (보안 강화)
-      # ==============================================================================
-      # - runAsNonRoot: Root 사용자 실행 금지
-      # - runAsUser: 65534 (nobody) 또는 Dockerfile에서 정의한 사용자
-      # - fsGroup: 볼륨 마운트 시 그룹 권한
-      # ==============================================================================
+      # Why: kube-apiserver 호출 불필요 — Pod 탈취 시 API 토큰 악용 방지 (ADR-016)
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 65534

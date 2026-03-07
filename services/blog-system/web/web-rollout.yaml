@@ -54,9 +54,8 @@ spec:
         sidecar.istio.io/proxyMemory: "40Mi"
         sidecar.istio.io/proxyMemoryLimit: "128Mi"
     spec:
-      # ==============================================================================
-      # imagePullSecrets (Private GHCR 이미지 pull용)
-      # ==============================================================================
+      # Why: kube-apiserver 호출 불필요 — Pod 탈취 시 API 토큰 악용 방지 (ADR-016)
+      automountServiceAccountToken: false
       imagePullSecrets:
         - name: ghcr-secret
       # ==============================================================================
