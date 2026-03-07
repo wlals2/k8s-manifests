@@ -35,7 +35,14 @@ spec:
 
           containers:
           - name: etcd-backup
-            image: alpine:3.19
+            # Why: 커스텀 이미지로 전환 — 런타임 apk add + wget etcdctl 제거
+            #      Falco "Drop and execute new binary" 오탐 해소 + 빌드 시간 단축
+            #      이미지 소스: blogsite/docker/etcd-backup/Dockerfile
+            image: ghcr.io/wlals2/etcd-backup:latest
+
+            securityContext:
+              # Why: 런타임 파일시스템 쓰기 차단 → 공격자가 바이너리 드롭 불가
+              readOnlyRootFilesystem: true
 
             command:
             - /bin/sh
@@ -43,15 +50,6 @@ spec:
             - |
               echo "=== etcd Backup to S3 Started ==="
               START_TIME=$(date +%s)
-
-              apk add --no-cache aws-cli curl wget tar
-
-              # Why: Alpine에 etcdctl 패키지 없음 → GitHub Release에서 설치
-              ETCD_VER=v3.5.11
-              wget -q https://github.com/etcd-io/etcd/releases/download/${ETCD_VER}/etcd-${ETCD_VER}-linux-amd64.tar.gz
-              tar -xzf etcd-${ETCD_VER}-linux-amd64.tar.gz
-              cp etcd-${ETCD_VER}-linux-amd64/etcdctl /usr/local/bin/
-              rm -rf etcd-${ETCD_VER}-linux-amd64*
 
               DATE=$(date +%Y-%m-%d)
               TIMESTAMP=$(date +%Y%m%d-%H%M%S)
@@ -144,12 +142,17 @@ spec:
             - name: etcd-certs
               mountPath: /etc/kubernetes/pki/etcd
               readOnly: true
+            # Why: readOnlyRootFilesystem이므로 /tmp에 쓰기 위한 emptyDir 필요
+            - name: tmp
+              mountPath: /tmp
 
           volumes:
           - name: etcd-certs
             hostPath:
               path: /etc/kubernetes/pki/etcd
               type: Directory
+          - name: tmp
+            emptyDir: {}
 
 ---
 # ==============================================================================
@@ -193,9 +196,15 @@ spec:
 
           containers:
           - name: mysql-backup
-            # Why: mysql:8.0-debian 사용 — Alpine MariaDB는 caching_sha2_password 미지원
-            #      8.0(Oracle Linux)은 apt-get 없음, debian 태그는 apt-get 사용 가능
-            image: mysql:8.0-debian
+            # Why: 커스텀 이미지로 전환 — 런타임 apt-get install 제거
+            #      Falco "Drop and execute new binary" Critical 148건/일 오탐 해소
+            #      베이스: mysql:8.0-debian + awscli/curl/gzip 사전 설치
+            #      이미지 소스: blogsite/docker/mysql-backup/Dockerfile
+            image: ghcr.io/wlals2/mysql-backup:latest
+
+            securityContext:
+              # Why: 런타임 파일시스템 쓰기 차단 → 공격자가 바이너리 드롭 불가
+              readOnlyRootFilesystem: true
 
             command:
             - /bin/sh
@@ -203,9 +212,6 @@ spec:
             - |
               echo "MySQL Backup to S3 Started"
               START_TIME=$(date +%s)
-
-              # Why: mysql:8.0 이미지에 aws-cli/curl 없음 → apt로 설치
-              apt-get update -qq && apt-get install -y -qq awscli curl gzip > /dev/null 2>&1
 
               DATE=$(date +%Y-%m-%d)
               TIMESTAMP=$(date +%Y%m%d-%H%M%S)
@@ -276,30 +282,32 @@ spec:
               rm -f $COMPRESSED_FILE
 
             env:
-            # MySQL 비밀번호
-            # Secret에서 가져옴: backup-system namespace의 mysql-secret
-            # 주의: Secret은 SealedSecret으로 관리 (평문 Git 저장 금지)
             - name: MYSQL_ROOT_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: mysql-secret
                   key: mysql-root-password
-
-            # AWS 인증 정보
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
                   name: aws-s3-credentials
                   key: AWS_ACCESS_KEY_ID
-
             - name: AWS_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
                   name: aws-s3-credentials
                   key: AWS_SECRET_ACCESS_KEY
-
             - name: AWS_DEFAULT_REGION
               valueFrom:
                 secretKeyRef:
                   name: aws-s3-credentials
                   key: AWS_DEFAULT_REGION
+
+            volumeMounts:
+            # Why: readOnlyRootFilesystem이므로 /tmp에 쓰기 위한 emptyDir 필요
+            - name: tmp
+              mountPath: /tmp
+
+          volumes:
+          - name: tmp
+            emptyDir: {}

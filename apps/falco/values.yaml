@@ -34,6 +34,14 @@ falco:
                    and container.image.repository = "docker.io/longhornio/longhorn-instance-manager"
                    and fd.sip = "::1")
 
+      # Why: VMware Tools(vmtoolsd)가 VM suspend/resume 시 네트워크 재설정을 위해
+      #      상대경로(../../statechange.subr)로 설정 파일을 읽는 정상 동작
+      #      ~12건/일, worker1~4(VMware VM)에서만 발생
+      - rule: Directory traversal monitored file read
+        override:
+          condition: append
+        condition: and not (proc.name = "network" and fd.name startswith "/etc/vmware-tools/")
+
     blog-rules.yaml: |
       # ==================================================================
       # Rule 1: Java Process Spawning Shell (RCE 방어) - CRITICAL
