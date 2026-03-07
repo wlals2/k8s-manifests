@@ -8,12 +8,20 @@ falco:
       kind: auto
 
   customRules:
-    # Why: Wazuh 프로세스들이 호스트에서 민감 파일을 주기적으로 읽음 (FIM, SCA 스캔)
+    # Why: 기본 룰 오탐 예외 처리 (runtime.md "Falco 기본 룰 오탐 목록" 참조)
     falco-exceptions.yaml: |
+      # Why: Wazuh 프로세스들이 호스트에서 민감 파일을 주기적으로 읽음 (FIM, SCA 스캔)
       - rule: Read sensitive file untrusted
         override:
           condition: append
         condition: and not proc.name in (wazuh-syscheckd, wazuh-modulesd)
+
+      # Why: MetalLB speaker는 L2 모드에서 GARP 전송을 위해 AF_PACKET 소켓이 필수
+      #      ~250건/일 오탐 발생 → 판단 근거: runtime.md 오탐 목록 (2026-03-08)
+      - rule: Packet socket created in container
+        override:
+          condition: append
+        condition: and not (k8s.ns.name = "metallb-system" and proc.name = "speaker")
 
     blog-rules.yaml: |
       # ==================================================================
