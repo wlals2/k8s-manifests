@@ -101,7 +101,8 @@ falco:
            fd.name startswith /usr/bin/ or
            fd.name startswith /sbin/ or
            fd.name startswith /usr/sbin/) and
-          not container.name in (mysql-backup, etcd-backup)
+          not container.name in (mysql-backup, etcd-backup) and
+          not container.image.repository in (moby/buildkit)
         output: >
           🔴 ERROR: 바이너리 디렉토리에 쓰기 시도 감지!
           (user=%user.name file=%fd.name pod=%k8s.pod.name
