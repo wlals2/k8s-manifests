@@ -10,11 +10,20 @@ falco:
   customRules:
     # Why: 기본 룰 오탐 예외 처리 (runtime.md "Falco 기본 룰 오탐 목록" 참조)
     falco-exceptions.yaml: |
-      # Why: Wazuh 프로세스들이 호스트에서 민감 파일을 주기적으로 읽음 (FIM, SCA 스캔)
+      # Why: 아래 3개 호스트 프로세스의 /etc/pam.d/* 접근은 정상 PAM 인증 흐름
+      #   - wazuh-syscheckd/modulesd: FIM·SCA 스캔 (runtime.md 오탐 목록 참조)
+      #   - smbd: Samba 네트워크 인증 시 PAM 호출 (CVE 대비: pam.d/ 외 경로는 여전히 탐지)
+      #   - pkexec: update-notifier가 패키지 잠금 확인 시 권한 상승 → PAM 호출
+      #             (PwnKit CVE-2021-4034 대비: parent=update-notifier 조건으로 범위 최소화)
       - rule: Read sensitive file untrusted
         override:
           condition: append
-        condition: and not proc.name in (wazuh-syscheckd, wazuh-modulesd)
+        condition: >
+          and not proc.name in (wazuh-syscheckd, wazuh-modulesd)
+          and not (proc.name = smbd and fd.name startswith /etc/pam.d/)
+          and not (proc.name = pkexec
+                   and proc.pname = update-notifier
+                   and fd.name startswith /etc/pam.d/)
 
       # Why: MetalLB speaker는 L2 모드에서 GARP 전송을 위해 AF_PACKET 소켓이 필수
       #      ~250건/일 오탐 발생 → 판단 근거: runtime.md 오탐 목록 (2026-03-08)
