@@ -111,13 +111,14 @@ spec:
             fieldRef:
               fieldPath: spec.nodeName
 
-        # Why: 실제 사용량(20m) × 2배 = 40m (리소스 정책 적용)
+        # Why: 실제 사용량(13m) × 2배 = 26m → 30m (리소스 정책 적용)
+        #      CPU limit 1000m → 200m (실측 대비 100배 과대 설정 해소)
         resources:
           requests:
-            cpu: 40m
+            cpu: 30m
             memory: 256Mi
           limits:
-            cpu: 1000m
+            cpu: 200m
             memory: 1Gi
 
         # Security Context - 시스템 메트릭 수집을 위해 필요

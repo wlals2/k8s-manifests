@@ -133,11 +133,11 @@ kube-prometheus-stack:
       # 권장: 홈랩 환경 기준
       resources:
         requests:
-          cpu: 500m      # 최소 0.5 core
-          memory: 2Gi    # 최소 2GB RAM
+          cpu: 1000m     # 실측(18m) 기준이나 쿼리 피크 대비 여유 확보
+          memory: 4Gi    # 실측(624Mi) × 2배 + 여유 (대규모 쿼리 시 급증)
         limits:
-          cpu: 2000m     # 최대 2 cores
-          memory: 4Gi    # 최대 4GB RAM
+          cpu: 3000m     # 피크 시 3 core까지 허용
+          memory: 6Gi    # OOM Killer 방지 상한선
 
   # ==============================================================================
   # Grafana
