@@ -1,0 +1,23 @@
+apiVersion: v2
+name: cilium
+description: Cilium CNI - Helm 직접 관리 (ArgoCD 미관리)
+type: application
+version: 1.18.6
+appVersion: "1.18.6"
+
+# Why ArgoCD 미관리:
+#   Cilium은 K8s 네트워크 자체(CNI)를 담당하므로 ArgoCD보다 먼저 필요.
+#   ArgoCD가 Cilium을 업데이트하는 중 네트워크가 끊기면 ArgoCD 자신도 중단됨 (Bootstrap 순서 문제).
+#   대신 values.yaml을 Git으로 추적하고, helm upgrade로 직접 적용.
+#
+# 적용 명령어:
+#   helm upgrade cilium cilium/cilium -n kube-system -f apps/cilium/values.yaml
+#
+# 재구축 시:
+#   helm repo add cilium https://helm.cilium.io/
+#   helm install cilium cilium/cilium --version 1.18.6 -n kube-system -f apps/cilium/values.yaml
+
+dependencies:
+  - name: cilium
+    version: "1.18.6"
+    repository: https://helm.cilium.io/

@@ -1,0 +1,84 @@
+# ==============================================================================
+# Cilium values.yaml
+# ==============================================================================
+# 목적: K8s CNI + Hubble 네트워크 가시성 + Hubble Export(Wazuh SIEM 연동)
+# 관리: ArgoCD 미관리 — helm upgrade로 직접 적용 (Bootstrap 순서 문제)
+# 의존성: Wazuh가 /var/run/cilium/hubble/events.log를 logcollector로 수집
+# ==============================================================================
+
+k8sServiceHost: 192.168.1.187
+k8sServicePort: 6443
+
+# Why: kube-proxy 없이 Cilium이 직접 서비스 로드밸런싱 처리 (eBPF 기반, 성능 우수)
+kubeProxyReplacement: true
+
+bpf:
+  # Why: Pod 간 NAT 없이 직접 라우팅 가능하게 하는 eBPF masquerade
+  masquerade: true
+  # Why: Istio mTLS와 함께 사용 시 투명 프록시(TProxy) 필요
+  tproxy: true
+
+hubble:
+  enabled: true
+
+  metrics:
+    enabled:
+      - dns:query
+      - drop
+      - tcp
+      - flow
+      - port-distribution
+      - icmp
+      - httpV2:exemplars=true;labelsContext=source_ip,source_namespace,source_workload,destination_ip,destination_namespace,destination_workload,traffic_direction
+    dashboards:
+      enabled: false
+    serviceMonitor:
+      enabled: false
+
+  relay:
+    enabled: true
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  ui:
+    enabled: true
+    replicas: 1
+    service:
+      type: NodePort
+      nodePort: 31234
+    ingress:
+      enabled: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  # Why: Cilium 흐름 로그를 파일로 저장 → Wazuh logcollector가 수집 → SIEM 교차 소스 상관 분석
+  #      "DROPPED 이벤트만" 저장하는 이유: 정상 흐름은 수백만 건/일이라 볼륨 폭발.
+  #      DROPPED = CiliumNetworkPolicy에 의해 차단된 연결 = 공격 시도 또는 정책 위반만 기록.
+  export:
+    static:
+      enabled: true
+      # Why: /var/run/cilium/ 은 Cilium DaemonSet이 hostPath로 마운트하는 노드 경로
+      filePath: /var/run/cilium/hubble/events.log
+      # Why: DROPPED 이벤트만 수집 — 정상 FORWARDED는 노이즈, 공격 탐지에 불필요
+      allowList:
+        - '{"verdict":["DROPPED"]}'
+      # Why: 교차 분석에 필요한 필드만 저장 (전체 저장 시 디스크 과부하)
+      fieldMask:
+        - source
+        - destination
+        - verdict
+        - drop_reason
+        - IP
+        - l4
+        - time
