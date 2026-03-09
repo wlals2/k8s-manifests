@@ -184,6 +184,17 @@ spec:
       - port: "8080"
         protocol: TCP
 
+  # Rule 5: Prometheus → was:8080 허용 (JVM/앱 메트릭 스크래핑)
+  # Why: /actuator/prometheus 엔드포인트 수집. L7 경로 제한은 Istio was-authz가 담당
+  - fromEndpoints:
+    - matchLabels:
+        app.kubernetes.io/name: prometheus
+        io.kubernetes.pod.namespace: monitoring
+    toPorts:
+    - ports:
+      - port: "8080"
+        protocol: TCP
+
   # Egress
   egress:
   # Rule 1: was → mysql:3306 허용
