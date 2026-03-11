@@ -1,0 +1,84 @@
+# ==============================================================================
+# agent-readonly RBAC - AI Agent 전용 읽기 권한
+# ==============================================================================
+# 목적: Infra Agent가 kubectl 명령으로 클러스터 상태를 조회하기 위한 최소 권한
+# 의존성: agent-team-server (Discord Bot) → 이 ServiceAccount의 kubeconfig 사용
+# 근거: ADR-016 최소 권한 원칙 — get/list/watch + pods/log만 허용
+# ==============================================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: agent-readonly
+  namespace: blog-system
+  labels:
+    app: agent-readonly
+    tier: monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: agent-readonly
+rules:
+  # 코어 리소스 읽기
+  - apiGroups: [""]
+    resources:
+      - pods
+      - pods/log
+      - services
+      - endpoints
+      - namespaces
+      - nodes
+      - configmaps
+      - events
+      - persistentvolumeclaims
+    verbs: ["get", "list", "watch"]
+  # 워크로드 리소스 읽기
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+      - daemonsets
+      - replicasets
+      - statefulsets
+    verbs: ["get", "list", "watch"]
+  # 배치 리소스 읽기
+  - apiGroups: ["batch"]
+    resources:
+      - jobs
+      - cronjobs
+    verbs: ["get", "list", "watch"]
+  # 네트워크 리소스 읽기
+  - apiGroups: ["networking.k8s.io"]
+    resources:
+      - ingresses
+      - networkpolicies
+    verbs: ["get", "list", "watch"]
+  # 메트릭 (kubectl top 명령용)
+  - apiGroups: ["metrics.k8s.io"]
+    resources:
+      - pods
+      - nodes
+    verbs: ["get", "list"]
+  # HPA/VPA 읽기
+  - apiGroups: ["autoscaling"]
+    resources:
+      - horizontalpodautoscalers
+    verbs: ["get", "list", "watch"]
+  # Argo Rollouts 읽기
+  - apiGroups: ["argoproj.io"]
+    resources:
+      - rollouts
+      - analysisruns
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: agent-readonly
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: agent-readonly
+subjects:
+  - kind: ServiceAccount
+    name: agent-readonly
+    namespace: blog-system

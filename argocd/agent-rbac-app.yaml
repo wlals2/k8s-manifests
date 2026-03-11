@@ -1,0 +1,28 @@
+# ==============================================================================
+# Agent RBAC ArgoCD Application
+# ==============================================================================
+# 목적: AI Agent 전용 RBAC(ServiceAccount, ClusterRole)를 GitOps로 관리
+# 의존성: root-app.yaml이 자동 인식
+# ==============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: agent-rbac
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/wlals2/k8s-manifests.git
+    targetRevision: main
+    path: configs/agent-rbac
+  destination:
+    server: https://kubernetes.default.svc
+    # ClusterRole/ClusterRoleBinding은 클러스터 스코프
+    # ServiceAccount는 YAML 내 metadata.namespace(blog-system)를 따름
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
