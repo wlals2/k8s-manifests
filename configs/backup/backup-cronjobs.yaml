@@ -32,6 +32,9 @@ spec:
           # Why: etcd는 Control Plane에서만 실행
           nodeName: k8s-cp
           restartPolicy: OnFailure
+          # Why: etcd-backup 이미지가 GHCR private → 인증 없이 풀 불가
+          imagePullSecrets:
+          - name: ghcr-secret
 
           containers:
           - name: etcd-backup
@@ -193,6 +196,9 @@ spec:
           # restartPolicy: OnFailure
           # 이유: mysqldump 일시적 실패 대응 (네트워크 오류 등)
           restartPolicy: OnFailure
+          # Why: mysql-backup 이미지가 GHCR private → 인증 없이 풀 불가
+          imagePullSecrets:
+          - name: ghcr-secret
 
           containers:
           - name: mysql-backup
