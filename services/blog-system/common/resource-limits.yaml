@@ -8,13 +8,13 @@
 # - Cryptocurrency Mining 공격 차단 (CPU 무제한 사용 방지)
 # - OOM Killer 방지 (메모리 제한으로 노드 안정성 보장)
 #
-# 현재 사용량 (blog-system):
-# - Requests: CPU 1000m, Memory 1856Mi
-# - Limits: CPU 2600m, Memory 4Gi
+# 현재 사용량 (blog-system, PXC HA 포함):
+# - Requests: CPU 1660m, Memory 4288Mi
+# - Limits: CPU 4700m, Memory 7424Mi
 #
-# Quota 설정 (여유 100-150%):
-# - Requests: CPU 2cores, Memory 4Gi
-# - Limits: CPU 6cores, Memory 10Gi
+# Quota 설정 (여유 ~50%):
+# - Requests: CPU 3cores, Memory 6Gi
+# - Limits: CPU 20cores, Memory 15Gi
 # ==============================================================================
 
 ---
@@ -33,11 +33,13 @@ metadata:
 spec:
   hard:
     # CPU 제한
-    requests.cpu: "2"           # 전체 요청 CPU 2 cores까지
+    # Why: PXC HA 3노드 + HAProxy 2 추가로 인한 증량 (ADR-017)
+    requests.cpu: "3"           # 전체 요청 CPU 3 cores까지
     limits.cpu: "20"            # 전체 제한 CPU 20 cores까지 (istio-proxy sidecar 포함, 여유 확보)
 
     # Memory 제한
-    requests.memory: 4Gi        # 전체 요청 메모리 4Gi까지
+    # Why: PXC 3×512Mi + HAProxy 2×256Mi 추가 (ADR-017)
+    requests.memory: 6Gi        # 전체 요청 메모리 6Gi까지
     limits.memory: 15Gi         # 전체 제한 메모리 15Gi까지 (istio-proxy sidecar 포함)
 
     # Pod 수 제한
