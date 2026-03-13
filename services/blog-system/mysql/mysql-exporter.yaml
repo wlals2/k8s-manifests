@@ -62,16 +62,17 @@ spec:
           limits:
             cpu: 200m
             memory: 256Mi
+        # Why: /-/healthy는 MySQL ping 1회만 실행 → 무거운 스크래퍼 쿼리와 Probe 분리
         livenessProbe:
           httpGet:
-            path: /metrics
+            path: /-/healthy
             port: 9104
           initialDelaySeconds: 30
           periodSeconds: 10
           timeoutSeconds: 5
         readinessProbe:
           httpGet:
-            path: /metrics
+            path: /-/healthy
             port: 9104
           initialDelaySeconds: 10
           periodSeconds: 5
