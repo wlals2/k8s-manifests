@@ -61,7 +61,7 @@ spec:
   haproxy:
     enabled: true
     size: 2
-    image: percona/percona-xtradb-cluster-operator:1.19.0-haproxy
+    image: percona/haproxy:2.8.17
 
     # Why: ADR-003과 동일 — HAProxy도 PXC와 직접 통신하므로 sidecar 제외
     annotations:
@@ -92,7 +92,8 @@ spec:
     enabled: false
 
   backup:
-    image: percona/percona-xtradb-cluster-operator:1.19.0-pxc8.0-backup
+    # Why: PXC 8.0 호환 backup 이미지 (8.4용은 percona-xtrabackup:8.4.0-5.1)
+    image: percona/percona-xtrabackup:8.0.35-34.1
     storages:
       s3-backup:
         type: s3
