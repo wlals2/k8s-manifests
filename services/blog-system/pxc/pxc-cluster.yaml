@@ -67,6 +67,10 @@ spec:
     annotations:
       sidecar.istio.io/inject: "false"
 
+    # Why: Kyverno require-non-root 정책 준수
+    containerSecurityContext:
+      runAsNonRoot: true
+
     resources:
       requests:
         cpu: 100m
