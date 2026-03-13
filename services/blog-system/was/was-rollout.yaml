@@ -101,11 +101,12 @@ spec:
                 configMapKeyRef:
                   name: was-config
                   key: SPRING_DATASOURCE_USERNAME
+            # Why: PXC Operator가 자동 생성한 Secret 사용 (ADR-017)
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: mysql-secret
-                  key: mysql-root-password
+                  name: mysql-pxc-secrets
+                  key: root
             # GitHub OAuth (Decap CMS)
             - name: GITHUB_OAUTH_CLIENT_ID
               value: "Ov23liUDXOW2o62lb8a3"

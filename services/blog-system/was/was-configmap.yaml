@@ -19,9 +19,10 @@ metadata:
     tier: backend
 data:
   # MySQL 연결 URL
-  # mysql-service: Kubernetes Service DNS (같은 Namespace)
-  # 전체 DNS: mysql-service.blog-system.svc.cluster.local
-  SPRING_DATASOURCE_URL: jdbc:mysql://mysql-service:3306/board?useSSL=false&allowPublicKeyRetrieval=true
+  # Why: PXC HAProxy를 통해 접속 → 자동 Failover (ADR-017)
+  # mysql-pxc-haproxy: PXC Operator가 생성한 HAProxy Service DNS
+  # 전체 DNS: mysql-pxc-haproxy.blog-system.svc.cluster.local
+  SPRING_DATASOURCE_URL: jdbc:mysql://mysql-pxc-haproxy:3306/board?useSSL=false&allowPublicKeyRetrieval=true
 
   # MySQL 사용자명 (민감하지 않음)
   SPRING_DATASOURCE_USERNAME: root

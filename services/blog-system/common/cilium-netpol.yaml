@@ -197,7 +197,7 @@ spec:
 
   # Egress
   egress:
-  # Rule 1: was → mysql:3306 허용
+  # Rule 1: was → mysql:3306 허용 (기존 단일 MySQL)
   - toEndpoints:
     - matchLabels:
         app: mysql
@@ -205,6 +205,21 @@ spec:
     toPorts:
     - ports:
       - port: "3306"
+        protocol: TCP
+
+  # Rule 1-2: was → PXC HAProxy:3306 허용 (MySQL HA — ADR-017)
+  # Why: PXC HAProxy는 Operator가 관리하므로 app: mysql 라벨이 아닌
+  #      app.kubernetes.io/component: haproxy 라벨 사용
+  - toEndpoints:
+    - matchLabels:
+        app.kubernetes.io/component: haproxy
+        app.kubernetes.io/instance: mysql-pxc
+        io.kubernetes.pod.namespace: blog-system
+    toPorts:
+    - ports:
+      - port: "3306"
+        protocol: TCP
+      - port: "3309"
         protocol: TCP
 
   # Rule 2: DNS 허용
