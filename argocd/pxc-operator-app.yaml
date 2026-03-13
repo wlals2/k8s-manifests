@@ -1,0 +1,28 @@
+# ==============================================================================
+# pxc-operator - Percona XtraDB Cluster Operator for MySQL HA
+# ==============================================================================
+# 목적: MySQL HA 자동 관리 (PXC 클러스터 생성/Failover/백업)
+# 의존성: PXC 클러스터 CR은 blog-system namespace에 별도 배포 (blog-system-app)
+# ==============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pxc-operator
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/wlals2/k8s-manifests.git
+    targetRevision: main
+    path: apps/pxc-operator
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: pxc-operator
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true

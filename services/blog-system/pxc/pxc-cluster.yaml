@@ -1,0 +1,106 @@
+# ==============================================================================
+# mysql-pxc - Percona XtraDB Cluster (MySQL HA)
+# ==============================================================================
+# 목적: 단일 MySQL → 3노드 동기 복제 클러스터로 전환 (자동 Failover)
+# 의존성: pxc-operator (pxc-operator namespace)가 먼저 설치되어야 함
+# ==============================================================================
+apiVersion: pxc.percona.com/v1
+kind: PerconaXtraDBCluster
+metadata:
+  name: mysql-pxc
+spec:
+  crVersion: "1.19.0"
+
+  # Why: secretsName 미지정 → Operator가 "mysql-pxc-secrets" 자동 생성
+  #      Phase 4에서 root 비밀번호를 추출하여 WAS Secret에 반영
+
+  # Why: 홈랩 내부 통신이므로 TLS 불필요, 외부 노출 없음
+  unsafeFlags:
+    tls: true
+  tls:
+    enabled: false
+
+  upgradeOptions:
+    apply: disabled
+    schedule: "0 4 * * *"
+
+  pxc:
+    size: 3
+    image: percona/percona-xtradb-cluster:8.0.36-28.1
+
+    # Why: ADR-003 — MySQL은 Server-First 프로토콜, sidecar 주입 시 데드락
+    annotations:
+      sidecar.istio.io/inject: "false"
+
+    # Why: ADR-016 — kube-apiserver 호출 불필요
+    containerSecurityContext:
+      runAsNonRoot: true
+
+    resources:
+      requests:
+        cpu: 300m
+        memory: 512Mi
+      limits:
+        cpu: 600m
+        memory: 1Gi
+
+    # Why: PXC 3노드를 서로 다른 Worker에 분산 → 단일 노드 장애 시 쿼럼 유지
+    affinity:
+      antiAffinityTopologyKey: "kubernetes.io/hostname"
+
+    podDisruptionBudget:
+      maxUnavailable: 1
+
+    volumeSpec:
+      persistentVolumeClaim:
+        storageClassName: longhorn
+        resources:
+          requests:
+            storage: 5Gi
+
+  haproxy:
+    enabled: true
+    size: 2
+    image: percona/percona-xtradb-cluster-operator:1.19.0-haproxy
+
+    # Why: ADR-003과 동일 — HAProxy도 PXC와 직접 통신하므로 sidecar 제외
+    annotations:
+      sidecar.istio.io/inject: "false"
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 200m
+        memory: 512Mi
+
+    affinity:
+      antiAffinityTopologyKey: "kubernetes.io/hostname"
+
+    podDisruptionBudget:
+      maxUnavailable: 1
+
+  proxysql:
+    enabled: false
+
+  logcollector:
+    enabled: false
+
+  backup:
+    image: percona/percona-xtradb-cluster-operator:1.19.0-pxc8.0-backup
+    storages:
+      s3-backup:
+        type: s3
+        verifyTLS: true
+        s3:
+          # Why: 기존 mysql-backup CronJob과 동일한 S3 버킷 재사용
+          bucket: jimin-backup
+          # Why: 기존 mysql-backup CronJob과 동일한 AWS 자격증명 재사용
+          credentialsSecret: aws-s3-credentials
+          region: ap-northeast-2
+    schedule:
+      - name: "daily-backup"
+        schedule: "0 18 * * *"
+        keep: 7
+        storageName: s3-backup

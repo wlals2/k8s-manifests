@@ -1,0 +1,11 @@
+apiVersion: v2
+name: my-pxc-operator
+description: Wrapper chart for Percona XtraDB Cluster Operator
+type: application
+version: 0.1.0
+appVersion: "1.19.0"
+
+dependencies:
+  - name: pxc-operator
+    version: 1.19.0
+    repository: https://percona.github.io/percona-helm-charts/

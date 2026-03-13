@@ -1,0 +1,17 @@
+# Why: Wrapper Chart이므로 모든 설정을 'pxc-operator:' 키 아래에 작성
+
+pxc-operator:
+  # Why: Operator는 pxc-operator NS에 설치하지만, PXC 클러스터는 blog-system에 생성
+  #      watchAllNamespaces: true 대신 최소 권한 원칙(ADR-016) 적용
+  watchNamespace: "blog-system"
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 200m
+      memory: 500Mi
+
+  # Why: 텔레메트리 데이터 외부 전송 불필요 (홈랩 내부 운영)
+  disableTelemetry: true
