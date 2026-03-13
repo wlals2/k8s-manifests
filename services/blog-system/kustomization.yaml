@@ -13,7 +13,6 @@ namespace: blog-system
 # 리소스 그룹 (컴포넌트별 디렉터리)
 resources:
   - common   # Gateway, HPA, VPA, PDB 등 공통 리소스
-  - mysql    # MySQL 데이터베이스 (기존 단일 인스턴스 — PXC 전환 완료 후 제거)
   - pxc      # Percona XtraDB Cluster (MySQL HA — ADR-017)
   - was      # WAS (백엔드 API)
   - web      # Web (프론트엔드)
