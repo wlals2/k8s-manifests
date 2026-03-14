@@ -51,6 +51,14 @@ spec:
     podDisruptionBudget:
       maxUnavailable: 1
 
+    # Why: HAProxy health check script가 33062(Admin Port)로 wsrep 상태를 확인
+    #      PXC 8.0은 Admin Port 기본 비활성 → 명시적으로 활성화 필요
+    #      Admin Port는 max_connections 소진 시에도 항상 접속 가능하여 health check에 적합
+    configuration: |
+      [mysqld]
+      admin_port=33062
+      admin_address=0.0.0.0
+
     volumeSpec:
       persistentVolumeClaim:
         storageClassName: longhorn
