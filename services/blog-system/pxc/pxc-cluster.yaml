@@ -27,6 +27,8 @@ spec:
   pxc:
     size: 3
     image: percona/percona-xtradb-cluster:8.0.36-28.1
+    # Why: 전체 클러스터 crash 시 Operator가 최신 seqno 노드를 자동 감지해 bootstrap
+    autoRecovery: true
 
     # Why: ADR-003 — MySQL은 Server-First 프로토콜, sidecar 주입 시 데드락
     annotations:
@@ -51,13 +53,11 @@ spec:
     podDisruptionBudget:
       maxUnavailable: 1
 
-    # Why: HAProxy health check script가 33062(Admin Port)로 wsrep 상태를 확인
-    #      PXC 8.0은 Admin Port 기본 비활성 → 명시적으로 활성화 필요
-    #      Admin Port는 max_connections 소진 시에도 항상 접속 가능하여 health check에 적합
+    # Why: HAProxy health check가 33062(Admin Port)로 wsrep 상태 확인
+    #      Operator가 node.cnf에 admin-address=<pod_ip> 자동 설정 → admin_port만 추가
     configuration: |
       [mysqld]
       admin_port=33062
-      admin_address=0.0.0.0
 
     volumeSpec:
       persistentVolumeClaim:
