@@ -87,7 +87,7 @@ falco:
           proc.name in (apk, apt, apt-get, yum, rpm, dnf, pip, pip3, npm) and
           not proc.pname in (package_mgmt_binaries) and
           not container.image.repository in (wazuh/wazuh-manager) and
-          not container.name in (mysql-backup, etcd-backup)
+          not container.name in (etcd-backup)
         output: >
           ⚠️ WARNING: 컨테이너 내부에서 패키지 관리자가 실행되었습니다!
             (user=%user.name pod=%k8s.pod.name namespace=%k8s.ns.name
@@ -110,7 +110,7 @@ falco:
            fd.name startswith /usr/bin/ or
            fd.name startswith /sbin/ or
            fd.name startswith /usr/sbin/) and
-          not container.name in (mysql-backup, etcd-backup) and
+          not container.name in (etcd-backup) and
           not container.image.repository in (moby/buildkit)
         output: >
           🔴 ERROR: 바이너리 디렉토리에 쓰기 시도 감지!
@@ -130,7 +130,6 @@ falco:
       #   - 시스템 namespace 제외 (kube-system, monitoring 등)
       #   - Istio sidecar/initContainer 이미지 제외
       #   - backup CronJob namespace 제외
-      #   - blog-system의 mysql-backup CronJob 컨테이너 제외
       - rule: Shell Spawned in Application Container
         desc: Any shell execution in application container indicates compromise regardless of parent process
         condition: >
@@ -139,7 +138,7 @@ falco:
           proc.name in (bash, sh, ksh, zsh, dash) and
           not k8s.ns.name in (kube-system, monitoring, argocd, falco, istio-system, security, backup-system, longhorn-system, metallb-system, sealed-secrets) and
           not container.image.repository in (docker.io/istio/proxyv2, docker.io/curlimages/curl, moby/buildkit) and
-          not container.name in (istio-init, otel-agent-download, mysqldump, s3-upload, mysql, etcd-backup)
+          not container.name in (istio-init, otel-agent-download, etcd-backup)
         output: >
           ⚠️ WARNING: 앱 컨테이너에서 Shell이 실행되었습니다! (침투 의심)
             (user=%user.name pod=%k8s.pod.name namespace=%k8s.ns.name

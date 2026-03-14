@@ -118,8 +118,7 @@ falco-talon:
       # Why: /bin, /sbin 쓰기 = 백도어/rootkit 설치 시도
       #      False Positive 가능성 있어 Phase 1에서는 라벨만
       # exceptions.namespaces:
-      #   backup-system — etcd-backup, mysql-backup이 Alpine 이미지에서
-      #   `apk add aws-cli` 실행 → /usr/bin에 정상적으로 쓰는 오탐
+      #   backup-system — etcd-backup이 Alpine 이미지에서 패키지 설치 시 오탐 가능
       #   CronJob 특성상 Pod가 완료 후 즉시 삭제되어 라벨 적용도 실패함
       - rule: Write to Binary Dir
         match:

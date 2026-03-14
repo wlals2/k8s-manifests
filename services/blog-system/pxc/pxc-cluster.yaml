@@ -107,9 +107,7 @@ spec:
         type: s3
         verifyTLS: true
         s3:
-          # Why: 기존 mysql-backup CronJob과 동일한 S3 버킷 재사용
           bucket: jimin-backup
-          # Why: 기존 mysql-backup CronJob과 동일한 AWS 자격증명 재사용
           credentialsSecret: aws-s3-credentials
           region: ap-northeast-2
     schedule:

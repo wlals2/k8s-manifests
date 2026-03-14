@@ -90,9 +90,9 @@ spec:
 
 ---
 # ==============================================================================
-# MySQL Service TCP Probe
+# MySQL (PXC HAProxy) TCP Probe
 # ==============================================================================
-# Target: mysql-service 내부 DNS
+# Target: mysql-pxc-haproxy 내부 DNS (PXC HA — ADR-017)
 # Module: tcp_connect (TCP 포트 열림 확인)
 # ==============================================================================
 apiVersion: monitoring.coreos.com/v1
@@ -123,4 +123,4 @@ spec:
   targets:
     staticConfig:
       static:
-      - mysql-service.blog-system.svc.cluster.local:3306
+      - mysql-pxc-haproxy.blog-system.svc.cluster.local:3306

@@ -4,11 +4,9 @@
 # 목적: CronJob 및 배치 작업 모니터링
 #
 # 포함된 패널:
-# 1. CronJob 상태 개요 (Active, Suspended)
-# 2. 마지막 실행 시간 및 다음 스케줄
-# 3. Job 성공/실패 히스토리
-# 4. Pushgateway 메트릭 (배치 작업 결과)
-# 5. MySQL Backup Job 상세
+# 1. CronJob 상태 개요 (Active)
+# 2. Job 성공/실패 히스토리
+# 3. Pushgateway 메트릭 (배치 작업 결과)
 # ==============================================================================
 
 apiVersion: v1
@@ -41,78 +39,8 @@ data:
           "type": "row"
         },
         {
-          "datasource": "Prometheus",
-          "fieldConfig": {
-            "defaults": {
-              "color": { "mode": "thresholds" },
-              "mappings": [
-                { "options": { "0": { "color": "green", "index": 0, "text": "Idle" } }, "type": "value" },
-                { "options": { "1": { "color": "yellow", "index": 1, "text": "Running" } }, "type": "value" }
-              ],
-              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] }
-            }
-          },
-          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
-          "id": 1,
-          "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-          "targets": [{ "expr": "kube_cronjob_status_active{namespace=\"blog-system\",cronjob=\"mysql-backup\"}", "legendFormat": "mysql-backup", "refId": "A" }],
-          "title": "mysql-backup 상태",
-          "type": "stat"
-        },
-        {
-          "datasource": "Prometheus",
-          "fieldConfig": {
-            "defaults": {
-              "color": { "mode": "thresholds" },
-              "mappings": [
-                { "options": { "0": { "color": "green", "index": 0, "text": "Active" } }, "type": "value" },
-                { "options": { "1": { "color": "red", "index": 1, "text": "Suspended" } }, "type": "value" }
-              ],
-              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] }
-            }
-          },
-          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
-          "id": 2,
-          "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-          "targets": [{ "expr": "kube_cronjob_spec_suspend{namespace=\"blog-system\",cronjob=\"mysql-backup\"}", "legendFormat": "Suspended", "refId": "A" }],
-          "title": "Suspend 상태",
-          "type": "stat"
-        },
-        {
-          "datasource": "Prometheus",
-          "fieldConfig": {
-            "defaults": {
-              "color": { "mode": "thresholds" },
-              "unit": "dateTimeFromNow",
-              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] }
-            }
-          },
-          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
-          "id": 3,
-          "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-          "targets": [{ "expr": "kube_cronjob_status_last_schedule_time{namespace=\"blog-system\",cronjob=\"mysql-backup\"} * 1000", "legendFormat": "Last Run", "refId": "A" }],
-          "title": "마지막 실행",
-          "type": "stat"
-        },
-        {
-          "datasource": "Prometheus",
-          "fieldConfig": {
-            "defaults": {
-              "color": { "mode": "thresholds" },
-              "unit": "dateTimeFromNow",
-              "thresholds": { "mode": "absolute", "steps": [ { "color": "blue", "value": null } ] }
-            }
-          },
-          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
-          "id": 4,
-          "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-          "targets": [{ "expr": "kube_cronjob_next_schedule_time{namespace=\"blog-system\",cronjob=\"mysql-backup\"} * 1000", "legendFormat": "Next Run", "refId": "A" }],
-          "title": "다음 예정",
-          "type": "stat"
-        },
-        {
           "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 1 },
           "id": 101,
           "panels": [],
           "title": "Job 실행 히스토리",
@@ -131,7 +59,7 @@ data:
               { "matcher": { "id": "byName", "options": "Succeeded" }, "properties": [ { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } } ] }
             ]
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 2 },
           "id": 10,
           "options": { "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
           "targets": [
@@ -150,7 +78,7 @@ data:
               "unit": "s"
             }
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 2 },
           "id": 11,
           "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
           "targets": [
@@ -161,7 +89,7 @@ data:
         },
         {
           "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 10 },
           "id": 102,
           "panels": [],
           "title": "CronJob 상세 테이블",
@@ -180,7 +108,7 @@ data:
               { "matcher": { "id": "byName", "options": "Next Schedule" }, "properties": [ { "id": "unit", "value": "dateTimeFromNow" } ] }
             ]
           },
-          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 15 },
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 11 },
           "id": 20,
           "options": { "showHeader": true, "cellHeight": "sm" },
           "targets": [
@@ -198,7 +126,7 @@ data:
         },
         {
           "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 19 },
           "id": 103,
           "panels": [],
           "title": "Pushgateway 메트릭",
@@ -213,7 +141,7 @@ data:
               "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] }
             }
           },
-          "gridPos": { "h": 4, "w": 8, "x": 0, "y": 24 },
+          "gridPos": { "h": 4, "w": 8, "x": 0, "y": 20 },
           "id": 30,
           "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [{ "expr": "count(push_time_seconds)", "legendFormat": "Metrics", "refId": "A" }],
@@ -229,7 +157,7 @@ data:
               "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 86400 }, { "color": "red", "value": 172800 } ] }
             }
           },
-          "gridPos": { "h": 4, "w": 8, "x": 8, "y": 24 },
+          "gridPos": { "h": 4, "w": 8, "x": 8, "y": 20 },
           "id": 31,
           "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [{ "expr": "max(push_time_seconds) * 1000", "legendFormat": "Last Push", "refId": "A" }],
@@ -248,41 +176,13 @@ data:
               "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] }
             }
           },
-          "gridPos": { "h": 4, "w": 8, "x": 16, "y": 24 },
+          "gridPos": { "h": 4, "w": 8, "x": 16, "y": 20 },
           "id": 32,
           "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [{ "expr": "up{job=\"pushgateway\"}", "legendFormat": "Pushgateway", "refId": "A" }],
           "title": "Pushgateway 상태",
           "type": "stat"
         },
-        {
-          "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 },
-          "id": 104,
-          "panels": [],
-          "title": "MySQL Backup 로그",
-          "type": "row"
-        },
-        {
-          "datasource": "Loki",
-          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 29 },
-          "id": 40,
-          "options": {
-            "dedupStrategy": "none",
-            "enableLogDetails": true,
-            "prettifyLogMessage": false,
-            "showCommonLabels": false,
-            "showLabels": false,
-            "showTime": true,
-            "sortOrder": "Descending",
-            "wrapLogMessage": true
-          },
-          "targets": [
-            { "datasource": "Loki", "expr": "{namespace=\"blog-system\", pod=~\"mysql-backup.*\"}", "legendFormat": "", "refId": "A" }
-          ],
-          "title": "MySQL Backup Job 로그",
-          "type": "logs"
-        }
       ],
       "refresh": "1m",
       "schemaVersion": 38,
