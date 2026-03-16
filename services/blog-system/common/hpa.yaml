@@ -10,7 +10,7 @@
 #
 # 최소/최대 Replicas:
 # - WAS: 2-10개
-# - WEB: 2-5개
+# - WEB: 2-10개
 #
 # VPA 통합:
 # - VPA updateMode: Auto → requests 자동 조정
@@ -89,7 +89,7 @@ spec:
     name: web
 
   minReplicas: 2
-  maxReplicas: 5
+  maxReplicas: 10
 
   metrics:
   # Metric 1: CPU 사용률
