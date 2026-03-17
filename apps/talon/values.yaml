@@ -113,10 +113,11 @@ falco-talon:
                 falco-alert: package-manager-detected
 
       # ========================================================================
-      # Rule 3: 바이너리 디렉토리 쓰기 → 의심 라벨 태깅 (ERROR)
+      # Rule 3: 바이너리 디렉토리 쓰기 → 라벨링 + 네트워크 격리 (ERROR)
       # ========================================================================
       # Why: /bin, /sbin 쓰기 = 백도어/rootkit 설치 시도
-      #      False Positive 가능성 있어 Phase 1에서는 라벨만
+      #      라벨링만으로는 공격자가 이미 도구를 설치한 뒤 → 네트워크 격리 필수
+      #      C&C 통신/횡이동을 차단하되, DNS/모니터링은 허용 (포렌식용)
       # exceptions.namespaces:
       #   backup-system — etcd-backup이 Alpine 이미지에서 패키지 설치 시 오탐 가능
       #   CronJob 특성상 Pod가 완료 후 즉시 삭제되어 라벨 적용도 실패함
@@ -133,8 +134,16 @@ falco-talon:
             actionner: kubernetes:label
             parameters:
               labels:
-                analysis/status: suspicious
-                falco-alert: binary-dir-write-detected
+                quarantine: "true"
+                falco-response: "isolated"
+                isolated-reason: "binary-dir-write-detected"
+          - action: Isolate Compromised Pod
+            actionner: kubernetes:networkpolicy
+            parameters:
+              allow_dns: true
+              allow_monitoring: true
+              deny_all_ingress: true
+              deny_all_egress: true
 
       # ========================================================================
       # Rule 4: 앱 컨테이너 Shell 실행 → 의심 라벨 태깅 (WARNING)
