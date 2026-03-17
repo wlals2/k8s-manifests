@@ -1,0 +1,23 @@
+# ==============================================================================
+# longhorn-routes - Longhorn UI 외부 접근 라우팅
+# ==============================================================================
+# 목적: longhorn.jiminhome.shop → longhorn-frontend Service 연결
+# 의존성: blog-gateway (blog-system), longhorn-frontend (longhorn-system)
+# ==============================================================================
+
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: longhorn-routes
+  namespace: istio-system
+spec:
+  hosts:
+    - "longhorn.jiminhome.shop"
+  gateways:
+    - blog-system/blog-gateway
+  http:
+    - route:
+        - destination:
+            host: longhorn-frontend.longhorn-system.svc.cluster.local
+            port:
+              number: 80
