@@ -281,19 +281,24 @@ kube-prometheus-stack:
           slack_configs:
             - api_url: 'https://discordapp.com/api/webhooks/1467150664336408668/L8uFfxn5O8WXLpt99Q1oeWmhp6H9ae8OOb0oUMzmWojIGDuufs-zDbZ2JnrSE7Mm9Ya-/slack'
               send_resolved: true
-              title: '{{ .Status | toUpper }}: {{ .CommonLabels.alertname }}'
-              text: '{{ range .Alerts }}*{{ .Labels.severity }}* - {{ .Annotations.summary }}{{ end }}'
+              color: '{{ if eq .Status "firing" }}#FF4444{{ else }}#36D399{{ end }}'
+              title: '{{ if eq .Status "firing" }}🔴 FIRING{{ else }}✅ RESOLVED{{ end }}: {{ .CommonLabels.alertname }}'
+              text: '{{ range .Alerts }}**{{ .Labels.severity }}** - {{ .Annotations.summary }}{{ end }}'
         - name: 'discord-critical'
           slack_configs:
             - api_url: 'https://discordapp.com/api/webhooks/1467150664336408668/L8uFfxn5O8WXLpt99Q1oeWmhp6H9ae8OOb0oUMzmWojIGDuufs-zDbZ2JnrSE7Mm9Ya-/slack'
               send_resolved: true
-              title: '🔴 CRITICAL: {{ .CommonLabels.alertname }}'
+              # Why: #FF4444=빨강(firing), #36D399=초록(resolved) → Discord 임베드 좌측 색상 바
+              color: '{{ if eq .Status "firing" }}#FF4444{{ else }}#36D399{{ end }}'
+              title: '{{ if eq .Status "firing" }}🔴 CRITICAL{{ else }}✅ RESOLVED{{ end }}: {{ .CommonLabels.alertname }}'
               text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
         - name: 'discord-warning'
           slack_configs:
             - api_url: 'https://discordapp.com/api/webhooks/1467150664336408668/L8uFfxn5O8WXLpt99Q1oeWmhp6H9ae8OOb0oUMzmWojIGDuufs-zDbZ2JnrSE7Mm9Ya-/slack'
               send_resolved: true
-              title: '⚠️ WARNING: {{ .CommonLabels.alertname }}'
+              # Why: #FFAA00=노랑(warning firing), #36D399=초록(resolved)
+              color: '{{ if eq .Status "firing" }}#FFAA00{{ else }}#36D399{{ end }}'
+              title: '{{ if eq .Status "firing" }}⚠️ WARNING{{ else }}✅ RESOLVED{{ end }}: {{ .CommonLabels.alertname }}'
               text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
       inhibit_rules:
         # Why: Critical 발생 시 같은 alertname의 Warning 억제 → 중복 알림 방지
