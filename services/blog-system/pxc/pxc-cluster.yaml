@@ -79,12 +79,13 @@ spec:
     containerSecurityContext:
       runAsNonRoot: true
 
+    # Why: 실측 148m에서 CPU 스로틀링 → Readiness timeout → WAS 연결 실패 (2026-03-17)
     resources:
       requests:
-        cpu: 100m
+        cpu: 300m
         memory: 256Mi
       limits:
-        cpu: 200m
+        cpu: 800m
         memory: 512Mi
 
     affinity:
