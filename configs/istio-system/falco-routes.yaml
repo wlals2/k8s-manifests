@@ -1,0 +1,22 @@
+# ==============================================================================
+# falco-routes - Falco Sidekick UI 외부 접근 라우팅
+# ==============================================================================
+# 목적: falco.jiminhome.shop → falco-falcosidekick-ui Service 연결
+# 의존성: blog-gateway (blog-system), falco-falcosidekick-ui (falco)
+# ==============================================================================
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: falco-routes
+  namespace: istio-system
+spec:
+  hosts:
+    - "falco.jiminhome.shop"
+  gateways:
+    - blog-system/blog-gateway
+  http:
+    - route:
+        - destination:
+            host: falco-falcosidekick-ui.falco.svc.cluster.local
+            port:
+              number: 2802

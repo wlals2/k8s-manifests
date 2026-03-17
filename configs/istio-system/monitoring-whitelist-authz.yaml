@@ -71,6 +71,7 @@ spec:
         - "alert.jiminhome.shop"
         - "wazuh.jiminhome.shop"
         - "longhorn.jiminhome.shop"
+        - "falco.jiminhome.shop"
         # Note: longhorn.jiminhome.shop은 blog-gateway → longhorn-frontend 라우팅으로 접근 → 내부 전용
     from:
     - source:
