@@ -120,6 +120,16 @@ falco:
         tags: [maturity_stable, container, filesystem, mitre_persistence, T1543]
 
       # ==================================================================
+      # 기본 룰 비활성화: Terminal shell in container (Notice)
+      # ==================================================================
+      # Why: 기본 룰(Notice)이 먼저 매칭되면 커스텀 룰(Warning)에 도달 불가
+      #      Falco는 하나의 이벤트에 하나의 룰만 매칭하므로,
+      #      기본 룰을 끄고 커스텀 룰(Rule 5)이 대신 매칭되게 함
+      #      → Warning 레벨이므로 Talon IPS 대응 체인까지 연결됨
+      - rule: Terminal shell in container
+        enabled: false
+
+      # ==================================================================
       # Rule 5: Shell Spawned in Application Container - WARNING
       # ==================================================================
       # 목적: 앱 컨테이너에서 shell 실행 = 침투 성공 신호 (부모 프로세스 무관)
