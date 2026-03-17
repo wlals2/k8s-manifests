@@ -22,7 +22,7 @@ metadata:
     app: was
     tier: backend
 spec:
-  replicas: 2 # 초기 replicas (HPA가 2-10으로 조정)
+  replicas: 0 # 초기 replicas (HPA가 2-10으로 조정)
   selector:
     matchLabels:
       app: was
