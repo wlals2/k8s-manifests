@@ -70,8 +70,8 @@ spec:
         - "prom.jiminhome.shop"
         - "alert.jiminhome.shop"
         - "wazuh.jiminhome.shop"
-        - "longhorn.jiminhome.shop:80"
-         # Note: longhorn.jiminhome.shop은 blog-gateway → longhorn-frontend 라우팅으로 접근 → 내부 전용
+        - "longhorn.jiminhome.shop"
+        # Note: longhorn.jiminhome.shop은 blog-gateway → longhorn-frontend 라우팅으로 접근 → 내부 전용
     from:
     - source:
         remoteIpBlocks: ["192.168.1.0/24"]
