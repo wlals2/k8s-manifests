@@ -252,6 +252,57 @@ kube-prometheus-stack:
   alertmanager:
     enabled: true
 
+    # Why: AlertManager → Discord 알림 연동
+    # 핵심: Discord /slack 엔드포인트 사용 → slack_configs로 보내면 Discord가 이해
+    #       webhook_configs는 Discord 미호환 (AlertManager JSON ≠ Discord JSON)
+    config:
+      global:
+        resolve_timeout: 5m
+      route:
+        group_by: ['alertname', 'namespace', 'severity']
+        group_wait: 30s
+        group_interval: 30s
+        repeat_interval: 4h
+        receiver: 'discord-homelab'
+        routes:
+          - match:
+              severity: critical
+            receiver: 'discord-critical'
+          - match:
+              severity: warning
+            receiver: 'discord-warning'
+          - match:
+              alertname: Watchdog
+            receiver: 'null'
+      receivers:
+        - name: 'null'
+        # Why: severity별 분리하면 나중에 채널 분리 가능 (현재는 같은 webhook)
+        - name: 'discord-homelab'
+          slack_configs:
+            - api_url: 'https://discordapp.com/api/webhooks/1467150664336408668/L8uFfxn5O8WXLpt99Q1oeWmhp6H9ae8OOb0oUMzmWojIGDuufs-zDbZ2JnrSE7Mm9Ya-/slack'
+              send_resolved: true
+              title: '{{ .Status | toUpper }}: {{ .CommonLabels.alertname }}'
+              text: '{{ range .Alerts }}*{{ .Labels.severity }}* - {{ .Annotations.summary }}{{ end }}'
+        - name: 'discord-critical'
+          slack_configs:
+            - api_url: 'https://discordapp.com/api/webhooks/1467150664336408668/L8uFfxn5O8WXLpt99Q1oeWmhp6H9ae8OOb0oUMzmWojIGDuufs-zDbZ2JnrSE7Mm9Ya-/slack'
+              send_resolved: true
+              title: '🔴 CRITICAL: {{ .CommonLabels.alertname }}'
+              text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        - name: 'discord-warning'
+          slack_configs:
+            - api_url: 'https://discordapp.com/api/webhooks/1467150664336408668/L8uFfxn5O8WXLpt99Q1oeWmhp6H9ae8OOb0oUMzmWojIGDuufs-zDbZ2JnrSE7Mm9Ya-/slack'
+              send_resolved: true
+              title: '⚠️ WARNING: {{ .CommonLabels.alertname }}'
+              text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+      inhibit_rules:
+        # Why: Critical 발생 시 같은 alertname의 Warning 억제 → 중복 알림 방지
+        - source_match:
+            severity: 'critical'
+          target_match:
+            severity: 'warning'
+          equal: ['alertname', 'namespace']
+
     # AlertManager 설정
     alertmanagerSpec:
       # Storage 설정 (선택 사항)
