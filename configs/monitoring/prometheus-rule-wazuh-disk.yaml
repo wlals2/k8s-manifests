@@ -38,7 +38,7 @@ spec:
         component: wazuh
         category: disk
       annotations:
-        summary: "Wazuh Indexer 디스크 사용률 80% 초과"
+        summary: "⚠️ Wazuh 디스크 80% 초과: {{ $labels.persistentvolumeclaim }} ({{ $value | humanizePercentage }})"
         description: |
           Wazuh Indexer PVC 디스크 사용률이 {{ $value | humanizePercentage }}입니다.
 
@@ -64,7 +64,7 @@ spec:
         component: wazuh
         category: disk
       annotations:
-        summary: "🚨 Wazuh Indexer 디스크 사용률 90% 초과 (긴급)"
+        summary: "🚨 Wazuh 디스크 90% 초과: {{ $labels.persistentvolumeclaim }} ({{ $value | humanizePercentage }})"
         description: |
           Wazuh Indexer PVC 디스크 사용률이 {{ $value | humanizePercentage }}입니다.
 
@@ -93,7 +93,7 @@ spec:
         component: wazuh
         category: log-collection
       annotations:
-        summary: "Wazuh 로그 수집 중단 (5분간 로그 없음)"
+        summary: "⚠️ Wazuh 로그 수집 중단 (5분간 로그 없음)"
         description: |
           Wazuh Manager가 5분간 로그를 받지 못했습니다.
 

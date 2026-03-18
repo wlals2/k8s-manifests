@@ -42,7 +42,7 @@ spec:
         component: node
         category: disk
       annotations:
-        summary: "노드 디스크 사용률 80% 초과"
+        summary: "⚠️ 디스크 80% 초과: {{ $labels.instance }} ({{ $value | humanizePercentage }})"
         description: |
           노드 {{ $labels.instance }} 디스크 사용률이 {{ $value | humanizePercentage }}입니다.
 
@@ -71,7 +71,7 @@ spec:
         component: node
         category: disk
       annotations:
-        summary: "🚨 노드 디스크 사용률 90% 초과 (긴급)"
+        summary: "🚨 디스크 90% 초과: {{ $labels.instance }} ({{ $value | humanizePercentage }})"
         description: |
           노드 {{ $labels.instance }} 디스크 사용률이 {{ $value | humanizePercentage }}입니다.
 

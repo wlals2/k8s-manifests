@@ -36,7 +36,7 @@ spec:
         component: node
         category: cpu
       annotations:
-        summary: "노드 CPU 사용률 80% 초과"
+        summary: "⚠️ CPU 80% 초과: {{ $labels.instance }} ({{ $value | humanizePercentage }})"
         description: |
           노드 {{ $labels.instance }} CPU 사용률이 {{ $value | humanizePercentage }}입니다.
 
@@ -61,7 +61,7 @@ spec:
         component: node
         category: cpu
       annotations:
-        summary: "🚨 노드 CPU 사용률 90% 초과 (긴급)"
+        summary: "🚨 CPU 90% 초과: {{ $labels.instance }} ({{ $value | humanizePercentage }})"
         description: |
           노드 {{ $labels.instance }} CPU 사용률이 {{ $value | humanizePercentage }}입니다.
 
@@ -93,7 +93,7 @@ spec:
         component: node
         category: memory
       annotations:
-        summary: "노드 메모리 사용률 80% 초과"
+        summary: "⚠️ 메모리 80% 초과: {{ $labels.instance }} ({{ $value | humanizePercentage }})"
         description: |
           노드 {{ $labels.instance }} 메모리 사용률이 {{ $value | humanizePercentage }}입니다.
 
@@ -118,7 +118,7 @@ spec:
         component: node
         category: memory
       annotations:
-        summary: "🚨 노드 메모리 사용률 90% 초과 (긴급)"
+        summary: "🚨 메모리 90% 초과: {{ $labels.instance }} ({{ $value | humanizePercentage }})"
         description: |
           노드 {{ $labels.instance }} 메모리 사용률이 {{ $value | humanizePercentage }}입니다.
 
@@ -149,7 +149,7 @@ spec:
         component: pod
         category: stability
       annotations:
-        summary: "Pod 재시작 빈도 높음"
+        summary: "⚠️ Pod 재시작 빈도 높음: {{ $labels.namespace }}/{{ $labels.pod }}"
         description: |
           Pod {{ $labels.namespace }}/{{ $labels.pod }}가 자주 재시작되고 있습니다.
 

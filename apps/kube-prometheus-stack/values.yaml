@@ -122,7 +122,7 @@ kube-prometheus-stack:
             # 30d retention → ~11GB + 여유분 = 20GB 충분 (55% 예상)
             resources:
               requests:
-                storage: 20Gi
+                storage: 40Gi
 
       # Why: Tempo metrics_generator가 span metrics를 remote_write로 push하기 위해 필요
       #      이 설정 없으면 Prometheus가 /api/v1/write 엔드포인트를 열지 않음
@@ -259,7 +259,8 @@ kube-prometheus-stack:
       global:
         resolve_timeout: 5m
       route:
-        group_by: ['alertname', 'namespace', 'severity']
+        # Why: instance 추가 → 동일 알람이 여러 노드에서 발화할 때 노드별로 분리
+        group_by: ['alertname', 'namespace', 'severity', 'instance']
         group_wait: 30s
         group_interval: 30s
         repeat_interval: 4h
@@ -283,7 +284,8 @@ kube-prometheus-stack:
               send_resolved: true
               color: '{{ if eq .Status "firing" }}#FF4444{{ else }}#36D399{{ end }}'
               title: '{{ if eq .Status "firing" }}🔴 FIRING{{ else }}✅ RESOLVED{{ end }}: {{ .CommonLabels.alertname }}'
-              text: '{{ range .Alerts }}**{{ .Labels.severity }}** - {{ .Annotations.summary }}{{ end }}'
+              text: '{{ range .Alerts }}**{{ .Labels.severity }}** - {{ .Annotations.summary }}
+{{ end }}'
         - name: 'discord-critical'
           slack_configs:
             - api_url: 'https://discordapp.com/api/webhooks/1467150664336408668/L8uFfxn5O8WXLpt99Q1oeWmhp6H9ae8OOb0oUMzmWojIGDuufs-zDbZ2JnrSE7Mm9Ya-/slack'
@@ -291,7 +293,8 @@ kube-prometheus-stack:
               # Why: #FF4444=빨강(firing), #36D399=초록(resolved) → Discord 임베드 좌측 색상 바
               color: '{{ if eq .Status "firing" }}#FF4444{{ else }}#36D399{{ end }}'
               title: '{{ if eq .Status "firing" }}🔴 CRITICAL{{ else }}✅ RESOLVED{{ end }}: {{ .CommonLabels.alertname }}'
-              text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+              text: '{{ range .Alerts }}{{ .Annotations.summary }}
+{{ end }}'
         - name: 'discord-warning'
           slack_configs:
             - api_url: 'https://discordapp.com/api/webhooks/1467150664336408668/L8uFfxn5O8WXLpt99Q1oeWmhp6H9ae8OOb0oUMzmWojIGDuufs-zDbZ2JnrSE7Mm9Ya-/slack'
@@ -299,7 +302,8 @@ kube-prometheus-stack:
               # Why: #FFAA00=노랑(warning firing), #36D399=초록(resolved)
               color: '{{ if eq .Status "firing" }}#FFAA00{{ else }}#36D399{{ end }}'
               title: '{{ if eq .Status "firing" }}⚠️ WARNING{{ else }}✅ RESOLVED{{ end }}: {{ .CommonLabels.alertname }}'
-              text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+              text: '{{ range .Alerts }}{{ .Annotations.summary }}
+{{ end }}'
       inhibit_rules:
         # Why: Critical 발생 시 같은 alertname의 Warning 억제 → 중복 알림 방지
         - source_match:
