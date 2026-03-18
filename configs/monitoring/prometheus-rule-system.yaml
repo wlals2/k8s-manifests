@@ -167,16 +167,18 @@ spec:
 
     # Alert 6: 서비스 다운 (Pod 0개)
     - alert: ServiceDown
-      # Why: Deployment가 0개 Pod로 스케일되면 서비스 정지
+      # Why: spec.replicas>0인데 available=0이면 의도치 않은 서비스 중단
+      #      spec.replicas=0은 의도적 중지(ai-response-service 등)이므로 제외
       expr: |
-        kube_deployment_status_replicas_available == 0
+        kube_deployment_spec_replicas > 0
+        and kube_deployment_status_replicas_available == 0
       for: 2m
       labels:
         severity: critical
         component: service
         category: availability
       annotations:
-        summary: "🚨 서비스 다운 (Pod 0개)"
+        summary: "🚨 서비스 다운: {{ $labels.namespace }}/{{ $labels.deployment }}"
         description: |
           Deployment {{ $labels.namespace }}/{{ $labels.deployment }}의 Pod가 0개입니다.
 
