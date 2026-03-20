@@ -5,6 +5,11 @@ metadata:
   namespace: argocd
   finalizers:
   - resources-finalizer.argocd.argoproj.io
+  annotations:
+    # Why: 트리거 정의는 ConfigMap에 있지만, 어떤 Application이 구독할지는 여기서 결정
+    notifications.argoproj.io/subscribe.on-sync-failed.discord: ""
+    notifications.argoproj.io/subscribe.on-health-degraded.discord: ""
+    notifications.argoproj.io/subscribe.on-sync-succeeded.discord: ""
 spec:
   project: default
   source:
