@@ -174,7 +174,8 @@ falco:
           not fd.sip in ("127.0.0.1", "::1") and
           not k8s.ns.name in (kube-system, monitoring, argocd, falco, istio-system, security, backup-system, longhorn-system, metallb-system, sealed-secrets, cert-manager) and
           not container.image.repository in (moby/buildkit) and
-          not container.name in (mysql-exporter)
+          not container.name in (mysql-exporter) and
+          not proc.name in (helm)
         output: >
           🔵 NOTICE: 예상치 못한 외부 연결 시도 감지
           (connection=%fd.name lport=%fd.lport rport=%fd.rport
