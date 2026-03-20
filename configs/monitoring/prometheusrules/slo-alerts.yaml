@@ -162,3 +162,41 @@ spec:
               2. kubectl get svc -n blog-system
               3. Istio Gateway 확인: kubectl get gateway -n blog-system
               4. AuthorizationPolicy 확인: kubectl get authorizationpolicy -n istio-system
+
+        - alert: WASServiceDown
+          # Why: WEB probe만으로는 WAS 장애 감지 불가 (WEB이 살아있으면 SLO 알람 미발화)
+          #      WAS actuator/health 직접 probe → WAS 컨테이너 기동 실패도 감지
+          expr: probe_success{job="blackbox-http", instance="http://was-service.blog-system.svc.cluster.local:8080/actuator/health"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            slo: availability
+            component: blog-system
+            page: "true"
+          annotations:
+            summary: "WAS 서비스 다운!"
+            description: |
+              WAS actuator/health 응답 없음 — API 요청 전체 실패 상태.
+
+              긴급 조치:
+              1. kubectl get pods -n blog-system -l app=was
+              2. kubectl describe pod -n blog-system -l app=was | grep -A5 "Events:"
+              3. kubectl logs -n blog-system -l app=was --tail=100
+
+        - alert: WASContainerNotReady
+          # Why: WAS Pod phase=Running이지만 컨테이너 not ready (CreateContainerConfigError 등)는
+          #      KubePodNotReady와 probe 알람 모두 미감지 — 컨테이너 레벨 직접 체크 필요
+          expr: kube_pod_container_status_ready{namespace="blog-system", container="was"} == 0
+          for: 5m
+          labels:
+            severity: warning
+            component: blog-system
+          annotations:
+            summary: "WAS 컨테이너 Not Ready"
+            description: |
+              WAS 컨테이너가 5분 이상 Not Ready 상태입니다.
+              Pod phase=Running이지만 컨테이너 내부 문제 (Secret 미마운트, ConfigMap 누락 등) 가능성.
+
+              진단:
+              1. kubectl get pods -n blog-system -l app=was
+              2. kubectl describe pod -n blog-system -l app=was | grep -E "State:|Reason:|Events:" -A5
