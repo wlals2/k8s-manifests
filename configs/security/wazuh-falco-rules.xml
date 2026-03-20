@@ -65,8 +65,10 @@ Discord 알람 임계값 (master.conf integration level=10):
 
   <!-- Rule 100070: Outbound Connection 반복 → CRITICAL 격상 (에스컬레이션) -->
   <!-- Why: 단발성 아웃바운드는 오탐 가능성, 5분 내 3회 반복 시 C2 통신으로 판단 -->
+  <!-- Why negate: helm/git은 차트·코드 저장소 연결이 구조적으로 필수 → 에스컬레이션 제외 -->
   <rule id="100070" level="12" frequency="3" timeframe="300">
     <if_matched_sid>100010</if_matched_sid>
+    <field name="output_fields.proc.name" negate="yes">^(helm|git)$</field>
     <description>Falco: Multiple outbound connections detected (Escalated: Possible C2 Communication)</description>
     <mitre>
       <id>T1071</id>
@@ -76,8 +78,10 @@ Discord 알람 임계값 (master.conf integration level=10):
   </rule>
 
   <!-- Rule 100071: 커스텀 Outbound Connection 반복 → CRITICAL 격상 -->
+  <!-- Why negate: helm/git은 차트·코드 저장소 연결이 구조적으로 필수 → 에스컬레이션 제외 -->
   <rule id="100071" level="12" frequency="3" timeframe="300">
     <if_matched_sid>100011</if_matched_sid>
+    <field name="output_fields.proc.name" negate="yes">^(helm|git)$</field>
     <description>Falco: Unexpected outbound connection 3+ times in 5min (Escalated: Possible C2 Communication)</description>
     <mitre>
       <id>T1071</id>
