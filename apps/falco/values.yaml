@@ -177,7 +177,7 @@ falco:
           not container.image.repository in (moby/buildkit) and
           not container.name in (mysql-exporter) and
           not proc.name in (helm, git) and
-          not (proc.name = "pilot-agent" and fd.sip = "169.254.169.254")
+          not (proc.name = "pilot-agent" and fd.sip in ("169.254.169.254"))
         output: >
           🔵 NOTICE: 예상치 못한 외부 연결 시도 감지
           (connection=%fd.name lport=%fd.lport rport=%fd.rport
