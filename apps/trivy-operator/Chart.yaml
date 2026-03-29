@@ -1,0 +1,10 @@
+apiVersion: v2
+name: my-trivy-operator
+descripition: Wrapper chart for trivy-operator vulnerability scanning
+type: application
+version: 0.1.0
+appVersion: 0.28.1 # Step 1에서 확인한 appVersion 교체
+dependencies:
+  - name: trivy-operator
+    version: 0.28.1 # Step 1에서 확인한 appVersion 교체
+    repository: https://aquasecurity.github.io/trivy-operator-chart/

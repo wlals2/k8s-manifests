@@ -1,0 +1,38 @@
+# ==============================================================================
+# Trivy Operator - 클러스터 내 CVE 자동 스캔
+# ==============================================================================
+# 목적: 배포된 이미지의 취약점을 VulnerabilityReport CRD로 자동 생성
+# 의존성: AI Security Copilot TrivyCollector가 이 CRD를 조회
+# ==============================================================================
+
+# Why: Wrapper Chart이므로 모든 설정을 'trivy-operator:' 키 아래에 작성
+# Why: Kustomize를 사용하여 ArgoCD가 리소스를 자동 배포
+
+trivy-operator:
+  # why: home lab은 리소스 제한적 -> 스캔 동시 실행수 제한
+  opratyor:
+    replicas: 1
+  # why: CVE 스캔 결과를 VulnerabilityReport CRD로 생성 ->
+    scanJobsConcurrency: 3
+
+  trivy:
+    # Why: 매번 DB를 다운로드하면 네트워크 부담 → 내장 DB 사용
+    offlineScan: false
+
+    severity: "CRITICAL,HIGH"
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  # Why: 모든 namespace를 스캔하면 시스템 NS 노이즈 → 대상 제한
+  # 빈 값이면 전체 스캔, 필요시 아래 주석 해제하여 제한
+  # targetNamespaces: "blog-system"
+
+  serviceMonitor:
+    # Why: Prometheus가 메트릭 수집하여 Grafana에서 CVE 현황 확인 가능
+    enabled: true
