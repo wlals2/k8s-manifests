@@ -32,7 +32,10 @@ trivy-operator:
   # targetNamespaces: "blog-system"
 
   trivyOperator:
-    # Why: CP 노드에 NoSchedule taint 존재 → node-collector(CP 스캔)가 스케줄링 불가
+    # Why: kube-bench가 이미 CIS 벤치마크 담당 → 기능 중복 + node-collector는 root 실행으로 Kyverno require-non-root 위반
+    clusterComplianceEnabled: false
+
+    # Why: CP 노드에 NoSchedule taint 존재 → scan job이 스케줄링 불가
     #      chart 내부 변수명이 .Values.trivyOperator.scanJobTolerations → ConfigMap의 scanJob.tolerations 키로 변환됨
     scanJobTolerations:
       - key: node-role.kubernetes.io/control-plane
