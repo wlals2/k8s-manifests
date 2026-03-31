@@ -29,17 +29,23 @@ data:
           - url: 'https://discordapp.com/api/webhooks/1467150664336408668/L8uFfxn5O8WXLpt99Q1oeWmhp6H9ae8OOb0oUMzmWojIGDuufs-zDbZ2JnrSE7Mm9Ya-'
             send_resolved: true
 
-      # 🔥 CRITICAL 레벨 - Discord Webhook 직접 연동
+      # 🔥 CRITICAL 레벨 - Discord + Bot 자동 진단
       - name: 'discord-critical'
         webhook_configs:
           - url: 'https://discordapp.com/api/webhooks/1467150664336408668/L8uFfxn5O8WXLpt99Q1oeWmhp6H9ae8OOb0oUMzmWojIGDuufs-zDbZ2JnrSE7Mm9Ya-'
             send_resolved: true
+          # Why: critical은 즉시 에이전트가 자동 진단·조치
+          - url: 'http://192.168.1.187:9094/webhook'
+            send_resolved: false
 
-      # ⚠️ WARNING 레벨 - Discord Webhook 직접 연동
+      # ⚠️ WARNING 레벨 - Discord + Bot 자동 진단
       - name: 'discord-warning'
         webhook_configs:
           - url: 'https://discordapp.com/api/webhooks/1467150664336408668/L8uFfxn5O8WXLpt99Q1oeWmhp6H9ae8OOb0oUMzmWojIGDuufs-zDbZ2JnrSE7Mm9Ya-'
             send_resolved: true
+          # Why: warning도 에이전트가 원인 파악 (조치는 사람 확인 후)
+          - url: 'http://192.168.1.187:9094/webhook'
+            send_resolved: false
 
     inhibit_rules:
       # Critical 알람 발생 시 Warning 알람 억제
