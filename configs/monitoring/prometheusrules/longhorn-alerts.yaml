@@ -10,6 +10,7 @@ metadata:
   name: longhorn-alerts
   namespace: monitoring
   labels:
+    prometheus: kube-prometheus
     release: kube-prometheus-stack
     app: longhorn
     component: storage
