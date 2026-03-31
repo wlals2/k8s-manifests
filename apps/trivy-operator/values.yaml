@@ -22,10 +22,11 @@ trivy-operator:
     resources:
       requests:
         cpu: 100m
-        memory: 128Mi
+        memory: 192Mi
       limits:
         cpu: 500m
-        memory: 512Mi
+        # Why: mysql-pxc(4컨테이너) 스캔 시 실측 502Mi → 1.5배 룰 적용 (64Mi 단위)
+        memory: 768Mi
 
   # Why: 모든 namespace를 스캔하면 시스템 NS 노이즈 → 대상 제한
   # 빈 값이면 전체 스캔, 필요시 아래 주석 해제하여 제한
