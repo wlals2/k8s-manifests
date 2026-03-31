@@ -31,13 +31,13 @@ trivy-operator:
   # 빈 값이면 전체 스캔, 필요시 아래 주석 해제하여 제한
   # targetNamespaces: "blog-system"
 
-  nodeCollector:
-    # Why: CP 노드에 NoSchedule taint 존재 → toleration 없으면 node-collector Job 스케줄링 불가
-    #      node-collector는 CP 노드 자체(kubelet 설정, 파일 권한)를 검사하므로 CP에 올라야 함
-    tolerations:
-      - key: node-role.kubernetes.io/control-plane
-        operator: Exists
-        effect: NoSchedule
+  # Why: CP 노드에 NoSchedule taint 존재 → node-collector(CP 스캔)가 스케줄링 불가
+  #      nodeCollector.tolerations 키는 이 chart 버전에서 미지원 → scanJobTolerations 사용
+  #      scanJobTolerations는 scanner pods + node-collector 모두에 적용됨
+  scanJobTolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
 
   serviceMonitor:
     # Why: Prometheus가 메트릭 수집하여 Grafana에서 CVE 현황 확인 가능
