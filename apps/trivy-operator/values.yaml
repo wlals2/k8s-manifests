@@ -31,13 +31,13 @@ trivy-operator:
   # 빈 값이면 전체 스캔, 필요시 아래 주석 해제하여 제한
   # targetNamespaces: "blog-system"
 
-  # Why: CP 노드에 NoSchedule taint 존재 → node-collector(CP 스캔)가 스케줄링 불가
-  #      nodeCollector.tolerations 키는 이 chart 버전에서 미지원 → scanJobTolerations 사용
-  #      scanJobTolerations는 scanner pods + node-collector 모두에 적용됨
-  scanJobTolerations:
-    - key: node-role.kubernetes.io/control-plane
-      operator: Exists
-      effect: NoSchedule
+  trivyOperator:
+    # Why: CP 노드에 NoSchedule taint 존재 → node-collector(CP 스캔)가 스케줄링 불가
+    #      chart 내부 변수명이 .Values.trivyOperator.scanJobTolerations → ConfigMap의 scanJob.tolerations 키로 변환됨
+    scanJobTolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
 
   serviceMonitor:
     # Why: Prometheus가 메트릭 수집하여 Grafana에서 CVE 현황 확인 가능
