@@ -1,0 +1,97 @@
+# ==============================================================================
+# Longhorn Alert Rules
+# ==============================================================================
+# 목적: Longhorn 스토리지 장애를 Discord로 즉시 알림
+# 의존성: servicemonitors/longhorn.yaml (메트릭 수집 선행 필요)
+# ==============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: longhorn-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+    app: longhorn
+    component: storage
+spec:
+  groups:
+    - name: longhorn-critical
+      interval: 30s
+      rules:
+        - alert: LonghornVolumeFault
+          # 볼륨이 faulted 상태 = 레플리카가 모두 손상되어 I/O 불가
+          # 즉시 조치하지 않으면 데이터 유실로 이어짐
+          expr: longhorn_volume_robustness{state="faulted"} == 1
+          for: 1m
+          labels:
+            severity: critical
+            component: storage
+          annotations:
+            summary: "Longhorn 볼륨 장애: {{ $labels.volume }}"
+            description: |
+              볼륨 {{ $labels.volume }}이 faulted 상태입니다. 모든 레플리카가 손상되었습니다.
+
+              조치:
+                1. kubectl get replicas.longhorn.io -n longhorn-system -l longhornvolume={{ $labels.volume }}
+                2. kubectl get volumes.longhorn.io {{ $labels.volume }} -n longhorn-system -o yaml
+                3. Longhorn UI에서 해당 볼륨 → Salvage 시도
+
+        - alert: LonghornVolumeDegraded
+          # 레플리카 1개 손실 = 나머지 레플리카에 장애 발생 시 데이터 유실
+          # degraded 상태에서 즉시 재구성이 시작되지 않으면 위험
+          expr: longhorn_volume_robustness{state="degraded"} == 1
+          for: 5m
+          labels:
+            severity: warning
+            component: storage
+          annotations:
+            summary: "Longhorn 볼륨 degraded: {{ $labels.volume }}"
+            description: |
+              볼륨 {{ $labels.volume }}이 5분 이상 degraded 상태입니다. 레플리카 1개가 손실되었습니다.
+
+              조치:
+                1. kubectl get replicas.longhorn.io -n longhorn-system -l longhornvolume={{ $labels.volume }}
+                2. 해당 노드 상태 확인: kubectl get nodes.longhorn.io -n longhorn-system
+                3. 자동 재구성 대기 (replica-replenishment-wait-interval: 600s)
+
+    - name: longhorn-warning
+      interval: 1m
+      rules:
+        - alert: LonghornDiskHighUsage
+          # 디스크가 85% 차면 Longhorn이 새 레플리카 스케줄링을 거부함
+          # (replica-auto-balance-disk-pressure-percentage: 90 이전에 경고)
+          expr: |
+            (longhorn_disk_usage_bytes / longhorn_disk_capacity_bytes) > 0.85
+          for: 10m
+          labels:
+            severity: warning
+            component: storage
+          annotations:
+            summary: "Longhorn 디스크 사용률 높음: {{ $labels.node }}/{{ $labels.disk }}"
+            description: |
+              {{ $labels.node }}의 {{ $labels.disk }} 사용률이 {{ $value | humanizePercentage }} 입니다.
+
+              현재 사용률: {{ $value | humanizePercentage }}
+              조치:
+                1. 불필요한 스냅샷 정리 (Longhorn UI → Volumes → Snapshots)
+                2. 미사용 볼륨 삭제 확인
+                3. 90% 도달 전 다른 노드로 레플리카 이동 검토
+
+        - alert: LonghornNodeNotSchedulable
+          # Longhorn 노드가 스케줄링 불가 = 새 레플리카 배치 불가
+          # 클러스터 전체의 레플리카 배치 능력이 저하됨
+          expr: longhorn_node_status{condition="schedulable", condition_reason!=""} == 0
+          for: 5m
+          labels:
+            severity: warning
+            component: storage
+          annotations:
+            summary: "Longhorn 노드 스케줄링 불가: {{ $labels.node }}"
+            description: |
+              {{ $labels.node }} 노드가 5분 이상 Longhorn 스케줄링 불가 상태입니다.
+              원인: {{ $labels.condition_reason }}
+
+              조치:
+                1. kubectl get nodes.longhorn.io {{ $labels.node }} -n longhorn-system -o yaml
+                2. 디스크 공간/상태 확인
+                3. Longhorn manager 재시작 검토

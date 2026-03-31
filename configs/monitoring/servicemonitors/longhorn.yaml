@@ -1,0 +1,27 @@
+# ==============================================================================
+# Longhorn ServiceMonitor
+# ==============================================================================
+# 목적: Longhorn 스토리지 메트릭을 Prometheus가 수집하도록 연결
+# 의존성: longhorn-backend 서비스 (longhorn-system/9500)
+# ==============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: longhorn
+  namespace: monitoring
+  labels:
+    prometheus: kube-prometheus
+    app: longhorn
+    component: storage
+spec:
+  selector:
+    matchLabels:
+      app: longhorn-manager
+  namespaceSelector:
+    matchNames:
+      - longhorn-system
+  endpoints:
+    - port: manager
+      interval: 30s
+      scrapeTimeout: 10s
+      path: /metrics
