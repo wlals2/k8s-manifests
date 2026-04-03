@@ -59,6 +59,13 @@ spec:
       [mysqld]
       admin_port=33062
 
+    # Why: 재시작 직후 33062 Admin Port 열리기 전에 Readiness 체크 시작 → 연결 거부(errno 111)
+    #      initialDelaySeconds=30으로 초기화 시간 확보 (실측: 초기화 60-90초 소요)
+    readinessProbes:
+      initialDelaySeconds: 30
+      timeoutSeconds: 30
+      failureThreshold: 3
+
     volumeSpec:
       persistentVolumeClaim:
         storageClassName: longhorn
@@ -96,7 +103,9 @@ spec:
 
     # Why: 기본값 timeoutSeconds=1 → MySQL 헬스체크 응답 지연 시 Probe 실패 → 반복 재시작 (haproxy-0: 47회, haproxy-1: 51회)
     #      5초로 완화하여 일시적 쿼리 지연에도 Probe 통과 가능하게 함 (2026-03-29)
+    #      initialDelaySeconds=30 추가 → PXC 재시작 직후 backend 연결 전 충분한 대기 (2026-03-31)
     readinessProbes:
+      initialDelaySeconds: 30
       timeoutSeconds: 5
 
   proxysql:
