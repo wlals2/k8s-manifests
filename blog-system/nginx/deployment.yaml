@@ -1,0 +1,71 @@
+# ==============================================================================
+# hugo-blog Deployment
+# ==============================================================================
+# 목적: Hugo 정적 사이트를 nginx 컨테이너로 배포
+# 의존성: hugo-blog-config ConfigMap, hugo-blog:v1.0.0 로컬 이미지
+# 이미지 빌드: cd /home/jimin/blogsite && docker build -t hugo-blog:v1.0.0 .
+# ==============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hugo-blog
+  namespace: blog-system
+  labels:
+    app: hugo-blog
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hugo-blog
+  template:
+    metadata:
+      labels:
+        app: hugo-blog
+    spec:
+      containers:
+      - name: nginx
+        # Why: latest 금지 정책 — 이미지 재빌드 시 태그 교체 필요
+        image: hugo-blog:v1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 80
+        envFrom:
+        - configMapRef:
+            name: hugo-blog-config
+        # Why: ConfigMap의 nginx.conf를 conf.d에 마운트
+        #      nginx 기본 이미지는 /etc/nginx/conf.d/*.conf를 자동 include함
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d/default.conf
+          subPath: nginx.conf
+          readOnly: true
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+        # /health는 Dockerfile에서 정적 생성 (`echo "OK" > /usr/share/nginx/html/health`)
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 15
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 2
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: hugo-blog-config
+          items:
+          - key: nginx.conf
+            path: nginx.conf

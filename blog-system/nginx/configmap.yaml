@@ -1,0 +1,63 @@
+# ==============================================================================
+# Hugo Blog ConfigMap
+# ==============================================================================
+# 목적: Hugo 빌드 시 환경 변수 및 Nginx 캐시 설정
+# 의존성: nginx/deployment.yaml (envFrom으로 참조)
+# ==============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hugo-blog-config
+  namespace: blog-system
+  labels:
+    app: hugo-blog
+data:
+  # Hugo 정적 사이트는 빌드 타임에 설정이 적용됨
+  # 아래 값들은 향후 런타임 설정 변경을 위해 보존
+  HUGO_BASE_URL: "https://blog.jiminhome.shop/"
+  HUGO_TITLE: "Jimin | Cloud Engineer Journey"
+  HUGO_THEME: "PaperMod"
+  HUGO_LANGUAGE_CODE: "ko-kr"
+  HUGO_TIME_ZONE: "Asia/Seoul"
+
+  # Why: CDN 없이 로컬 캐시로 응답 속도 향상
+  NGINX_CACHE_VALID: "1h"
+  NGINX_GZIP_LEVEL: "6"
+
+  HUGO_ENABLE_SITEMAP: "true"
+  HUGO_BUILD_FUTURE: "true"
+
+  # Why: Hugo는 clean URL 구조(/posts/slug/ → index.html)를 사용하므로
+  #      기본 nginx 설정으로는 디렉토리 경로 요청 시 404 반환.
+  #      try_files로 $uri → $uri/ → $uri/index.html 순서로 탐색해야 함.
+  nginx.conf: |
+    server {
+      listen 80;
+      server_name _;
+      root /usr/share/nginx/html;
+      index index.html;
+
+      # Hugo clean URL: /posts/my-post/ 형태의 경로 처리
+      location / {
+        try_files $uri $uri/ $uri/index.html =404;
+      }
+
+      # Why: gzip으로 정적 파일 전송 크기 절감 (HTML/CSS/JS ~70% 감소)
+      gzip on;
+      gzip_vary on;
+      gzip_types text/plain text/css application/javascript application/json
+                 application/xml text/xml image/svg+xml font/woff2;
+
+      # Why: 정적 자산은 변경이 없으므로 브라우저 캐시 활용
+      location ~* \.(css|js|png|jpg|jpeg|ico|woff2?|svg)$ {
+        expires 1h;
+        add_header Cache-Control "public, immutable";
+      }
+
+      # 헬스체크 엔드포인트 (K8s probe 전용)
+      location = /health {
+        access_log off;
+        return 200 "OK";
+        add_header Content-Type text/plain;
+      }
+    }

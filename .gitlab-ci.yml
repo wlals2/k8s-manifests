@@ -1,0 +1,42 @@
+# ==============================================================================
+# GitLab CI — k8s-manifests 자동 배포
+# ==============================================================================
+# 목적: main 브랜치 push 시 kubectl apply로 클러스터에 자동 반영
+# 의존성: gitlab-runner (shell executor, k8s-cp 노드 설치 필요)
+# ==============================================================================
+
+stages:
+  - validate
+  - deploy
+
+variables:
+  KUBECTL: kubectl
+  KUBECONFIG: /etc/kubernetes/admin.conf
+
+# main 브랜치 push 시에만 실행
+.only-main: &only-main
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+validate:
+  stage: validate
+  <<: *only-main
+  script:
+    - echo "=== Validating manifests ==="
+    - find . -name "*.yaml" -o -name "*.yml" | grep -v archive | grep -v '.gitlab-ci.yml' | xargs -I{} kubectl --dry-run=client apply -f {} 2>&1 | grep -v "^$" || true
+    - echo "=== Validation complete ==="
+
+deploy:
+  stage: deploy
+  <<: *only-main
+  script:
+    - echo "=== Deploying to cluster ==="
+    - |
+      for dir in blog-system metallb-system monitoring; do
+        if [ -d "$dir" ]; then
+          echo "Applying $dir..."
+          kubectl apply -f "$dir/" --recursive 2>&1 || echo "Warning: $dir apply had errors"
+        fi
+      done
+    - echo "=== Deploy complete ==="
+    - kubectl get pods -A | grep -v Running | grep -v Completed | grep -v NAME || true
