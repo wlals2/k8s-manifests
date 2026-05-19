@@ -1,0 +1,30 @@
+# ==============================================================================
+# bitcoind-archive Service — ClusterIP only
+# ==============================================================================
+# 외부 P2P 노출 없음 (운영 bitcoind-p2p NodePort 30833 유지로 P2P 인바운드 충분).
+# archive는 outbound P2P로 IBD → 외부 NodePort 불필요.
+# 인덱서가 archive로 전환 시:
+#   BTC_RPC_URL=http://bitcoind-archive.crypto-cti.svc.cluster.local:8332
+#   BTC_ZMQ_URL=tcp://bitcoind-archive.crypto-cti.svc.cluster.local:28332
+# ==============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: bitcoind-archive
+  namespace: crypto-cti
+  labels:
+    app: bitcoind-archive
+spec:
+  type: ClusterIP
+  selector:
+    app: bitcoind-archive
+  ports:
+    - name: rpc
+      port: 8332
+      targetPort: 8332
+    - name: zmq-block
+      port: 28332
+      targetPort: 28332
+    - name: zmq-tx
+      port: 28333
+      targetPort: 28333

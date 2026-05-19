@@ -1,0 +1,78 @@
+# ==============================================================================
+# Postgres 스키마 적용 Job (수동 트리거)
+# ==============================================================================
+# 사용법:
+#   1. 사용자가 schema.sql을 ConfigMap으로 생성:
+#      kubectl create configmap crypto-cti-schema -n crypto-cti \
+#        --from-file=schema.sql=/home/jimin/crypto-cti/crypto-python-cde/db/schema.sql
+#
+#   2. (스키마 변경 시) ConfigMap 갱신:
+#      kubectl create configmap crypto-cti-schema -n crypto-cti \
+#        --from-file=schema.sql=/home/jimin/crypto-cti/crypto-python-cde/db/schema.sql \
+#        --dry-run=client -o yaml | kubectl apply -f -
+#
+#   3. Job 적용 (재실행 시 기존 Job 삭제 후):
+#      kubectl delete job apply-schema -n crypto-cti --ignore-not-found
+#      kubectl apply -f 11-postgres-schema-job.yaml
+#
+# schema.sql은 IF NOT EXISTS 기반이므로 idempotent — 중복 실행 안전.
+# ==============================================================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: apply-schema
+  namespace: crypto-cti
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: psql
+          image: postgres:14
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PGHOST
+              value: postgres.crypto-cti.svc.cluster.local
+            - name: PGPORT
+              value: "5432"
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+            - name: PGDATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_DB
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              echo "[apply-schema] waiting for postgres..."
+              until pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER"; do sleep 2; done
+              echo "[apply-schema] applying schema.sql..."
+              psql -v ON_ERROR_STOP=1 -f /schema/schema.sql
+              echo "[apply-schema] done."
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          volumeMounts:
+            - name: schema
+              mountPath: /schema
+      volumes:
+        - name: schema
+          configMap:
+            name: crypto-cti-schema

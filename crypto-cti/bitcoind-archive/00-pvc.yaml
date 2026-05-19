@@ -1,0 +1,27 @@
+# ==============================================================================
+# bitcoind-archive PVC — 700Gi local-path (worker2)
+# ==============================================================================
+# 용량 산정 (2026-05-18 — worker2 /mnt/data 가용 612G 한도 안에서):
+#   - 현재 BTC 체인 ~700GB (block + chainstate + txindex)
+#   - 시작은 600Gi → IBD 중반/후반 디스크 부족 시 worker2 LVM 추가 확장 + PV 재생성
+#   - local-path WaitForFirstConsumer 이므로 PV는 Pod 스케줄 시 생성
+#
+# 노드: k8s-worker2
+#   - 2026-05-18 LVM 확장 완료: vg_data <649.99 GiB (sda4 500G + sdb 100G + sdc 50G)
+#   - /mnt/data 639G (가용 612G)
+#   - worker1은 운영 pruned bitcoind 점유 (분리 운영)
+# ==============================================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-bitcoind-archive-0
+  namespace: crypto-cti
+  labels:
+    app: bitcoind-archive
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 600Gi

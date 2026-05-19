@@ -1,0 +1,190 @@
+# ==============================================================================
+# bitcoind (pruned) StatefulSet — Phase 0
+# ==============================================================================
+# 이미지 선택: lncm/bitcoind
+#   - 공식 bitcoincore.org가 docker hub에 비공식 이미지 (bitcoin/bitcoin)을
+#     운영하지 않음. lncm/bitcoind는 reproducible build + non-root user(1000)로
+#     홈랩 보안 모범사례에 부합. (대안: kylemanna/bitcoind, btcpayserver/bitcoin)
+#
+# 노드 배치: k8s-worker1
+#   - /mnt/data가 200GB LVM으로 가장 큰 노드. pruned(10GB)+IBD 임시 사용 충분.
+#   - RAM 14Gi 중 12Gi를 bitcoind에 할당. dbcache=8192Mi로 IBD UTXO set
+#     fully in-memory 유지 → 디스크 I/O 폭발 회피, IBD 30~50% 가속.
+#
+# Pruning 한계 (반드시 인지):
+#   - prune=10000 → 약 10GB 보존, 그 이전 블록 데이터 소실
+#   - 과거 블록 backfill 불가. watch + recent backfill만 지원
+#   - txindex=0 (pruned와 호환 불가). 임의 txid 조회 불가, mempool/최근만 가능
+#
+# Service:
+#   - rpc/zmq: ClusterIP (클러스터 내부만)
+#   - p2p: NodePort 30833 (선택 — outbound만으로도 IBD 동작, 외부 inbound는 옵션)
+#     ※ 30080(hugo-blog)과 충돌 없음. NodePort 범위 30000-32767 안.
+# ==============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bitcoind-config
+  namespace: crypto-cti
+data:
+  bitcoin.conf: |
+    # ---- Network ----
+    server=1
+    listen=1
+    maxconnections=100
+    # 클러스터 Pod CIDR + Service CIDR 허용 (내부 RPC 접근용)
+    rpcallowip=10.0.0.0/8
+    rpcallowip=192.168.0.0/16
+    rpcbind=0.0.0.0:8332
+
+    # ---- Pruning ----
+    prune=10000
+    # txindex는 pruned와 호환 불가 → 명시적 0
+    txindex=0
+
+    # ---- Performance ----
+    dbcache=8192
+    maxmempool=300
+
+    # ---- ZMQ (indexer watch 모드용) ----
+    # 코드(btc/rpc.py:133)는 zmq.SUBSCRIBE "hashblock"이라 발행 토픽도 hashblock이어야 함.
+    # rawblock으로 발행 시 토픽 mismatch — connect는 되지만 메시지 0건 수신.
+    zmqpubhashblock=tcp://0.0.0.0:28332
+    zmqpubrawtx=tcp://0.0.0.0:28333
+
+    # ---- Logging ----
+    debug=0
+    printtoconsole=1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bitcoind
+  namespace: crypto-cti
+  labels:
+    app: bitcoind
+spec:
+  type: ClusterIP
+  # Do not pin clusterIP. In-cluster clients must use Service DNS:
+  # bitcoind.crypto-cti.svc.cluster.local
+  selector:
+    app: bitcoind
+  ports:
+    - name: rpc
+      port: 8332
+      targetPort: 8332
+    - name: zmq-block
+      port: 28332
+      targetPort: 28332
+    - name: zmq-tx
+      port: 28333
+      targetPort: 28333
+---
+# 외부 P2P 연결용 (선택). outbound만으로도 IBD 가능하므로 첫 단계에선 생략 가능.
+apiVersion: v1
+kind: Service
+metadata:
+  name: bitcoind-p2p
+  namespace: crypto-cti
+  labels:
+    app: bitcoind
+spec:
+  type: NodePort
+  selector:
+    app: bitcoind
+  ports:
+    - name: p2p
+      port: 8333
+      targetPort: 8333
+      nodePort: 30833
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: bitcoind
+  namespace: crypto-cti
+spec:
+  serviceName: bitcoind
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bitcoind
+  template:
+    metadata:
+      labels:
+        app: bitcoind
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - k8s-worker1
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: bitcoind
+          image: lncm/bitcoind:v27.1
+          imagePullPolicy: IfNotPresent
+          args:
+            - "-conf=/etc/bitcoin/bitcoin.conf"
+            - "-datadir=/data/.bitcoin"
+            - "-rpcuser=$(RPC_USER)"
+            - "-rpcpassword=$(RPC_PASSWORD)"
+          envFrom:
+            - secretRef:
+                name: bitcoind-rpc-secret
+          ports:
+            - name: rpc
+              containerPort: 8332
+            - name: p2p
+              containerPort: 8333
+            - name: zmq-block
+              containerPort: 28332
+            - name: zmq-tx
+              containerPort: 28333
+          resources:
+            requests:
+              cpu: 2
+              memory: 4Gi
+            limits:
+              cpu: 4
+              memory: 12Gi
+          # IBD 중에는 RPC 응답이 늦을 수 있음 → 관대한 probe
+          readinessProbe:
+            tcpSocket:
+              port: 8332
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            tcpSocket:
+              port: 8333
+            initialDelaySeconds: 120
+            periodSeconds: 60
+            timeoutSeconds: 10
+            failureThreshold: 3
+          volumeMounts:
+            - name: config
+              mountPath: /etc/bitcoin
+            - name: data
+              mountPath: /data/.bitcoin
+      volumes:
+        - name: config
+          configMap:
+            name: bitcoind-config
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 50Gi

@@ -1,0 +1,82 @@
+# ==============================================================================
+# Crypto CTI API Deployment — Phase 0
+# ==============================================================================
+# Runs the FastAPI app inside Kubernetes so it can use CoreDNS Service names:
+#   - postgres.crypto-cti.svc.cluster.local
+#   - bitcoind.crypto-cti.svc.cluster.local
+#
+# Build/push expected image:
+#   docker build -t 192.168.1.187:5000/crypto-cti-api:phase-0 /home/jimin/crypto-cti/crypto-python-cde
+#   docker push 192.168.1.187:5000/crypto-cti-api:phase-0
+# ==============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: crypto-cti-api
+  namespace: crypto-cti
+  labels:
+    app: crypto-cti-api
+spec:
+  type: ClusterIP
+  selector:
+    app: crypto-cti-api
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crypto-cti-api
+  namespace: crypto-cti
+  labels:
+    app: crypto-cti-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: crypto-cti-api
+  template:
+    metadata:
+      labels:
+        app: crypto-cti-api
+    spec:
+      containers:
+        - name: api
+          image: 192.168.1.187:5000/crypto-cti-api:phase-0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            # Secret: 비밀값 (DATABASE_URL, BTC_RPC_URL/USER/PASSWORD, BTC_ZMQ_URL, API_KEYS)
+            - secretRef:
+                name: crypto-cti-env
+            # ConfigMap: 평문 튜닝값 (BACKFILL_BATCH_SIZE, ETH_TRACE_ENABLED, LOG_LEVEL).
+            # Secret과 분리: Secret은 RBAC 보호, ConfigMap은 누구나 읽어도 안전한 값.
+            - configMapRef:
+                name: crypto-cti-tuning
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1
+              memory: 1Gi

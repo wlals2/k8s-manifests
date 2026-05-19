@@ -1,0 +1,13 @@
+# ==============================================================================
+# crypto-cti Namespace (Phase 0 — BTC PoC)
+# ==============================================================================
+# 목적: BTC 인덱서 + Postgres + bitcoind 격리
+# Phase 0: BTC만. Phase 1+에서 TRON, ETH 추가 예정 (동일 namespace 재사용 가능)
+# ==============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: crypto-cti
+  labels:
+    app.kubernetes.io/name: crypto-cti
+    phase: "0"

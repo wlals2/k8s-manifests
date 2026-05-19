@@ -1,0 +1,166 @@
+# ==============================================================================
+# bitcoind-archive StatefulSet — txindex=1, prune=0 (full archive)
+# ==============================================================================
+# 운영 pruned bitcoind와 공존:
+#   - 운영 (crypto-cti/bitcoind, worker1, 50Gi, prune=10000, txindex=0) — 유지
+#   - archive (crypto-cti/bitcoind-archive, worker2, 700Gi, prune=0, txindex=1)
+#   - 인덱서는 IBD 완료 후 archive RPC로 전환 (BTC_RPC_URL 환경변수 변경)
+#
+# 이미지: lncm/bitcoind:v27.1 (운영 pruned와 동일 — phase-0/20-bitcoind.yaml:132)
+# Secret: bitcoind-rpc-secret 재사용 (운영 RPC user/pass와 동일)
+#   → 운영 인덱서가 archive로 전환 시 코드 변경 없이 BTC_RPC_URL만 교체
+#   → 보안 분리가 필요해지면 후속 ADR로 archive 전용 Secret 분리 검토
+#
+# 리소스 (2026-05-18 IBD 가속 — worker2 메모리 archive 우선 할당 결정):
+#   - requests 2 CPU / 4Gi  → 스케줄 보장
+#   - limits 4 CPU / 12Gi   → dbcache=10240 + par=4 활용
+#   - worker2 14Gi RAM 중 archive 우선 — ES-poc OOMKill 시 자동 재시작 (ADR-0007 패턴, PV 무손실)
+#   - 영구 유지 결정 — archive는 IBD 후에도 historical query에 RAM 많이 씀
+#
+# Probe:
+#   - startupProbe: IBD 동안 매우 길게 (failureThreshold 60 × periodSeconds 30 = 30분)
+#     ※ IBD 자체는 1~2주 걸리지만 RPC 포트 8332는 시작 직후 LISTEN → 30분 안에 통과
+#   - readinessProbe: 8332 RPC TCP (IBD 중에도 응답 가능)
+#   - livenessProbe: 8333 P2P TCP (P2P 연결 살아있는지)
+# ==============================================================================
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: bitcoind-archive
+  namespace: crypto-cti
+  labels:
+    app: bitcoind-archive
+spec:
+  serviceName: bitcoind-archive
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bitcoind-archive
+  # PVC retain: archive 재기동 시 IBD 다시 안 함
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  template:
+    metadata:
+      labels:
+        app: bitcoind-archive
+    spec:
+      # worker2 고정 — local-path PV는 노드 귀속이므로 required (preferred 금지)
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - k8s-worker2
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: bitcoind
+          image: lncm/bitcoind:v27.1
+          imagePullPolicy: IfNotPresent
+          args:
+            - "-conf=/etc/bitcoin/bitcoin.conf"
+            - "-datadir=/data/.bitcoin"
+            - "-rpcuser=$(RPC_USER)"
+            - "-rpcpassword=$(RPC_PASSWORD)"
+          envFrom:
+            - secretRef:
+                name: bitcoind-rpc-secret
+          ports:
+            - name: rpc
+              containerPort: 8332
+            - name: p2p
+              containerPort: 8333
+            - name: zmq-block
+              containerPort: 28332
+            - name: zmq-tx
+              containerPort: 28333
+          resources:
+            requests:
+              cpu: "2"
+              memory: 4Gi
+            limits:
+              cpu: "4"
+              memory: 12Gi
+          # IBD 시작 시 RPC 8332 LISTEN까지 시간 확보 (failure 60 × 30s = 30분)
+          startupProbe:
+            tcpSocket:
+              port: 8332
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket:
+              port: 8332
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            tcpSocket:
+              port: 8333
+            initialDelaySeconds: 600
+            periodSeconds: 60
+            timeoutSeconds: 10
+            failureThreshold: 5
+          volumeMounts:
+            - name: config
+              mountPath: /etc/bitcoin
+            - name: data
+              mountPath: /data/.bitcoin
+      volumes:
+        - name: config
+          configMap:
+            name: bitcoind-archive-config
+        # data 볼륨은 미리 만든 PVC (00-pvc.yaml)를 직접 참조 (volumeClaimTemplates 미사용)
+        # 이유: STS volumeClaimTemplates는 PVC 이름을 자동 생성하지만,
+        # 700Gi 단일 PVC는 명시적으로 관리하는 게 운영/롤백 시 더 명확.
+        - name: data
+          persistentVolumeClaim:
+            claimName: data-bitcoind-archive-0
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bitcoind-archive-config
+  namespace: crypto-cti
+data:
+  bitcoin.conf: |
+    # ---- Network ----
+    server=1
+    listen=1
+    maxconnections=100
+    # 클러스터 Pod CIDR + Service CIDR 허용 (내부 RPC 접근용)
+    rpcallowip=10.0.0.0/8
+    rpcallowip=192.168.0.0/16
+    rpcbind=0.0.0.0:8332
+
+    # ---- Archive 핵심 ----
+    prune=0
+    txindex=1
+
+    # ---- Performance (2026-05-18 IBD 가속 튜닝) ----
+    # RAM limit 12Gi 안에서 dbcache 10Gi → UTXO set 대부분 RAM 상주 → flush 빈도↓
+    # par=4: script verification 4 thread (limits.cpu=4와 일치)
+    # blocksonly=1: IBD 동안 mempool 비활성화 → 디스크 IO 절감
+    #   인덱서는 ZMQ hashblock으로만 트리거하므로 mempool 정보 불필요
+    #   archive 용도라도 historical 데이터만 쓰면 영구 유지 가능
+    dbcache=10240
+    par=4
+    blocksonly=1
+    maxmempool=300
+
+    # ---- ZMQ (인덱서 watch 모드용) ----
+    # 운영 bitcoind와 동일 토픽 — 인덱서 코드 변경 없이 RPC URL만 전환 가능
+    # blocksonly=1이면 raw tx는 발행 안 됨 (hashblock만 작동) — 인덱서는 hashblock만 사용
+    zmqpubhashblock=tcp://0.0.0.0:28332
+    zmqpubrawtx=tcp://0.0.0.0:28333
+
+    # ---- Logging ----
+    debug=0
+    printtoconsole=1

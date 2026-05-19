@@ -1,0 +1,77 @@
+# ==============================================================================
+# Crypto CTI Indexer (watch mode) — Phase 0.5
+# ==============================================================================
+# ZMQ pubrawblock(:28332)을 구독해 새 블록을 즉시 파싱 → DB write → Discord 알림.
+# 단일 이미지(crypto-cti-api:phase-0)를 그대로 재사용하고, command만 분기한다.
+#
+# 재사용 자원:
+#   - Service:   bitcoind.crypto-cti.svc.cluster.local:8332 (RPC)
+#                bitcoind.crypto-cti.svc.cluster.local:28332 (ZMQ pubrawblock)
+#                postgres.crypto-cti.svc.cluster.local:5432
+#   - Secret:    crypto-cti-env  (DATABASE_URL, BTC_RPC_*, BTC_ZMQ_URL,
+#                                 API_KEYS, WATCHLIST_WEBHOOK_URL ← 추가 필요)
+#   - ConfigMap: crypto-cti-tuning (LOG_LEVEL, BTC_BACKFILL_BATCH_SIZE 등)
+#
+# Service는 노출하지 않는다 (HTTP 엔드포인트 없음 — ZMQ subscriber + DB writer 전용).
+#
+# 마이그레이션 주의:
+#   호스트 venv에서 `python main.py btc watch`가 동작 중이면 먼저 종료 후 apply.
+#   동시에 두 watcher가 돌면 같은 블록을 중복 INSERT(PK 충돌)하므로 둘 중 하나만 유지.
+# ==============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crypto-cti-indexer-watch
+  namespace: crypto-cti
+  labels:
+    app: crypto-cti-indexer-watch
+    component: indexer
+    mode: watch
+spec:
+  replicas: 1
+  strategy:
+    # ZMQ subscriber는 단일 인스턴스. RollingUpdate 중 잠깐 두 Pod가 겹치면
+    # 같은 블록을 동시에 처리해 PK 충돌 가능 → Recreate로 직렬화.
+    type: Recreate
+  selector:
+    matchLabels:
+      app: crypto-cti-indexer-watch
+  template:
+    metadata:
+      labels:
+        app: crypto-cti-indexer-watch
+        component: indexer
+        mode: watch
+    spec:
+      containers:
+        - name: indexer
+          image: 192.168.1.187:5000/crypto-cti-api:phase-0
+          imagePullPolicy: IfNotPresent
+          # Dockerfile의 기본 CMD(uvicorn)을 override하여 watch 모드로 실행
+          command: ["python", "main.py", "btc", "watch"]
+          envFrom:
+            - secretRef:
+                name: crypto-cti-env
+            - configMapRef:
+                name: crypto-cti-tuning
+          # HTTP 엔드포인트가 없으므로 프로세스 생존 여부로 liveness 판단.
+          # ZMQ 연결이 끊겨 Python 프로세스가 죽으면 K8s가 재시작.
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "pgrep -f 'main.py btc watch' >/dev/null"
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # readinessProbe 불필요 — Service 노출 안 함
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      restartPolicy: Always

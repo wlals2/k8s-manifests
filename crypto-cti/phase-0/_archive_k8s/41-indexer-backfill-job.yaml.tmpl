@@ -1,0 +1,65 @@
+# ==============================================================================
+# Crypto CTI Indexer (backfill mode) — Phase 0.5
+# ==============================================================================
+# 특정 height 범위 [START, END]를 일괄 처리하는 일회성 Job 템플릿.
+# 같은 이미지(crypto-cti-api:phase-0)를 사용하고 command만 backfill로 분기.
+#
+# 사용법 (sed 치환 후 apply):
+#   sed -e 's/__START__/942330/' -e 's/__END__/947939/' \
+#       41-indexer-backfill-job.yaml.tmpl | kubectl apply -f -
+#
+# 또는 envsubst 방식 (placeholder를 ${START} / ${END}로 바꿔도 무방):
+#   START=942330 END=947939 envsubst < 41-indexer-backfill-job.yaml.tmpl | kubectl apply -f -
+#
+# Job 이름에 height 범위를 포함시켜 동시에 여러 backfill을 병렬 실행 가능.
+# ttlSecondsAfterFinished=3600 → 완료 1시간 후 자동 삭제 (이력은 logs로만 남김).
+#
+# pruned 노드 한계:
+#   __START__가 bitcoind의 `pruneheight` 미만이면 RPC가 실패 → Job 실패.
+#   사전에 `kubectl exec bitcoind-0 -- bitcoin-cli getblockchaininfo | grep pruneheight` 확인.
+# ==============================================================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: indexer-backfill-__START__-__END__
+  namespace: crypto-cti
+  labels:
+    app: crypto-cti-indexer-backfill
+    component: indexer
+    mode: backfill
+spec:
+  ttlSecondsAfterFinished: 3600
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app: crypto-cti-indexer-backfill
+        component: indexer
+        mode: backfill
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: indexer
+          image: 192.168.1.187:5000/crypto-cti-api:phase-0
+          imagePullPolicy: IfNotPresent
+          command:
+            - python
+            - main.py
+            - btc
+            - backfill
+            - --start
+            - "__START__"
+            - --end
+            - "__END__"
+          envFrom:
+            - secretRef:
+                name: crypto-cti-env
+            - configMapRef:
+                name: crypto-cti-tuning
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
