@@ -1,0 +1,29 @@
+# ==============================================================================
+# Crypto CTI MVP Web — NetworkPolicy (traefik ingress only)
+# ==============================================================================
+# 35-mvp-web.yaml 의 Pod 에 traefik namespace 외부 ingress 차단.
+# SoT: docs/adr/ADR-0033-mvp-web-ui-deployment-plan.md §2 (NetworkPolicy 블록)
+#
+# 주의 (Traefik 미도입 시):
+#   traefik 미도입 + LoadBalancer (MetalLB) 경로 채택 시 from 섹션을 ipBlock 으로 교체.
+#   ADR-0033 §"Open Questions" #1 결정 후 본 파일 갱신.
+# ==============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mvp-allow-traefik
+  namespace: crypto-cti
+spec:
+  podSelector:
+    matchLabels:
+      app: crypto-cti-mvp
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: traefik
+      ports:
+        - protocol: TCP
+          port: 80

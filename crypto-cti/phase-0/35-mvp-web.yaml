@@ -1,0 +1,112 @@
+# ==============================================================================
+# Crypto CTI MVP Web — Phase 0
+# ==============================================================================
+# nginx + FastAPI multi-stage 이미지 (`:mvp`) 의 Deployment/Service/Ingress.
+# SoT: docs/adr/ADR-0033-mvp-web-ui-deployment-plan.md §2
+#
+# 빌드 절차 (사용자 영역, ADR-0033 §3):
+#   cd /home/jimin/project/crypto-cti-ofac
+#   docker build -f Dockerfile.mvp -t 192.168.1.187:5000/crypto-cti-api:mvp .
+#   docker push 192.168.1.187:5000/crypto-cti-api:mvp
+#   kubectl apply -f 35-mvp-web.yaml
+#   kubectl apply -f 92-networkpolicy-mvp.yaml
+#   kubectl rollout status deploy/crypto-cti-mvp -n crypto-cti
+#
+# 검증:
+#   curl -k https://cti.jiminhome.shop/
+#   curl -H 'X-API-Key: ...' https://cti.jiminhome.shop/api/healthz
+#
+# 권장 응답 (advisory, 2026-05-28):
+#   - Ingress controller: Traefik (ADR-0011 도입) vs MetalLB direct (LoadBalancer Service)
+#     → Traefik 도입 미정 시 본 manifest 의 Ingress 섹션을 LoadBalancer 로 교체
+#   - TLS: internal-only 라 self-signed OK (ADR-0013)
+# ==============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crypto-cti-mvp
+  namespace: crypto-cti
+  labels:
+    app: crypto-cti-mvp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: crypto-cti-mvp
+  template:
+    metadata:
+      labels:
+        app: crypto-cti-mvp
+    spec:
+      containers:
+        - name: mvp
+          image: 192.168.1.187:5000/crypto-cti-api:mvp
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 80
+          envFrom:
+            # Secret: DATABASE_URL, API_KEYS 등. 30-api.yaml 과 동일 source.
+            - secretRef:
+                name: crypto-cti-env
+            - configMapRef:
+                name: crypto-cti-tuning
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: crypto-cti-mvp
+  namespace: crypto-cti
+  labels:
+    app: crypto-cti-mvp
+spec:
+  type: ClusterIP
+  selector:
+    app: crypto-cti-mvp
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: crypto-cti-mvp
+  namespace: crypto-cti
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  rules:
+    - host: cti.jiminhome.shop                  # ADR-0013 internal-only
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: crypto-cti-mvp
+                port:
+                  number: 80
